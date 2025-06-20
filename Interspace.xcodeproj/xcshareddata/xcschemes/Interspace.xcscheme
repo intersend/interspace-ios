@@ -32,7 +32,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "00E356ED1AD99517003FC87E"
+               BlueprintIdentifier = "CD6C8568030616CB15238860"
                BuildableName = "InterspaceTests.xctest"
                BlueprintName = "InterspaceTests"
                ReferencedContainer = "container:Interspace.xcodeproj">
