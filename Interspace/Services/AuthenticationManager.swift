@@ -377,30 +377,148 @@ final class AuthenticationManager: ObservableObject {
         }
     }
     
+    @available(iOS 16.0, *)
     func authenticateWithPasskey(email: String? = nil) async throws {
-        let passkeyResult: PasskeyResult
-        
-        if let email = email {
-            // Registration flow
-            passkeyResult = try await PasskeyService.shared.registerPasskey(for: email)
-        } else {
-            // Authentication flow
-            passkeyResult = try await PasskeyService.shared.authenticateWithPasskey()
+        guard PasskeyService.isPasskeyAvailable() else {
+            throw AuthenticationError.passkeyNotSupported
         }
         
-        let config = WalletConnectionConfig(
-            strategy: .passkey,
-            walletType: nil,
-            email: nil,
-            verificationCode: passkeyResult.credentialID,
-            walletAddress: nil,
-            signature: passkeyResult.signature,
-            message: nil,
-            socialProvider: nil,
-            socialProfile: nil
+        DispatchQueue.main.async {
+            self.isLoading = true
+            self.error = nil
+        }
+        
+        do {
+            // Authentication flow - returns tokens directly
+            let tokens = try await PasskeyService.shared.authenticateWithPasskey(username: email)
+            
+            // Store tokens
+            KeychainManager.shared.accessToken = tokens.accessToken
+            KeychainManager.shared.refreshToken = tokens.refreshToken
+            
+            // Update authentication state
+            DispatchQueue.main.async {
+                self.isAuthenticated = true
+                self.isLoading = false
+            }
+            
+            // Fetch user profile
+            await fetchCurrentUser()
+            
+        } catch {
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.error = AuthenticationError.passkeyAuthenticationFailed(error.localizedDescription)
+            }
+            throw error
+        }
+    }
+    
+    func authenticateWithApple() async throws {
+        print("🍎 AuthenticationManager: Starting Apple authentication")
+        
+        await MainActor.run {
+            isLoading = true
+            error = nil
+        }
+        
+        #if DEBUG
+        // Check if development mode is enabled
+        if EnvironmentConfiguration.shared.isDevelopmentModeEnabled {
+            print("🍎 AuthenticationManager: Using development mode Apple Sign-In")
+            
+            // Create mock Apple result
+            let mockResult = AppleSignInResult(
+                userId: "dev_apple_user_\(UUID().uuidString)",
+                identityToken: "dev_apple_identity_token_\(UUID().uuidString)",
+                authorizationCode: "dev_apple_auth_code_\(UUID().uuidString)",
+                email: "dev.apple@example.com",
+                fullName: PersonNameComponents(
+                    givenName: "Dev",
+                    familyName: "Apple"
+                ),
+                realUserStatus: .likelyReal
+            )
+            
+            try await handleAppleSignInResult(mockResult)
+            return
+        }
+        #endif
+        
+        do {
+            let appleResult = try await AppleSignInService.shared.signIn()
+            print("🍎 AuthenticationManager: Apple Sign-In successful, user: \(appleResult.userId)")
+            
+            try await handleAppleSignInResult(appleResult)
+            
+        } catch let error as AppleSignInError {
+            // Map Apple Sign-In errors to authentication errors
+            await MainActor.run {
+                isLoading = false
+            }
+            
+            switch error {
+            case .userCancelled:
+                // User cancelled - don't show error
+                print("🍎 AuthenticationManager: User cancelled Apple Sign-In")
+                throw AuthenticationError.unknown("")
+            case .noIdentityToken, .noAuthorizationCode:
+                throw AuthenticationError.unknown("Apple Sign-In failed: Missing required tokens")
+            case .invalidCredential, .authorizationFailed, .invalidResponse:
+                throw AuthenticationError.unknown("Apple Sign-In authorization failed")
+            default:
+                throw AuthenticationError.unknown(error.localizedDescription)
+            }
+        } catch {
+            await MainActor.run {
+                isLoading = false
+            }
+            throw error
+        }
+    }
+    
+    private func handleAppleSignInResult(_ result: AppleSignInResult) async throws {
+        print("🍎 AuthenticationManager: Processing Apple Sign-In result")
+        
+        // Build Apple auth request
+        let appleAuthRequest = AppleAuthRequest(
+            identityToken: result.identityToken,
+            authorizationCode: result.authorizationCode,
+            user: AppleUserInfo(
+                id: result.userId,
+                email: result.email,
+                firstName: result.fullName?.givenName,
+                lastName: result.fullName?.familyName
+            ),
+            deviceId: DeviceInfo.deviceId,
+            deviceName: DeviceInfo.deviceName,
+            deviceType: DeviceInfo.deviceType
         )
         
-        try await authenticate(with: config)
+        // Authenticate with backend
+        let response = try await authAPI.authenticateWithApple(request: appleAuthRequest)
+        
+        print("🍎 AuthenticationManager: Apple authentication API call successful!")
+        
+        // Save tokens securely
+        try keychainManager.saveTokens(
+            access: response.data.accessToken,
+            refresh: response.data.refreshToken,
+            expiresIn: response.data.expiresIn
+        )
+        
+        // Set token in API service
+        APIService.shared.setAccessToken(response.data.accessToken)
+        
+        // Fetch user info
+        await fetchCurrentUser()
+        
+        await MainActor.run {
+            self.isAuthenticated = true
+            self.isLoading = false
+        }
+        
+        print("🍎 AuthenticationManager: Apple authentication completed successfully!")
     }
     
     // MARK: - Wallet Profile Management

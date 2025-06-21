@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import SwiftUI
+import AuthenticationServices
 
 // MARK: - Authentication Strategy
 enum AuthStrategy: String, CaseIterable, Codable {
@@ -172,6 +173,11 @@ enum AuthenticationError: LocalizedError, Identifiable {
     case emailVerificationFailed
     case tokenExpired
     case unknown(String)
+    case passkeyNotSupported
+    case passkeyAuthenticationFailed(String)
+    case passkeyRegistrationFailed(String)
+    case notAuthenticated
+    case emailRequired
     
     var id: String {
         switch self {
@@ -187,6 +193,16 @@ enum AuthenticationError: LocalizedError, Identifiable {
             return "tokenExpired"
         case .unknown(let message):
             return "unknown-\(message)"
+        case .passkeyNotSupported:
+            return "passkeyNotSupported"
+        case .passkeyAuthenticationFailed(let message):
+            return "passkeyAuthenticationFailed-\(message)"
+        case .passkeyRegistrationFailed(let message):
+            return "passkeyRegistrationFailed-\(message)"
+        case .notAuthenticated:
+            return "notAuthenticated"
+        case .emailRequired:
+            return "emailRequired"
         }
     }
     
@@ -204,6 +220,16 @@ enum AuthenticationError: LocalizedError, Identifiable {
             return "Your session has expired. Please sign in again."
         case .unknown(let message):
             return message
+        case .passkeyNotSupported:
+            return "Passkeys are only supported on iOS 16 and later."
+        case .passkeyAuthenticationFailed(let message):
+            return "Passkey authentication failed: \(message)"
+        case .passkeyRegistrationFailed(let message):
+            return "Passkey registration failed: \(message)"
+        case .notAuthenticated:
+            return "You must be signed in to perform this action."
+        case .emailRequired:
+            return "Email address is required for passkey registration."
         }
     }
 }
@@ -226,4 +252,30 @@ struct DeviceInfo {
     }
     
     static let deviceType = "ios"
+}
+
+// MARK: - Apple Sign-In Models
+struct AppleSignInResult {
+    let userId: String
+    let identityToken: String
+    let authorizationCode: String
+    let email: String?
+    let fullName: PersonNameComponents?
+    let realUserStatus: ASUserDetectionStatus
+}
+
+struct AppleAuthRequest: Codable {
+    let identityToken: String
+    let authorizationCode: String
+    let user: AppleUserInfo
+    let deviceId: String
+    let deviceName: String
+    let deviceType: String
+}
+
+struct AppleUserInfo: Codable {
+    let id: String
+    let email: String?
+    let firstName: String?
+    let lastName: String?
 }
