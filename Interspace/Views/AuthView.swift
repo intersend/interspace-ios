@@ -33,6 +33,7 @@ struct AuthView: View {
                             onConnectCoinbase: connectCoinbaseWallet,
                             onConnectWalletConnect: connectWalletConnect,
                             onAuthenticateGoogle: authenticateWithGoogle,
+                            onAuthenticateApple: authenticateWithApple,
                             onAuthenticatePasskey: authenticateWithPasskey,
                             onAuthenticateGuest: authenticateAsGuest,
                             onShowEmailAuth: showEmailAuthentication,
@@ -162,10 +163,29 @@ struct AuthView: View {
     }
     
     private func authenticateWithPasskey() async {
+        if #available(iOS 16.0, *) {
+            do {
+                try await authManager.authenticateWithPasskey()
+            } catch {
+                print("🔗 AuthView: Passkey authentication error: \(error)")
+            }
+        } else {
+            // This shouldn't happen since button is hidden on iOS < 16
+            print("🔗 AuthView: Passkeys not supported on this iOS version")
+        }
+    }
+    
+    private func authenticateWithApple() async {
+        print("🔗 AuthView: User tapped Apple Sign-In button")
         do {
-            try await authManager.authenticateWithPasskey()
+            try await authManager.authenticateWithApple()
+            print("🔗 AuthView: Apple authentication completed successfully")
         } catch {
-            print("🔗 AuthView: Passkey authentication error: \(error)")
+            print("🔗 AuthView: Apple authentication error: \(error)")
+            // Don't show error alert for user cancellation (empty error message)
+            if error.localizedDescription.isEmpty {
+                print("🔗 AuthView: User cancelled Apple Sign-In")
+            }
         }
     }
     
@@ -273,6 +293,7 @@ struct UnauthenticatedView: View {
     let onConnectCoinbase: () async -> Void
     let onConnectWalletConnect: () async -> Void
     let onAuthenticateGoogle: () async -> Void
+    let onAuthenticateApple: () async -> Void
     let onAuthenticatePasskey: () async -> Void
     let onAuthenticateGuest: () async -> Void
     let onShowEmailAuth: () -> Void
@@ -423,14 +444,16 @@ struct UnauthenticatedView: View {
                             onShowEmailAuth()
                         }
                         
-                        LiquidGlassAuthButton(
-                            title: "Sign in with Passkey",
-                            subtitle: "Use Face ID or Touch ID",
-                            icon: "faceid",
-                            walletType: .apple
-                        ) {
-                            Task {
-                                await onAuthenticatePasskey()
+                        if #available(iOS 16.0, *), PasskeyService.isPasskeyAvailable() {
+                            LiquidGlassAuthButton(
+                                title: "Sign in with Passkey",
+                                subtitle: "Use Face ID or Touch ID",
+                                icon: "faceid",
+                                walletType: .apple
+                            ) {
+                                Task {
+                                    await onAuthenticatePasskey()
+                                }
                             }
                         }
                     }
