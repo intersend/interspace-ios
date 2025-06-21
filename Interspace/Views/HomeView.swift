@@ -1,32 +1,24 @@
 import SwiftUI
 
+// This is a placeholder HomeView that's no longer used in the main app
+// The main interface now uses TabView with ProfilesView, AppsView, and WalletView
 struct HomeView: View {
-    @EnvironmentObject var authService: AuthService
-
     var body: some View {
-        VStack {
-            Text("Welcome, \(authService.user?.email ?? "User")!")
+        VStack(spacing: 20) {
+            Text("Home")
                 .font(.largeTitle)
-                .padding()
-
-            Button(action: {
-                authService.signOut()
-            }) {
-                Text("Sign Out")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.red)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-            }
-            .padding()
+                .fontWeight(.bold)
+            
+            Text("This view is deprecated. The app now uses tab-based navigation.")
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
         }
+        .padding()
     }
 }
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
         HomeView()
-            .environmentObject(AuthService())
     }
 }
