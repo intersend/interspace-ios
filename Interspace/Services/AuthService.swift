@@ -437,16 +437,13 @@ final class PasskeyService {
             body = try? JSONEncoder().encode(requestData)
         }
         
-        let result: Result<PasskeyOptionsResponse, APIError> = await withCheckedContinuation { continuation in
-            APIService.shared.request(
-                endpoint: endpoint,
-                method: "POST",
-                body: body,
-                requiresAuth: isRegistration
-            ) { result in
-                continuation.resume(returning: result)
-            }
-        }
+        let result = try await APIService.shared.performRequest(
+            endpoint: endpoint,
+            method: .POST,
+            body: body,
+            responseType: PasskeyOptionsResponse.self,
+            requiresAuth: isRegistration
+        )
         
         switch result {
         case .success(let response):
@@ -515,7 +512,7 @@ final class PasskeyService {
                 )
             ),
             challenge: challenge,
-            deviceName: deviceName ?? UIDevice.current.name
+            deviceName: deviceName ?? (await MainActor.run { UIDevice.current.name })
         )
         
         let verifyResult: Result<PasskeyVerifyResponse, APIError> = await withCheckedContinuation { continuation in
@@ -553,10 +550,11 @@ final class PasskeyService {
         let (challenge, optionsData) = try await getPasskeyChallenge(for: username, isRegistration: false)
         
         guard let options = try? JSONDecoder().decode(PasskeyOptions.self, from: optionsData),
-              let rpId = options.rp?.id ?? PasskeyService.getDefaultRPID(),
               let challengeData = Data(base64URLEncoded: challenge) else {
             throw PasskeyError.authenticationFailed
         }
+        
+        let rpId = options.rp?.id ?? PasskeyService.getDefaultRPID()
         
         let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
         
@@ -564,11 +562,10 @@ final class PasskeyService {
         
         // If we have allowed credentials from server, set them
         if let allowedCredentials = options.allowCredentials, !allowedCredentials.isEmpty {
-            assertionRequest.allowedCredentials = allowedCredentials.compactMap { cred in
+            assertionRequest.allowedCredentials = allowedCredentials.compactMap { cred -> ASAuthorizationPlatformPublicKeyCredentialDescriptor? in
                 guard let credIdData = Data(base64URLEncoded: cred.id) else { return nil }
-                return ASAuthorizationPlatformPublicKeyCredentialAssertionRequest.Credential(
-                    credentialID: credIdData,
-                    transports: []
+                return ASAuthorizationPlatformPublicKeyCredentialDescriptor(
+                    credentialID: credIdData
                 )
             }
         }
@@ -607,7 +604,7 @@ final class PasskeyService {
                 )
             ),
             challenge: challenge,
-            deviceName: UIDevice.current.name
+            deviceName: await MainActor.run { UIDevice.current.name }
         )
         
         let verifyResult: Result<PasskeyVerifyResponse, APIError> = await withCheckedContinuation { continuation in
@@ -616,9 +613,8 @@ final class PasskeyService {
                 APIService.shared.request(
                     endpoint: "/auth/passkey/authenticate-verify",
                     method: "POST",
-                    body: body,
-                    requiresAuth: false
-                ) { result in
+                    body: body
+                ) { (result: Result<PasskeyVerifyResponse, APIError>) in
                     continuation.resume(returning: result)
                 }
             } catch {
@@ -753,5 +749,185 @@ extension Data {
         }
         
         self.init(base64Encoded: base64)
+    }
+}
+
+// MARK: - AppleSignInService
+
+final class AppleSignInService: NSObject {
+    static let shared = AppleSignInService()
+    
+    private var signInContinuation: CheckedContinuation<AppleSignInResult, Error>?
+    
+    override private init() {
+        super.init()
+    }
+    
+    @MainActor
+    func signIn() async throws -> AppleSignInResult {
+        print("🍎 AppleSignInService: Starting Apple Sign-In flow")
+        
+        let appleIDProvider = ASAuthorizationAppleIDProvider()
+        let request = appleIDProvider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+        
+        let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+        authorizationController.delegate = self
+        authorizationController.presentationContextProvider = self
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            self.signInContinuation = continuation
+            authorizationController.performRequests()
+        }
+    }
+    
+    func checkCredentialState(userID: String) async throws -> ASAuthorizationAppleIDProvider.CredentialState {
+        let appleIDProvider = ASAuthorizationAppleIDProvider()
+        return try await withCheckedThrowingContinuation { continuation in
+            appleIDProvider.getCredentialState(forUserID: userID) { credentialState, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: credentialState)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - ASAuthorizationControllerDelegate
+
+extension AppleSignInService: ASAuthorizationControllerDelegate {
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        print("🍎 AppleSignInService: Authorization completed successfully")
+        
+        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            print("🍎 AppleSignInService: ERROR - Invalid credential type")
+            signInContinuation?.resume(throwing: AppleSignInError.invalidCredential)
+            signInContinuation = nil
+            return
+        }
+        
+        // Extract identity token
+        guard let identityTokenData = appleIDCredential.identityToken,
+              let identityToken = String(data: identityTokenData, encoding: .utf8) else {
+            print("🍎 AppleSignInService: ERROR - No identity token")
+            signInContinuation?.resume(throwing: AppleSignInError.noIdentityToken)
+            signInContinuation = nil
+            return
+        }
+        
+        // Extract authorization code
+        guard let authorizationCodeData = appleIDCredential.authorizationCode,
+              let authorizationCode = String(data: authorizationCodeData, encoding: .utf8) else {
+            print("🍎 AppleSignInService: ERROR - No authorization code")
+            signInContinuation?.resume(throwing: AppleSignInError.noAuthorizationCode)
+            signInContinuation = nil
+            return
+        }
+        
+        print("🍎 AppleSignInService: Successfully extracted tokens")
+        print("🍎 AppleSignInService: User ID: \(appleIDCredential.user)")
+        print("🍎 AppleSignInService: Email: \(appleIDCredential.email ?? "Not provided")")
+        print("🍎 AppleSignInService: Full Name: \(appleIDCredential.fullName?.formatted() ?? "Not provided")")
+        print("🍎 AppleSignInService: Real User Status: \(appleIDCredential.realUserStatus.rawValue)")
+        
+        let result = AppleSignInResult(
+            userId: appleIDCredential.user,
+            identityToken: identityToken,
+            authorizationCode: authorizationCode,
+            email: appleIDCredential.email,
+            fullName: appleIDCredential.fullName,
+            realUserStatus: appleIDCredential.realUserStatus
+        )
+        
+        signInContinuation?.resume(returning: result)
+        signInContinuation = nil
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        print("🍎 AppleSignInService: Authorization failed with error: \(error)")
+        
+        if let authError = error as? ASAuthorizationError {
+            switch authError.code {
+            case .canceled:
+                print("🍎 AppleSignInService: User cancelled sign-in")
+                signInContinuation?.resume(throwing: AppleSignInError.userCancelled)
+            case .failed:
+                print("🍎 AppleSignInService: Authorization failed")
+                signInContinuation?.resume(throwing: AppleSignInError.authorizationFailed)
+            case .invalidResponse:
+                print("🍎 AppleSignInService: Invalid response")
+                signInContinuation?.resume(throwing: AppleSignInError.invalidResponse)
+            case .notHandled:
+                print("🍎 AppleSignInService: Authorization not handled")
+                signInContinuation?.resume(throwing: AppleSignInError.notHandled)
+            case .unknown:
+                print("🍎 AppleSignInService: Unknown error")
+                signInContinuation?.resume(throwing: AppleSignInError.unknown)
+            case .notInteractive:
+                print("🍎 AppleSignInService: Not interactive")
+                signInContinuation?.resume(throwing: AppleSignInError.notHandled)
+            case .matchedExcludedCredential:
+                print("🍎 AppleSignInService: Matched excluded credential")
+                signInContinuation?.resume(throwing: AppleSignInError.invalidCredential)
+            default:
+                print("🍎 AppleSignInService: Other error: \(authError)")
+                signInContinuation?.resume(throwing: error)
+            }
+        } else {
+            signInContinuation?.resume(throwing: error)
+        }
+        
+        signInContinuation = nil
+    }
+}
+
+// MARK: - ASAuthorizationControllerPresentationContextProviding
+
+extension AppleSignInService: ASAuthorizationControllerPresentationContextProviding {
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first else {
+            print("🍎 AppleSignInService: WARNING - No key window found, using new window")
+            return UIWindow()
+        }
+        
+        print("🍎 AppleSignInService: Using window: \(window)")
+        return window
+    }
+}
+
+// MARK: - AppleSignInError
+
+enum AppleSignInError: LocalizedError {
+    case invalidCredential
+    case noIdentityToken
+    case noAuthorizationCode
+    case userCancelled
+    case authorizationFailed
+    case invalidResponse
+    case notHandled
+    case unknown
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidCredential:
+            return "Invalid Apple ID credential"
+        case .noIdentityToken:
+            return "No identity token received from Apple"
+        case .noAuthorizationCode:
+            return "No authorization code received from Apple"
+        case .userCancelled:
+            return "Sign in with Apple was cancelled"
+        case .authorizationFailed:
+            return "Apple authorization failed"
+        case .invalidResponse:
+            return "Invalid response from Apple"
+        case .notHandled:
+            return "Apple authorization was not handled"
+        case .unknown:
+            return "Unknown error occurred during Apple Sign-In"
+        }
     }
 }

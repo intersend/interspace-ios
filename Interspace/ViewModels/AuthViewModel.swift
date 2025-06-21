@@ -82,6 +82,13 @@ final class AuthViewModel: ObservableObject {
             break // Show email input
         case .guest:
             authenticateAsGuest()
+        case .passkey:
+            if #available(iOS 16.0, *) {
+                authenticateWithPasskey()
+            } else {
+                error = AuthenticationError.passkeyNotSupported
+                showError = true
+            }
         default:
             break
         }
@@ -195,6 +202,76 @@ final class AuthViewModel: ObservableObject {
         let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
         let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
         return emailPredicate.evaluate(with: email)
+    }
+    
+    // MARK: - Passkey Authentication
+    
+    @available(iOS 16.0, *)
+    func authenticateWithPasskey() {
+        Task {
+            do {
+                isLoading = true
+                error = nil
+                
+                let tokens = try await PasskeyService.shared.authenticateWithPasskey()
+                
+                // Store tokens in keychain
+                if !tokens.accessToken.isEmpty {
+                    KeychainManager.shared.accessToken = tokens.accessToken
+                    KeychainManager.shared.refreshToken = tokens.refreshToken
+                    
+                    // Update authentication state
+                    await MainActor.run {
+                        authManager.isAuthenticated = true
+                    }
+                }
+                
+                isLoading = false
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.error = AuthenticationError.passkeyAuthenticationFailed(error.localizedDescription)
+                    self.showError = true
+                }
+            }
+        }
+    }
+    
+    @available(iOS 16.0, *)
+    func registerPasskey() {
+        guard authManager.isAuthenticated else {
+            error = AuthenticationError.notAuthenticated
+            showError = true
+            return
+        }
+        
+        Task {
+            do {
+                isLoading = true
+                error = nil
+                
+                // Get current user email
+                let userEmail = authManager.currentUser?.email ?? email
+                guard !userEmail.isEmpty else {
+                    throw AuthenticationError.emailRequired
+                }
+                
+                let _ = try await PasskeyService.shared.registerPasskey(for: userEmail)
+                
+                await MainActor.run {
+                    self.isLoading = false
+                    // Show success message
+                    self.errorMessage = "Passkey registered successfully!"
+                    self.showError = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.error = AuthenticationError.passkeyRegistrationFailed(error.localizedDescription)
+                    self.showError = true
+                }
+            }
+        }
     }
     
     // MARK: - Wallet Authentication
