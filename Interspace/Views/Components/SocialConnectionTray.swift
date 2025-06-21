@@ -180,9 +180,12 @@ struct SocialConnectionTray: View {
             } catch {
                 await MainActor.run {
                     isLoading = false
-                    errorMessage = error.localizedDescription
-                    showError = true
-                    HapticManager.notification(.error)
+                    // Don't show error for user cancellation (empty error message)
+                    if !error.localizedDescription.isEmpty {
+                        errorMessage = error.localizedDescription
+                        showError = true
+                        HapticManager.notification(.error)
+                    }
                 }
             }
         }

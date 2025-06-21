@@ -38,9 +38,9 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
     //     callback: URL(string: "interspace://callback")!  // Updated callback path
     // )
     
-    // Defer Google Sign-In configuration until needed
-    print("📱 AppDelegate: Deferring Google Sign-In configuration")
-    // GoogleSignInService.shared.configure() // Will be called when needed
+    // Configure Google Sign-In
+    print("📱 AppDelegate: Configuring Google Sign-In")
+    GoogleSignInService.shared.configure()
     
     // Track end of app delegate
     AppLaunchPerformance.shared.markAppDelegateEnd()

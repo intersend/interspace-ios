@@ -325,31 +325,56 @@ final class AuthenticationManager: ObservableObject {
         }
         #endif
         
-        let googleResult = try await GoogleSignInService.shared.signIn()
-        print("🔐 AuthenticationManager: Google Sign-In successful, email: \(googleResult.email)")
-        
-        // Use ID token if available, otherwise fall back to user ID
-        let authToken = googleResult.idToken ?? googleResult.userId
-        print("🔐 AuthenticationManager: Using auth token type: \(googleResult.idToken != nil ? "ID Token" : "User ID")")
-        
-        let config = WalletConnectionConfig(
-            strategy: .google,
-            walletType: nil,
-            email: googleResult.email,
-            verificationCode: nil,
-            walletAddress: nil,
-            signature: authToken,  // Pass the auth token here
-            message: nil,
-            socialProvider: "google",
-            socialProfile: SocialProfile(
-                id: googleResult.userId,
+        do {
+            let googleResult = try await GoogleSignInService.shared.signIn()
+            print("🔐 AuthenticationManager: Google Sign-In successful, email: \(googleResult.email)")
+            
+            // Ensure we have an ID token for backend authentication
+            guard let idToken = googleResult.idToken else {
+                print("🔐 AuthenticationManager: ERROR - No ID token received from Google Sign-In")
+                throw AuthenticationError.unknown("Google authentication failed: No ID token received")
+            }
+            
+            print("🔐 AuthenticationManager: Successfully obtained ID token")
+            
+            let config = WalletConnectionConfig(
+                strategy: .google,
+                walletType: nil,
                 email: googleResult.email,
-                name: googleResult.name,
-                picture: googleResult.imageURL
+                verificationCode: nil,
+                walletAddress: nil,
+                signature: idToken,  // Pass the ID token for backend verification
+                message: nil,
+                socialProvider: "google",
+                socialProfile: SocialProfile(
+                    id: googleResult.userId,
+                    email: googleResult.email,
+                    name: googleResult.name,
+                    picture: googleResult.imageURL
+                )
             )
-        )
-        
-        try await authenticate(with: config)
+            
+            try await authenticate(with: config)
+            
+        } catch let error as GoogleSignInError {
+            // Map Google Sign-In errors to authentication errors
+            switch error {
+            case .noViewController:
+                throw AuthenticationError.unknown("Unable to present Google Sign-In")
+            case .signInFailed(let message):
+                if message.contains("canceled") || message.contains("-5") {
+                    // User cancelled - don't show error
+                    print("🔐 AuthenticationManager: User cancelled Google Sign-In")
+                    throw AuthenticationError.unknown("")
+                }
+                throw AuthenticationError.unknown("Google Sign-In failed: \(message)")
+            case .noUserData:
+                throw AuthenticationError.unknown("No user data received from Google")
+            }
+        } catch {
+            // Re-throw other errors
+            throw error
+        }
     }
     
     func authenticateWithPasskey(email: String? = nil) async throws {

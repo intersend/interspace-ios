@@ -115,25 +115,27 @@ final class GoogleSignInService {
             
             print("🔐 GoogleSignInService: Starting configuration")
         
-        guard let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") else {
-            print("🔐 GoogleSignInService: ERROR - GoogleService-Info.plist not found in bundle")
+        // First try to get client ID from GoogleService-Info.plist
+        var clientId: String?
+        
+        if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+           let plist = NSDictionary(contentsOfFile: path) {
+            print("🔐 GoogleSignInService: Found GoogleService-Info.plist")
+            clientId = plist["CLIENT_ID"] as? String
+        }
+        
+        // Fallback to Info.plist if GoogleService-Info.plist not found or doesn't have CLIENT_ID
+        if clientId == nil {
+            print("🔐 GoogleSignInService: Falling back to Info.plist for configuration")
+            clientId = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String
+        }
+        
+        guard let finalClientId = clientId, !finalClientId.isEmpty else {
+            print("🔐 GoogleSignInService: ERROR - Could not find CLIENT_ID in GoogleService-Info.plist or GIDClientID in Info.plist")
             return
         }
         
-        print("🔐 GoogleSignInService: Found GoogleService-Info.plist at: \(path)")
-        
-        guard let plist = NSDictionary(contentsOfFile: path) else {
-            print("🔐 GoogleSignInService: ERROR - Could not read GoogleService-Info.plist")
-            return
-        }
-        
-        guard let clientId = plist["CLIENT_ID"] as? String else {
-            print("🔐 GoogleSignInService: ERROR - Could not find CLIENT_ID in GoogleService-Info.plist")
-            print("🔐 GoogleSignInService: Available keys: \(plist.allKeys)")
-            return
-        }
-        
-        print("🔐 GoogleSignInService: Found CLIENT_ID: \(clientId)")
+        print("🔐 GoogleSignInService: Found CLIENT_ID: \(finalClientId)")
         
         // Get server client ID from Info.plist if available
         var configuration: GIDConfiguration
@@ -141,10 +143,10 @@ final class GoogleSignInService {
            !serverClientId.isEmpty,
            !serverClientId.contains("YOUR_") {
             print("🔐 GoogleSignInService: Found server client ID: \(serverClientId.prefix(20))...")
-            configuration = GIDConfiguration(clientID: clientId, serverClientID: serverClientId)
+            configuration = GIDConfiguration(clientID: finalClientId, serverClientID: serverClientId)
         } else {
             print("⚠️ GoogleSignInService: No server client ID configured, using iOS client ID only")
-            configuration = GIDConfiguration(clientID: clientId)
+            configuration = GIDConfiguration(clientID: finalClientId)
         }
         
         GIDSignIn.sharedInstance.configuration = configuration
@@ -330,6 +332,87 @@ struct PasskeyResult {
     let credentialID: String
     let signature: String
     let email: String?
+    let clientDataJSON: String?
+    let attestationObject: String?
+    let authenticatorData: String?
+    let userHandle: String?
+}
+
+struct PasskeyOptionsResponse: Codable {
+    let success: Bool
+    let data: PasskeyOptions
+}
+
+struct PasskeyOptions: Codable {
+    let challenge: String
+    let rp: RelyingParty?
+    let user: PasskeyUser?
+    let pubKeyCredParams: [PublicKeyCredParam]?
+    let timeout: Int?
+    let attestation: String?
+    let excludeCredentials: [CredentialDescriptor]?
+    let allowCredentials: [CredentialDescriptor]?
+    let userVerification: String?
+}
+
+struct RelyingParty: Codable {
+    let name: String
+    let id: String
+}
+
+struct PasskeyUser: Codable {
+    let id: String
+    let name: String
+    let displayName: String
+}
+
+struct PublicKeyCredParam: Codable {
+    let type: String
+    let alg: Int
+}
+
+struct CredentialDescriptor: Codable {
+    let type: String
+    let id: String
+    let transports: [String]?
+}
+
+struct PasskeyVerifyRequest: Codable {
+    let response: PasskeyResponse
+    let challenge: String
+    let deviceName: String?
+}
+
+struct PasskeyResponse: Codable {
+    let id: String
+    let rawId: String
+    let type: String
+    let response: AuthenticatorResponse
+}
+
+struct AuthenticatorResponse: Codable {
+    // For registration
+    let clientDataJSON: String?
+    let attestationObject: String?
+    
+    // For authentication
+    let authenticatorData: String?
+    let signature: String?
+    let userHandle: String?
+}
+
+struct PasskeyVerifyResponse: Codable {
+    let success: Bool
+    let data: PasskeyVerifyData?
+    let message: String?
+}
+
+struct PasskeyVerifyData: Codable {
+    let verified: Bool
+    let credentialId: String?
+    let accessToken: String?
+    let refreshToken: String?
+    let expiresIn: Int?
 }
 
 final class PasskeyService {
@@ -345,34 +428,62 @@ final class PasskeyService {
         }
     }
     
-    private func getPasskeyChallenge(for email: String? = nil) async throws -> Data {
-        // In a real implementation, you'd get this from your server
-        // For now, we'll generate a mock challenge
-        // TODO: Implement proper server challenge request
-        return Data.random(count: 32)
+    private func getPasskeyChallenge(for username: String? = nil, isRegistration: Bool = false) async throws -> (challenge: String, options: Data) {
+        let endpoint = isRegistration ? "/auth/passkey/register-options" : "/auth/passkey/authenticate-options"
+        
+        var body: Data? = nil
+        if let username = username {
+            let requestData = ["username": username]
+            body = try? JSONEncoder().encode(requestData)
+        }
+        
+        let result: Result<PasskeyOptionsResponse, APIError> = await withCheckedContinuation { continuation in
+            APIService.shared.request(
+                endpoint: endpoint,
+                method: "POST",
+                body: body,
+                requiresAuth: isRegistration
+            ) { result in
+                continuation.resume(returning: result)
+            }
+        }
+        
+        switch result {
+        case .success(let response):
+            guard let optionsData = try? JSONEncoder().encode(response.data) else {
+                throw PasskeyError.registrationFailed
+            }
+            return (challenge: response.data.challenge, options: optionsData)
+        case .failure(let error):
+            throw error
+        }
     }
     
     @available(iOS 16.0, *)
-    func registerPasskey(for email: String) async throws -> PasskeyResult {
-        // Get challenge from server
-        guard let challengeData = try? await getPasskeyChallenge(for: email) else {
+    func registerPasskey(for email: String, deviceName: String? = nil) async throws -> AuthTokens {
+        // Get registration options from server
+        let (challenge, optionsData) = try await getPasskeyChallenge(for: email, isRegistration: true)
+        
+        guard let options = try? JSONDecoder().decode(PasskeyOptions.self, from: optionsData),
+              let rpId = options.rp?.id,
+              let userId = options.user?.id.data(using: .utf8),
+              let userName = options.user?.name,
+              let challengeData = Data(base64URLEncoded: challenge) else {
             throw PasskeyError.registrationFailed
         }
         
-        let userID = Data(email.utf8)
-        
-        // Use your domain for relying party
-        let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: "interspace.ios")
+        // Create platform provider with server's RP ID
+        let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
         
         let registrationRequest = platformProvider.createCredentialRegistrationRequest(
             challenge: challengeData,
-            name: email,
-            userID: userID
+            name: userName,
+            userID: userId
         )
         
         let authController = ASAuthorizationController(authorizationRequests: [registrationRequest])
         
-        return try await withCheckedThrowingContinuation { continuation in
+        let passkeyResult = try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 let delegate = PasskeyAuthorizationDelegate { result in
                     switch result {
@@ -387,23 +498,84 @@ final class PasskeyService {
                 authController.presentationContextProvider = delegate
                 authController.performRequests()
             }
+        }
+        
+        // Verify registration with server
+        let verifyRequest = PasskeyVerifyRequest(
+            response: PasskeyResponse(
+                id: passkeyResult.credentialID,
+                rawId: passkeyResult.credentialID,
+                type: "public-key",
+                response: AuthenticatorResponse(
+                    clientDataJSON: passkeyResult.clientDataJSON,
+                    attestationObject: passkeyResult.attestationObject,
+                    authenticatorData: nil,
+                    signature: nil,
+                    userHandle: nil
+                )
+            ),
+            challenge: challenge,
+            deviceName: deviceName ?? UIDevice.current.name
+        )
+        
+        let verifyResult: Result<PasskeyVerifyResponse, APIError> = await withCheckedContinuation { continuation in
+            do {
+                let body = try JSONEncoder().encode(verifyRequest)
+                APIService.shared.request(
+                    endpoint: "/auth/passkey/register-verify",
+                    method: "POST",
+                    body: body,
+                    requiresAuth: true
+                ) { result in
+                    continuation.resume(returning: result)
+                }
+            } catch {
+                continuation.resume(returning: .failure(.decodingFailed(error)))
+            }
+        }
+        
+        switch verifyResult {
+        case .success(let response):
+            if response.success && response.data?.verified == true {
+                // Registration successful - no tokens returned for registration
+                return AuthTokens(accessToken: "", refreshToken: "", expiresIn: 0)
+            } else {
+                throw PasskeyError.registrationFailed
+            }
+        case .failure(let error):
+            throw error
         }
     }
     
     @available(iOS 16.0, *)
-    func authenticateWithPasskey() async throws -> PasskeyResult {
-        // Get challenge from server
-        guard let challengeData = try? await getPasskeyChallenge() else {
+    func authenticateWithPasskey(username: String? = nil) async throws -> AuthTokens {
+        // Get authentication options from server
+        let (challenge, optionsData) = try await getPasskeyChallenge(for: username, isRegistration: false)
+        
+        guard let options = try? JSONDecoder().decode(PasskeyOptions.self, from: optionsData),
+              let rpId = options.rp?.id ?? PasskeyService.getDefaultRPID(),
+              let challengeData = Data(base64URLEncoded: challenge) else {
             throw PasskeyError.authenticationFailed
         }
         
-        let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: "interspace.ios")
+        let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
         
         let assertionRequest = platformProvider.createCredentialAssertionRequest(challenge: challengeData)
         
+        // If we have allowed credentials from server, set them
+        if let allowedCredentials = options.allowCredentials, !allowedCredentials.isEmpty {
+            assertionRequest.allowedCredentials = allowedCredentials.compactMap { cred in
+                guard let credIdData = Data(base64URLEncoded: cred.id) else { return nil }
+                return ASAuthorizationPlatformPublicKeyCredentialAssertionRequest.Credential(
+                    credentialID: credIdData,
+                    transports: []
+                )
+            }
+        }
+        
         let authController = ASAuthorizationController(authorizationRequests: [assertionRequest])
         
-        return try await withCheckedThrowingContinuation { continuation in
+        let passkeyResult = try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 let delegate = PasskeyAuthorizationDelegate { result in
                     switch result {
@@ -419,6 +591,65 @@ final class PasskeyService {
                 authController.performRequests()
             }
         }
+        
+        // Verify authentication with server
+        let verifyRequest = PasskeyVerifyRequest(
+            response: PasskeyResponse(
+                id: passkeyResult.credentialID,
+                rawId: passkeyResult.credentialID,
+                type: "public-key",
+                response: AuthenticatorResponse(
+                    clientDataJSON: passkeyResult.clientDataJSON,
+                    attestationObject: nil,
+                    authenticatorData: passkeyResult.authenticatorData,
+                    signature: passkeyResult.signature,
+                    userHandle: passkeyResult.userHandle
+                )
+            ),
+            challenge: challenge,
+            deviceName: UIDevice.current.name
+        )
+        
+        let verifyResult: Result<PasskeyVerifyResponse, APIError> = await withCheckedContinuation { continuation in
+            do {
+                let body = try JSONEncoder().encode(verifyRequest)
+                APIService.shared.request(
+                    endpoint: "/auth/passkey/authenticate-verify",
+                    method: "POST",
+                    body: body,
+                    requiresAuth: false
+                ) { result in
+                    continuation.resume(returning: result)
+                }
+            } catch {
+                continuation.resume(returning: .failure(.decodingFailed(error)))
+            }
+        }
+        
+        switch verifyResult {
+        case .success(let response):
+            if response.success,
+               let data = response.data,
+               data.verified == true,
+               let accessToken = data.accessToken,
+               let refreshToken = data.refreshToken,
+               let expiresIn = data.expiresIn {
+                return AuthTokens(
+                    accessToken: accessToken,
+                    refreshToken: refreshToken,
+                    expiresIn: expiresIn
+                )
+            } else {
+                throw PasskeyError.authenticationFailed
+            }
+        case .failure(let error):
+            throw error
+        }
+    }
+    
+    static func getDefaultRPID() -> String {
+        // Default to bundle identifier if no RP ID is set
+        return Bundle.main.bundleIdentifier ?? "interspace.com"
     }
 }
 
@@ -439,16 +670,24 @@ private class PasskeyAuthorizationDelegate: NSObject, ASAuthorizationControllerD
         
         if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration {
             let result = PasskeyResult(
-                credentialID: credential.credentialID.base64EncodedString(),
-                signature: credential.rawAttestationObject?.base64EncodedString() ?? "",
-                email: nil
+                credentialID: credential.credentialID.base64URLEncodedString(),
+                signature: "",
+                email: nil,
+                clientDataJSON: credential.rawClientDataJSON.base64URLEncodedString(),
+                attestationObject: credential.rawAttestationObject?.base64URLEncodedString(),
+                authenticatorData: nil,
+                userHandle: nil
             )
             completion(.success(result))
         } else if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion {
             let result = PasskeyResult(
-                credentialID: credential.credentialID.base64EncodedString(),
-                signature: credential.signature.base64EncodedString(),
-                email: nil
+                credentialID: credential.credentialID.base64URLEncodedString(),
+                signature: credential.signature.base64URLEncodedString(),
+                email: nil,
+                clientDataJSON: credential.rawClientDataJSON.base64URLEncodedString(),
+                attestationObject: nil,
+                authenticatorData: credential.rawAuthenticatorData.base64URLEncodedString(),
+                userHandle: credential.userID.base64URLEncodedString()
             )
             completion(.success(result))
         } else {
@@ -493,5 +732,26 @@ extension Data {
             SecRandomCopyBytes(kSecRandomDefault, count, bytes.bindMemory(to: UInt8.self).baseAddress!)
         }
         return data
+    }
+    
+    func base64URLEncodedString() -> String {
+        return self.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+    
+    init?(base64URLEncoded: String) {
+        var base64 = base64URLEncoded
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        
+        // Add padding if needed
+        let paddingLength = 4 - (base64.count % 4)
+        if paddingLength < 4 {
+            base64 += String(repeating: "=", count: paddingLength)
+        }
+        
+        self.init(base64Encoded: base64)
     }
 }
