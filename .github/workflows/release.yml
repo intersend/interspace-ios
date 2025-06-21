@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Select Xcode
+      run: sudo xcode-select -switch /Applications/Xcode_15.0.app
+    
+    - name: Install Dependencies
+      run: |
+        gem install cocoapods
+        pod install
+    
+    - name: Setup Configuration
+      env:
+        GOOGLE_SERVICE_INFO: ${{ secrets.GOOGLE_SERVICE_INFO_BASE64 }}
+        BUILD_CONFIG: ${{ secrets.BUILD_CONFIG_BASE64 }}
+      run: |
+        # Decode configuration files from secrets
+        echo "$GOOGLE_SERVICE_INFO" | base64 --decode > Interspace/GoogleService-Info.plist
+        echo "$BUILD_CONFIG" | base64 --decode > Interspace/Supporting/BuildConfiguration.xcconfig
+    
+    - name: Import Code Signing Certificates
+      env:
+        CERTIFICATES_P12: ${{ secrets.CERTIFICATES_P12 }}
+        CERTIFICATES_PASSWORD: ${{ secrets.CERTIFICATES_PASSWORD }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        # Create temporary keychain
+        security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        
+        # Import certificates
+        echo "$CERTIFICATES_P12" | base64 --decode > certificates.p12
+        security import certificates.p12 -k build.keychain -P "$CERTIFICATES_PASSWORD" -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+    
+    - name: Install Fastlane
+      run: |
+        brew install fastlane
+    
+    - name: Build and Upload to TestFlight
+      env:
+        FASTLANE_USER: ${{ secrets.APPLE_ID }}
+        FASTLANE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
+        MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      run: |
+        fastlane beta
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          build/*.ipa
+          build/*.dSYM.zip
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
