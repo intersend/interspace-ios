@@ -1,0 +1,106 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  XCODE_VERSION: '15.0'
+  IOS_DESTINATION: 'platform=iOS Simulator,name=iPhone 15,OS=17.0'
+
+jobs:
+  lint:
+    name: SwiftLint
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install SwiftLint
+      run: brew install swiftlint
+    
+    - name: Run SwiftLint
+      run: swiftlint lint --reporter github-actions-logging
+
+  test:
+    name: Build and Test
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Select Xcode
+      run: sudo xcode-select -switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+    
+    - name: Show Xcode version
+      run: xcodebuild -version
+    
+    - name: Cache CocoaPods
+      uses: actions/cache@v3
+      with:
+        path: Pods
+        key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-
+    
+    - name: Install CocoaPods
+      run: |
+        gem install cocoapods
+        pod install
+    
+    - name: Setup Configuration
+      run: |
+        # Create dummy configuration files for CI
+        cp Interspace/Supporting/BuildConfiguration.xcconfig.template Interspace/Supporting/BuildConfiguration.xcconfig
+        cp Interspace/GoogleService-Info.plist.template Interspace/GoogleService-Info.plist
+        
+        # Replace with CI values
+        sed -i '' 's/YOUR_DEBUG_API_URL_HERE/http:\/\/localhost:3000\/api\/v1/g' Interspace/Supporting/BuildConfiguration.xcconfig
+        sed -i '' 's/YOUR_PRODUCTION_API_URL_HERE/https:\/\/api.interspace.com\/api\/v1/g' Interspace/Supporting/BuildConfiguration.xcconfig
+        sed -i '' 's/YOUR_GOOGLE_CLIENT_ID_HERE/ci-test-client-id/g' Interspace/Supporting/BuildConfiguration.xcconfig
+        sed -i '' 's/YOUR_INFURA_API_KEY_HERE/ci-test-infura-key/g' Interspace/Supporting/BuildConfiguration.xcconfig
+        sed -i '' 's/YOUR_WALLETCONNECT_PROJECT_ID_HERE/ci-test-walletconnect-id/g' Interspace/Supporting/BuildConfiguration.xcconfig
+    
+    - name: Build
+      run: |
+        xcodebuild build \
+          -workspace Interspace.xcworkspace \
+          -scheme Interspace \
+          -destination "${{ env.IOS_DESTINATION }}" \
+          -configuration Debug \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          ONLY_ACTIVE_ARCH=NO
+    
+    - name: Run Tests
+      run: |
+        xcodebuild test \
+          -workspace Interspace.xcworkspace \
+          -scheme Interspace \
+          -destination "${{ env.IOS_DESTINATION }}" \
+          -configuration Debug \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          ONLY_ACTIVE_ARCH=NO \
+          -resultBundlePath TestResults
+    
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: test-results
+        path: TestResults.xcresult
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
