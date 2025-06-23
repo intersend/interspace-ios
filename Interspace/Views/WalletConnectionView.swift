@@ -1,10 +1,55 @@
 import SwiftUI
 
-struct WalletConnectionView: View {
+// Protocol for wallet connection handling
+protocol WalletConnectionHandler: ObservableObject {
+    func handleWalletConnection(walletType: WalletType, address: String, signature: String, message: String) async throws
+}
+
+// Make ProfileViewModel conform to the protocol
+extension ProfileViewModel: WalletConnectionHandler {
+    func handleWalletConnection(walletType: WalletType, address: String, signature: String, message: String) async throws {
+        // Profile linking logic
+        let config = WalletConnectionConfig(
+            strategy: .wallet,
+            walletType: walletType.rawValue,
+            email: nil,
+            verificationCode: nil,
+            walletAddress: address,
+            signature: signature,
+            message: message,
+            socialProvider: nil,
+            socialProfile: nil,
+            oauthCode: nil
+        )
+        try await linkWallet(config: config)
+    }
+}
+
+// Make AuthViewModel conform to the protocol
+extension AuthViewModel: WalletConnectionHandler {
+    func handleWalletConnection(walletType: WalletType, address: String, signature: String, message: String) async throws {
+        // Authentication logic
+        let config = WalletConnectionConfig(
+            strategy: .wallet,
+            walletType: walletType.rawValue,
+            email: nil,
+            verificationCode: nil,
+            walletAddress: address,
+            signature: signature,
+            message: message,
+            socialProvider: nil,
+            socialProfile: nil,
+            oauthCode: nil
+        )
+        try await authManager.authenticate(with: config)
+    }
+}
+
+struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
     let walletType: WalletType
-    @ObservedObject var viewModel: ProfileViewModel
+    @ObservedObject var viewModel: ViewModel
     let onComplete: () -> Void
-    var isForAuthentication: Bool = false // New parameter to distinguish auth vs profile linking
+    var isForAuthentication: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     @State private var isConnecting = false
@@ -445,17 +490,13 @@ struct WalletConnectionView: View {
             throw WalletError.signatureFailed("Missing signature or message")
         }
         
-        // Link wallet to profile using the view model
-        await viewModel.linkWalletAccount(
-            address: address,
+        // Use the protocol method for wallet connection
+        try await viewModel.handleWalletConnection(
             walletType: walletType,
+            address: address,
             signature: signature,
-            message: message,
-            customName: nil // Skip custom name for smoother flow
+            message: message
         )
-        
-        // Reload profile data to ensure linked accounts are updated
-        await viewModel.loadProfile()
     }
     
     private func performAuthentication() async throws {
@@ -466,22 +507,13 @@ struct WalletConnectionView: View {
         }
         
         do {
-            let config = WalletConnectionConfig(
-                strategy: .wallet,
-                walletType: walletType.rawValue,
-                email: nil,
-                verificationCode: nil,
-                walletAddress: address,
+            // Use the protocol method for wallet connection
+            try await viewModel.handleWalletConnection(
+                walletType: walletType,
+                address: address,
                 signature: signature,
-                message: message,
-                socialProvider: nil,
-                socialProfile: nil,
-                oauthCode: nil
+                message: message
             )
-            
-            // Try to authenticate directly
-            print("🔐 Attempting wallet authentication...")
-            try await authManager.authenticate(with: config)
             
         } catch let error as AuthenticationError {
             // If authentication fails, it might be a new wallet

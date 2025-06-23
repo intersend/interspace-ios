@@ -16,6 +16,7 @@ struct UniversalAddTray: View {
     @ObservedObject private var profileViewModel = ProfileViewModel.shared
     @ObservedObject private var authManager = AuthenticationManagerV2.shared
     @ObservedObject private var sessionCoordinator = SessionCoordinator.shared
+    @StateObject private var localAuthViewModel = AuthViewModel()
     @State private var showWalletConnection = false
     @State private var showSocialConnection = false
     @State private var selectedWalletType: WalletType?
@@ -26,7 +27,7 @@ struct UniversalAddTray: View {
     @State private var showWalletAuthorization = false
     @State private var showAddApp = false
     @State private var showProfileCreation = false
-    @State private var showWalletConnectionTray = false
+    // Removed showWalletConnectionTray - using direct authorization
     
     var body: some View {
         VStack(spacing: 0) {
@@ -53,10 +54,10 @@ struct UniversalAddTray: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
-                    // Header - Minimal Apple style
-                    Text("Add to Interspace")
-                        .font(.title2)
-                        .fontWeight(.semibold)
+                    // Header - iOS 18 Apple style
+                    Text(isForAuthentication ? "Connect to Interspace" : "Add to Interspace")
+                        .font(.system(.largeTitle, design: .rounded))
+                        .fontWeight(.bold)
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
@@ -110,14 +111,9 @@ struct UniversalAddTray: View {
                             ) {
                                 HapticManager.impact(.light)
                                 selectedWalletType = .metamask
-                                // Handle authentication vs account linking
-                                if isForAuthentication {
-                                    handleWalletAuthentication(walletType: .metamask)
-                                } else {
-                                    // Ensure wallet type is set before showing sheet
-                                    DispatchQueue.main.async {
-                                        showWalletAuthorization = true
-                                    }
+                                // Show authorization directly without intermediate tray
+                                DispatchQueue.main.async {
+                                    showWalletAuthorization = true
                                 }
                             }
                             
@@ -135,14 +131,9 @@ struct UniversalAddTray: View {
                             ) {
                                 HapticManager.impact(.light)
                                 selectedWalletType = .coinbase
-                                // Handle authentication vs account linking
-                                if isForAuthentication {
-                                    handleWalletAuthentication(walletType: .coinbase)
-                                } else {
-                                    // Ensure wallet type is set before showing sheet
-                                    DispatchQueue.main.async {
-                                        showWalletAuthorization = true
-                                    }
+                                // Show authorization directly without intermediate tray
+                                DispatchQueue.main.async {
+                                    showWalletAuthorization = true
                                 }
                             }
                             
@@ -160,14 +151,9 @@ struct UniversalAddTray: View {
                             ) {
                                 HapticManager.impact(.light)
                                 selectedWalletType = .walletConnect
-                                // Handle authentication vs account linking
-                                if isForAuthentication {
-                                    handleWalletAuthentication(walletType: .walletConnect)
-                                } else {
-                                    // Ensure wallet type is set before showing sheet
-                                    DispatchQueue.main.async {
-                                        showWalletAuthorization = true
-                                    }
+                                // Show authorization directly without intermediate tray
+                                DispatchQueue.main.async {
+                                    showWalletAuthorization = true
                                 }
                             }
                         }
@@ -277,24 +263,41 @@ struct UniversalAddTray: View {
                 }
             }
         }
-        .presentationBackground(.ultraThinMaterial)
+        .presentationBackground(.regularMaterial)
         .preferredColorScheme(.dark)
-        .presentationDragIndicator(.visible)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(28)
         .sheet(isPresented: $showWalletAuthorization) {
-            WalletAuthorizationTray(
-                walletType: selectedWalletType ?? .metamask,
-                onAuthorize: {
-                    showWalletAuthorization = false
-                    // Small delay to ensure smooth transition
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showWalletConnection = true
-                    }
-                },
-                onCancel: {
-                    showWalletAuthorization = false
-                    selectedWalletType = nil
+            if let walletType = selectedWalletType {
+                if isForAuthentication {
+                    // For authentication, use WalletConnectionView with AuthViewModel
+                    WalletConnectionView(
+                        walletType: walletType,
+                        viewModel: authViewModel ?? AuthViewModel(),
+                        onComplete: {
+                            isPresented = false
+                        },
+                        isForAuthentication: true
+                    )
+                } else {
+                    // For account linking, show authorization tray first
+                    WalletAuthorizationTray(
+                        walletType: walletType,
+                        onAuthorize: {
+                            showWalletAuthorization = false
+                            // Small delay to ensure smooth transition
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showWalletConnection = true
+                            }
+                        },
+                        onCancel: {
+                            showWalletAuthorization = false
+                            selectedWalletType = nil
+                        }
+                    )
                 }
-            )
+            }
         }
         .onChange(of: showWalletAuthorization) { newValue in
             if newValue && selectedWalletType == nil {
@@ -313,23 +316,10 @@ struct UniversalAddTray: View {
                 )
             }
         }
-        .sheet(isPresented: $showWalletConnectionTray) {
-            // Use WalletConnectionTray for authentication
-            WalletConnectionTray(
-                isPresented: $showWalletConnectionTray,
-                isForAuthentication: true,
-                authViewModel: authViewModel ?? AuthViewModel()
-            )
-            .onDisappear {
-                // Check if authentication succeeded
-                if isForAuthentication && authManager.isAuthenticated {
-                    isPresented = false
-                }
-            }
-        }
+        // Removed WalletConnectionTray - now using direct wallet authorization
         .sheet(isPresented: $showEmailAuth) {
             if isForAuthentication {
-                EmailAuthView(viewModel: authViewModel ?? AuthViewModel())
+                EmailAuthenticationView(isPresented: $showEmailAuth)
                     .onDisappear {
                         // Check if authentication succeeded
                         if authManager.isAuthenticated {
@@ -337,7 +327,7 @@ struct UniversalAddTray: View {
                         }
                     }
             } else {
-                EmailAuthView(viewModel: AuthViewModel())
+                EmailLinkingView(isPresented: $showEmailAuth)
             }
         }
         .sheet(isPresented: $showPasskeyAuth) {
@@ -383,11 +373,7 @@ struct UniversalAddTray: View {
     
     // MARK: - Authentication Handlers
     
-    private func handleWalletAuthentication(walletType: WalletType) {
-        // For authentication mode, show the wallet connection tray
-        selectedWalletType = walletType
-        showWalletConnectionTray = true
-    }
+    // Wallet connection is now handled by WalletConnectionView directly
     
     private func handleEmailAuthentication() {
         // Show email auth sheet
@@ -427,24 +413,19 @@ struct UniversalAddTray: View {
     }
     
     private func createProfile(name: String) async {
-        do {
-            // Create the profile using the view model
-            await profileViewModel.createProfile(name: name)
-            
-            // Reload profiles to reflect the change
-            await profileViewModel.loadProfiles()
-            
-            // Dismiss the add tray after successful creation
-            await MainActor.run {
-                isPresented = false
-            }
-            
-            // Show success feedback
-            HapticManager.notification(.success)
-        } catch {
-            print("Failed to create profile: \(error)")
-            HapticManager.notification(.error)
+        // Create the profile using the view model
+        await profileViewModel.createProfile(name: name)
+        
+        // Reload profiles to reflect the change
+        await profileViewModel.loadProfiles()
+        
+        // Dismiss the add tray after successful creation
+        await MainActor.run {
+            isPresented = false
         }
+        
+        // Show success feedback
+        HapticManager.notification(.success)
     }
 }
 
@@ -558,9 +539,11 @@ struct WalletAuthorizationTray: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .presentationDetents([.height(280)])
-        .presentationBackground(.ultraThinMaterial)
+        .presentationDetents([.height(320)])
+        .presentationBackground(.regularMaterial)
         .preferredColorScheme(.dark)
+        .presentationCornerRadius(28)
+        .presentationDragIndicator(.visible)
     }
 }
 
