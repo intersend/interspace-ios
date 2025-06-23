@@ -24,7 +24,7 @@ struct AuthResponse: Codable {
 struct AuthTokens: Codable {
     let accessToken: String
     let refreshToken: String
-    let expiresIn: Int
+    let expiresIn: Int?
 }
 
 // MARK: - Additional Request/Response Models
@@ -76,7 +76,7 @@ class AuthService {
         do {
             let body = try JSONEncoder().encode(authRequest)
             apiService.request(
-                endpoint: "/auth/authenticate",
+                endpoint: "/v2/auth/authenticate",
                 method: "POST",
                 body: body,
                 completion: completion
@@ -533,7 +533,7 @@ final class PasskeyService {
         
         if verifyResponse.success && verifyResponse.data?.verified == true {
             // Registration successful - no tokens returned for registration
-            return AuthTokens(accessToken: "", refreshToken: "", expiresIn: 0)
+            return AuthTokens(accessToken: "", refreshToken: "", expiresIn: nil)
         } else {
             throw PasskeyError.registrationFailed
         }
@@ -639,8 +639,8 @@ final class PasskeyService {
     }
     
     static func getDefaultRPID() -> String {
-        // Default to bundle identifier if no RP ID is set
-        return Bundle.main.bundleIdentifier ?? "interspace.com"
+        // Use the actual domain for passkey authentication
+        return "interspace.app"
     }
 }
 

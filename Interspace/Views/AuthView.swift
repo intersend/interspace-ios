@@ -66,7 +66,7 @@ struct AuthView: View {
             }
         }
         .sheet(isPresented: $showingEmailAuth) {
-            EmailAuthView(viewModel: viewModel)
+            EmailAuthenticationView(isPresented: $showingEmailAuth)
         }
         .sheet(isPresented: $showWalletConnectionTray) {
             WalletConnectionTray(
@@ -301,42 +301,22 @@ struct UnauthenticatedView: View {
                             .foregroundColor(DesignTokens.Colors.textPrimary)
                     }
                     
-                    // Authentication buttons
-                    VStack(spacing: 16) {
-                        // Connect Wallet - Primary action
-                        Button(action: {
-                            HapticManager.impact(.light)
-                            showWalletConnectionTray = true
-                        }) {
-                            Text("Connect Wallet")
-                                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: 320)
-                                .frame(height: 50)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(DesignTokens.Colors.primary)
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Add to Interspace - Secondary action
-                        Button(action: {
-                            HapticManager.impact(.light)
-                            showUniversalAddTray = true
-                        }) {
-                            Text("Add to Interspace")
-                                .font(.system(size: 17, weight: .medium, design: .rounded))
-                                .foregroundColor(DesignTokens.Colors.primary)
-                                .frame(maxWidth: 320)
-                                .frame(height: 50)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(DesignTokens.Colors.backgroundSecondary)
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                    // Single Connect button - Apple native style
+                    Button(action: {
+                        HapticManager.impact(.medium)
+                        showUniversalAddTray = true
+                    }) {
+                        Text("Connect")
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: 320)
+                            .frame(height: 56) // iOS 18 standard height
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(DesignTokens.Colors.primary)
+                            )
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 .padding(.horizontal, 20)
                 

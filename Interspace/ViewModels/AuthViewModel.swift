@@ -15,12 +15,8 @@ final class AuthViewModel: ObservableObject {
     @Published var errorMessage = ""
     @Published var showWalletTray = false
     
-    // Email Authentication
-    @Published var email = ""
-    @Published var verificationCode = ""
-    @Published var isEmailCodeSent = false
-    @Published var emailResendTimer = 0
-    @Published var canResendEmail = true
+    // Email Authentication (simplified)
+    @Published var isAuthenticationInProgress = false
     
     // Wallet Connection
     @Published var selectedWalletType: WalletType?
@@ -30,14 +26,9 @@ final class AuthViewModel: ObservableObject {
     private let walletService = WalletService.shared
     
     private var cancellables = Set<AnyCancellable>()
-    private var emailTimer: Timer?
     
     init() {
         setupBindings()
-    }
-    
-    deinit {
-        emailTimer?.invalidate()
     }
     
     // MARK: - Setup
@@ -95,6 +86,8 @@ final class AuthViewModel: ObservableObject {
     }
     
     func authenticateAsGuest() {
+        isAuthenticationInProgress = true
+        
         Task {
             do {
                 let config = WalletConnectionConfig(
@@ -111,105 +104,21 @@ final class AuthViewModel: ObservableObject {
                 )
                 
                 try await authManager.authenticate(with: config)
+                isAuthenticationInProgress = false
             } catch {
                 print("Guest authentication error: \(error)")
+                isAuthenticationInProgress = false
             }
         }
     }
     
-    // MARK: - Email Authentication
-    
-    func sendEmailCode() {
-        guard !email.isEmpty, isValidEmail(email) else {
-            error = AuthenticationError.emailVerificationFailed
-            showError = true
-            return
-        }
-        
-        Task {
-            do {
-                try await authManager.sendEmailCode(email)
-                isEmailCodeSent = true
-                startEmailResendTimer()
-            } catch {
-                print("Failed to send email code: \(error)")
-            }
-        }
-    }
-    
-    
-    func verifyEmailCode() {
-        guard !verificationCode.isEmpty, verificationCode.count == 6 else {
-            error = AuthenticationError.emailVerificationFailed
-            showError = true
-            return
-        }
-        
-        Task {
-            do {
-                let config = WalletConnectionConfig(
-                    strategy: .email,
-                    walletType: nil,
-                    email: email,
-                    verificationCode: verificationCode,
-                    walletAddress: nil,
-                    signature: nil,
-                    message: nil,
-                    socialProvider: nil,
-                    socialProfile: nil,
-                    oauthCode: nil
-                )
-                
-                try await authManager.authenticate(with: config)
-            } catch {
-                print("Email verification error: \(error)")
-            }
-        }
-    }
-    
-    func resendEmailCode() {
-        guard canResendEmail else { return }
-        
-        Task {
-            do {
-                try await authManager.resendEmailCode(email)
-                isEmailCodeSent = true
-                startEmailResendTimer()
-            } catch {
-                print("Failed to resend email code: \(error)")
-            }
-        }
-    }
-    
-    private func startEmailResendTimer() {
-        canResendEmail = false
-        emailResendTimer = 60
-        
-        emailTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                
-                if self.emailResendTimer > 0 {
-                    self.emailResendTimer -= 1
-                } else {
-                    self.canResendEmail = true
-                    self.emailTimer?.invalidate()
-                    self.emailTimer = nil
-                }
-            }
-        }
-    }
-    
-    private func isValidEmail(_ email: String) -> Bool {
-        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
-        return emailPredicate.evaluate(with: email)
-    }
     
     // MARK: - Passkey Authentication
     
     @available(iOS 16.0, *)
     func authenticateWithPasskey() {
+        isAuthenticationInProgress = true
+        
         Task {
             do {
                 isLoading = true
@@ -229,9 +138,11 @@ final class AuthViewModel: ObservableObject {
                 }
                 
                 isLoading = false
+                isAuthenticationInProgress = false
             } catch {
                 await MainActor.run {
                     self.isLoading = false
+                    self.isAuthenticationInProgress = false
                     self.error = AuthenticationError.passkeyAuthenticationFailed(error.localizedDescription)
                     self.showError = true
                 }
@@ -253,7 +164,7 @@ final class AuthViewModel: ObservableObject {
                 error = nil
                 
                 // Get current user email
-                let userEmail = authManager.currentUser?.email ?? email
+                let userEmail = authManager.currentUser?.email ?? ""
                 guard !userEmail.isEmpty else {
                     throw AuthenticationError.emailRequired
                 }
@@ -285,6 +196,8 @@ final class AuthViewModel: ObservableObject {
     }
     
     private func connectWallet(_ walletType: WalletType) {
+        isAuthenticationInProgress = true
+        
         Task {
             do {
                 // Let WalletService handle connection state management
@@ -308,8 +221,10 @@ final class AuthViewModel: ObservableObject {
                 )
                 
                 try await authManager.authenticate(with: config)
+                isAuthenticationInProgress = false
             } catch {
                 print("Wallet connection error: \(error)")
+                isAuthenticationInProgress = false
                 
                 // Handle specific wallet errors with better user feedback
                 await MainActor.run {
@@ -367,40 +282,25 @@ final class AuthViewModel: ObservableObject {
         selectedWalletType = nil
     }
     
+    func cancelAuthentication() {
+        isAuthenticationInProgress = false
+        resetAuthFlow()
+    }
+    
     func resetAuthFlow() {
+        // Don't reset if authentication is in progress
+        guard !isAuthenticationInProgress else { return }
+        
         selectedAuthStrategy = nil
-        email = ""
-        verificationCode = ""
-        isEmailCodeSent = false
         selectedWalletType = nil
         error = nil
         showError = false
         errorMessage = ""
         showWalletTray = false
-        emailTimer?.invalidate()
-        emailTimer = nil
-        canResendEmail = true
-        emailResendTimer = 0
         isLoading = false
     }
     
     // MARK: - Computed Properties
-    
-    var isEmailValid: Bool {
-        !email.isEmpty && isValidEmail(email)
-    }
-    
-    var isVerificationCodeValid: Bool {
-        verificationCode.count == 6 && verificationCode.allSatisfy { $0.isNumber }
-    }
-    
-    var emailResendText: String {
-        if canResendEmail {
-            return "Resend Code"
-        } else {
-            return "Resend in \(emailResendTimer)s"
-        }
-    }
     
     // MARK: - Wallet Connection Methods
     
@@ -487,3 +387,4 @@ final class AuthViewModel: ObservableObject {
         }
     }
 }
+
