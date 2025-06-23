@@ -11,7 +11,7 @@ final class SessionCoordinator: ObservableObject {
     // MARK: - Published Properties
     
     @Published var isAuthenticated = false
-    @Published var currentUser: User?
+    @Published var currentUser: UserV2?
     @Published var activeProfile: SmartProfile?
     @Published var sessionState: SessionState = .loading
     @Published var error: SessionError?
@@ -174,7 +174,12 @@ final class SessionCoordinator: ObservableObject {
             
             // Token is valid, update UI with cached data
             await MainActor.run {
-                self.currentUser = user
+                // Convert cached User to UserV2
+                self.currentUser = UserV2(
+                    id: user.id,
+                    email: user.email,
+                    isGuest: user.isGuest
+                )
                 self.isAuthenticated = true
                 
                 // Profiles are already SmartProfiles from cache
@@ -220,7 +225,12 @@ final class SessionCoordinator: ObservableObject {
                 print("🔐 SessionCoordinator: Using cached data for quick launch")
                 
                 // Apply cached data immediately
-                currentUser = cachedUser
+                // Convert cached User to UserV2
+                currentUser = UserV2(
+                    id: cachedUser.id,
+                    email: cachedUser.email,
+                    isGuest: cachedUser.isGuest
+                )
                 
                 if let activeProfile = cacheManager.getCachedActiveProfile() {
                     self.activeProfile = activeProfile
@@ -263,7 +273,12 @@ final class SessionCoordinator: ObservableObject {
             
             // Update UI on main thread
             await MainActor.run {
-                self.currentUser = user
+                // Convert User to UserV2
+                self.currentUser = UserV2(
+                    id: user.id,
+                    email: user.email,
+                    isGuest: user.isGuest
+                )
             }
             
             // Cache all the data in background
@@ -276,9 +291,7 @@ final class SessionCoordinator: ObservableObject {
             if profiles.isEmpty {
                 print("🔐 SessionCoordinator: New user detected - no profiles exist")
                 
-                // Check if the user has any auth strategies
-                let authStrategies = user.authStrategies
-                print("🔐 SessionCoordinator: User auth strategies: \(authStrategies)")
+                // In V2, profiles are created automatically during authentication
                 print("🔐 SessionCoordinator: User email: \(user.email ?? "none")")
                 
                 // For all new users, we need them to create their first profile
@@ -548,15 +561,13 @@ final class SessionCoordinator: ObservableObject {
             // since MPC setup is not implemented yet
             let isDevelopmentMode = true // TODO: Use EnvironmentConfiguration.shared.isDevelopmentModeEnabled when MPC is ready
             
-            // Check if this is an orphan account (social auth user creating first profile)
-            let isOrphanAccount = currentUser?.authStrategies.contains { strategy in
-                ["google", "apple"].contains(strategy)
-            } ?? false
+            // In V2, profiles are created automatically during authentication
+            // This method is only called if something went wrong
+            let isOrphanAccount = false
             
             if isOrphanAccount {
                 print("🔐 SessionCoordinator: Creating first SmartProfile for orphan account")
                 print("🔐 SessionCoordinator: User email: \(currentUser?.email ?? "unknown")")
-                print("🔐 SessionCoordinator: Auth strategies: \(currentUser?.authStrategies ?? [])")
             }
             
             let newProfile = try await profileAPI.createProfile(
@@ -700,8 +711,13 @@ final class SessionCoordinator: ObservableObject {
             
             // Update current data if it has changed
             await MainActor.run {
-                if self.currentUser?.updatedAt != freshUser.updatedAt {
-                    self.currentUser = freshUser
+                if self.currentUser?.id != freshUser.id {
+                    // Convert fresh User to UserV2
+                    self.currentUser = UserV2(
+                        id: freshUser.id,
+                        email: freshUser.email,
+                        isGuest: freshUser.isGuest
+                    )
                 }
                 
                 // Find and update active profile if changed

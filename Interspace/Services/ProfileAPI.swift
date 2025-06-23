@@ -15,7 +15,7 @@ final class ProfileAPI {
     func getProfiles() async throws -> [SmartProfile] {
         // The backend returns a wrapped response
         let response: ProfilesResponse = try await apiService.performRequest(
-            endpoint: "/profiles",
+            endpoint: "/v2/profiles",
             method: .GET,
             responseType: ProfilesResponse.self
         )
@@ -50,7 +50,7 @@ final class ProfileAPI {
         #endif
         
         let response: ProfileResponse = try await apiService.performRequest(
-            endpoint: "/profiles",
+            endpoint: "/v2/profiles",
             method: .POST,
             body: requestData,
             responseType: ProfileResponse.self
@@ -78,7 +78,7 @@ final class ProfileAPI {
     /// GET /profiles/:profileId
     func getProfile(profileId: String) async throws -> SmartProfile {
         let response: ProfileResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)",
+            endpoint: "/v2/profiles/\(profileId)",
             method: .GET,
             responseType: ProfileResponse.self
         )
@@ -89,7 +89,7 @@ final class ProfileAPI {
     func updateProfile(profileId: String, name: String?, isActive: Bool?) async throws -> SmartProfile {
         let request = UpdateProfileRequest(name: name, isActive: isActive)
         let response: ProfileResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)",
+            endpoint: "/v2/profiles/\(profileId)",
             method: .PUT,
             body: try JSONEncoder().encode(request),
             responseType: ProfileResponse.self
@@ -100,7 +100,7 @@ final class ProfileAPI {
     /// DELETE /profiles/:profileId
     func deleteProfile(profileId: String) async throws -> DeleteResponse {
         return try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)",
+            endpoint: "/v2/profiles/\(profileId)",
             method: .DELETE,
             responseType: DeleteResponse.self
         )
@@ -109,7 +109,7 @@ final class ProfileAPI {
     /// POST /profiles/:profileId/activate
     func activateProfile(profileId: String) async throws -> ActivateProfileResponse {
         return try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/activate",
+            endpoint: "/v2/profiles/\(profileId)/activate",
             method: .POST,
             responseType: ActivateProfileResponse.self
         )
@@ -120,7 +120,7 @@ final class ProfileAPI {
     /// GET /profiles/:profileId/apps
     func getApps(profileId: String) async throws -> [BookmarkedApp] {
         let response: AppsResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/apps",
+            endpoint: "/v2/profiles/\(profileId)/apps",
             method: .GET,
             responseType: AppsResponse.self
         )
@@ -130,7 +130,7 @@ final class ProfileAPI {
     /// POST /profiles/:profileId/apps
     func createApp(profileId: String, request: CreateAppRequest) async throws -> BookmarkedApp {
         let response: AppResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/apps",
+            endpoint: "/v2/profiles/\(profileId)/apps",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: AppResponse.self
@@ -141,7 +141,7 @@ final class ProfileAPI {
     /// PUT /apps/:appId
     func updateApp(appId: String, request: UpdateAppRequest) async throws -> BookmarkedApp {
         let response: AppResponse = try await apiService.performRequest(
-            endpoint: "/apps/\(appId)",
+            endpoint: "/v2/apps/\(appId)",
             method: .PUT,
             body: try JSONEncoder().encode(request),
             responseType: AppResponse.self
@@ -152,7 +152,7 @@ final class ProfileAPI {
     /// DELETE /apps/:appId
     func deleteApp(appId: String) async throws -> DeleteResponse {
         return try await apiService.performRequest(
-            endpoint: "/apps/\(appId)",
+            endpoint: "/v2/apps/\(appId)",
             method: .DELETE,
             responseType: DeleteResponse.self
         )
@@ -162,7 +162,7 @@ final class ProfileAPI {
     func reorderApps(profileId: String, appIds: [String], folderId: String?) async throws -> ReorderResponse {
         let request = ReorderAppsRequest(appIds: appIds, folderId: folderId)
         return try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/apps/reorder",
+            endpoint: "/v2/profiles/\(profileId)/apps/reorder",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: ReorderResponse.self
@@ -173,7 +173,7 @@ final class ProfileAPI {
     func moveApp(appId: String, folderId: String?, position: Int? = nil) async throws -> MoveResponse {
         let request = MoveAppRequest(targetFolderId: folderId, position: position)
         return try await apiService.performRequest(
-            endpoint: "/apps/\(appId)/move",
+            endpoint: "/v2/apps/\(appId)/move",
             method: .PUT,
             body: try JSONEncoder().encode(request),
             responseType: MoveResponse.self
@@ -185,7 +185,7 @@ final class ProfileAPI {
     /// GET /profiles/:profileId/accounts
     func getLinkedAccounts(profileId: String) async throws -> [LinkedAccount] {
         let response: LinkedAccountsResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/accounts",
+            endpoint: "/v2/profiles/\(profileId)/accounts",
             method: .GET,
             responseType: LinkedAccountsResponse.self
         )
@@ -195,7 +195,7 @@ final class ProfileAPI {
     /// POST /profiles/:profileId/accounts
     func linkAccount(profileId: String, request: LinkAccountRequest) async throws -> LinkedAccount {
         let response: LinkedAccountResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/accounts",
+            endpoint: "/v2/profiles/\(profileId)/accounts",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: LinkedAccountResponse.self
@@ -206,7 +206,7 @@ final class ProfileAPI {
     /// PUT /accounts/:accountId
     func updateLinkedAccount(accountId: String, request: UpdateAccountRequest) async throws -> LinkedAccount {
         let response: LinkedAccountResponse = try await apiService.performRequest(
-            endpoint: "/accounts/\(accountId)",
+            endpoint: "/v2/accounts/\(accountId)",
             method: .PUT,
             body: try JSONEncoder().encode(request),
             responseType: LinkedAccountResponse.self
@@ -217,7 +217,7 @@ final class ProfileAPI {
     /// DELETE /accounts/:accountId
     func unlinkAccount(accountId: String) async throws -> DeleteResponse {
         return try await apiService.performRequest(
-            endpoint: "/accounts/\(accountId)",
+            endpoint: "/v2/accounts/\(accountId)",
             method: .DELETE,
             responseType: DeleteResponse.self
         )
@@ -228,7 +228,7 @@ final class ProfileAPI {
     /// GET /profiles/:profileId/folders
     func getFolders(profileId: String) async throws -> [AppFolder] {
         let response: FoldersResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/folders",
+            endpoint: "/v2/profiles/\(profileId)/folders",
             method: .GET,
             responseType: FoldersResponse.self
         )
@@ -238,7 +238,7 @@ final class ProfileAPI {
     /// POST /profiles/:profileId/folders
     func createFolder(profileId: String, request: CreateFolderRequest) async throws -> AppFolder {
         let response: FolderResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/folders",
+            endpoint: "/v2/profiles/\(profileId)/folders",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: FolderResponse.self
@@ -249,7 +249,7 @@ final class ProfileAPI {
     /// GET /profiles/:profileId/folders/:folderId
     func getFolder(profileId: String, folderId: String) async throws -> AppFolder {
         let response: FolderResponse = try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/folders/\(folderId)",
+            endpoint: "/v2/profiles/\(profileId)/folders/\(folderId)",
             method: .GET,
             responseType: FolderResponse.self
         )
@@ -259,7 +259,7 @@ final class ProfileAPI {
     /// PUT /folders/:folderId
     func updateFolder(folderId: String, request: UpdateFolderRequest) async throws -> AppFolder {
         let response: FolderResponse = try await apiService.performRequest(
-            endpoint: "/folders/\(folderId)",
+            endpoint: "/v2/folders/\(folderId)",
             method: .PUT,
             body: try JSONEncoder().encode(request),
             responseType: FolderResponse.self
@@ -270,7 +270,7 @@ final class ProfileAPI {
     /// DELETE /folders/:folderId
     func deleteFolder(folderId: String) async throws -> DeleteResponse {
         return try await apiService.performRequest(
-            endpoint: "/folders/\(folderId)",
+            endpoint: "/v2/folders/\(folderId)",
             method: .DELETE,
             responseType: DeleteResponse.self
         )
@@ -280,7 +280,7 @@ final class ProfileAPI {
     func reorderFolders(profileId: String, folderIds: [String]) async throws -> ReorderResponse {
         let request = ReorderFoldersRequest(folderIds: folderIds)
         return try await apiService.performRequest(
-            endpoint: "/profiles/\(profileId)/folders/reorder",
+            endpoint: "/v2/profiles/\(profileId)/folders/reorder",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: ReorderResponse.self
@@ -290,7 +290,7 @@ final class ProfileAPI {
     /// POST /folders/:folderId/share
     func shareFolder(folderId: String) async throws -> ShareFolderResponse {
         return try await apiService.performRequest(
-            endpoint: "/folders/\(folderId)/share",
+            endpoint: "/v2/folders/\(folderId)/share",
             method: .POST,
             responseType: ShareFolderResponse.self
         )
@@ -299,7 +299,7 @@ final class ProfileAPI {
     /// DELETE /folders/:folderId/share
     func unshareFolder(folderId: String) async throws -> DeleteResponse {
         return try await apiService.performRequest(
-            endpoint: "/folders/\(folderId)/share",
+            endpoint: "/v2/folders/\(folderId)/share",
             method: .DELETE,
             responseType: DeleteResponse.self
         )
@@ -308,7 +308,7 @@ final class ProfileAPI {
     /// GET /folders/:folderId/contents
     func getFolderContents(folderId: String) async throws -> FolderContentsResponse {
         return try await apiService.performRequest(
-            endpoint: "/folders/\(folderId)/contents",
+            endpoint: "/v2/folders/\(folderId)/contents",
             method: .GET,
             responseType: FolderContentsResponse.self
         )

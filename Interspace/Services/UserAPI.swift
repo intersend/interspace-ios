@@ -13,7 +13,7 @@ final class UserAPI {
     /// GET /users/me
     func getCurrentUser() async throws -> User {
         let response: CurrentUserResponse = try await apiService.performRequest(
-            endpoint: "/users/me",
+            endpoint: "/v2/users/me",
             method: .GET,
             responseType: CurrentUserResponse.self
         )
@@ -23,7 +23,7 @@ final class UserAPI {
     /// GET /users/me/social-accounts
     func getSocialAccounts() async throws -> [SocialAccount] {
         let response: SocialAccountsResponse = try await apiService.performRequest(
-            endpoint: "/users/me/social-accounts",
+            endpoint: "/v2/users/me/social-accounts",
             method: .GET,
             responseType: SocialAccountsResponse.self
         )
@@ -33,7 +33,7 @@ final class UserAPI {
     /// POST /users/me/social-accounts
     func linkSocialAccount(request: LinkSocialAccountRequest) async throws -> SocialAccount {
         let response: SocialAccountResponse = try await apiService.performRequest(
-            endpoint: "/users/me/social-accounts",
+            endpoint: "/v2/users/me/social-accounts",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: SocialAccountResponse.self
@@ -44,7 +44,7 @@ final class UserAPI {
     /// DELETE /users/me/social-accounts/:id
     func unlinkSocialAccount(socialAccountId: String) async throws -> UnlinkSocialAccountResponse {
         return try await apiService.performRequest(
-            endpoint: "/users/me/social-accounts/\(socialAccountId)",
+            endpoint: "/v2/users/me/social-accounts/\(socialAccountId)",
             method: .DELETE,
             responseType: UnlinkSocialAccountResponse.self
         )
