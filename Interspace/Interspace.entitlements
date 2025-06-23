@@ -9,7 +9,9 @@
     <key>com.apple.developer.associated-domains</key>
     <array>
       <string>webcredentials:interspace.app</string>
+      <string>webcredentials:interspace.com</string>
       <string>applinks:interspace.app</string>
+      <string>applinks:interspace.com</string>
     </array>
   </dict>
 </plist>
