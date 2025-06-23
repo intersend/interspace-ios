@@ -132,6 +132,7 @@ struct WalletConnectionConfig {
     let message: String?
     let socialProvider: String?
     let socialProfile: SocialProfile?
+    let oauthCode: String?
 }
 
 struct SocialProfile {
@@ -278,4 +279,59 @@ struct AppleUserInfo: Codable {
     let email: String?
     let firstName: String?
     let lastName: String?
+}
+
+// MARK: - V2 API Models
+
+struct AccountV2: Codable {
+    let id: String
+    let strategy: String
+    let identifier: String
+    let metadata: [String: String]?
+    let createdAt: String
+    let updatedAt: String
+}
+
+struct ProfileSummaryV2: Codable {
+    let id: String
+    let displayName: String
+    let username: String?
+    let avatarUrl: String?
+    let privacyMode: String
+    var isActive: Bool
+}
+
+struct AuthResponseV2: Codable {
+    let success: Bool
+    let account: AccountV2
+    let user: User
+    let profiles: [ProfileSummaryV2]
+    let activeProfile: ProfileSummaryV2?
+    let tokens: AuthTokens
+    let isNewUser: Bool
+    let privacyMode: String
+    let sessionId: String
+}
+
+struct AuthenticationRequestV2: Codable {
+    let strategy: String
+    let identifier: String?
+    let credential: String?
+    let oauthCode: String?
+    let appleAuth: AppleAuthRequest?
+    let privacyMode: String?
+    let deviceId: String?
+}
+
+struct LinkAccountRequestV2: Codable {
+    let strategy: String
+    let identifier: String?
+    let credential: String?
+    let oauthCode: String?
+    let appleAuth: AppleAuthRequest?
+}
+
+struct IdentityGraphResponse: Codable {
+    let accounts: [AccountV2]
+    let profiles: [ProfileSummaryV2]
 }

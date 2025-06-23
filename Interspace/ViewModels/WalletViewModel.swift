@@ -41,7 +41,7 @@ final class WalletViewModel: ObservableObject {
         error = nil
         
         // Check if user is a guest
-        if AuthenticationManager.shared.currentUser?.isGuest == true {
+        if AuthenticationManagerV2.shared.currentUser?.isGuest == true {
             // For guest users, show empty wallet state
             unifiedBalance = nil
         } else {
@@ -85,7 +85,7 @@ final class WalletViewModel: ObservableObject {
         error = nil
         
         // Check if user is a guest
-        if AuthenticationManager.shared.currentUser?.isGuest == true {
+        if AuthenticationManagerV2.shared.currentUser?.isGuest == true {
             // For guest users, just clear the state
             unifiedBalance = nil
         } else {
@@ -125,7 +125,7 @@ final class WalletViewModel: ObservableObject {
         error = nil
         
         // Check if user is a guest
-        if AuthenticationManager.shared.currentUser?.isGuest == true {
+        if AuthenticationManagerV2.shared.currentUser?.isGuest == true {
             // For guest users, show empty transaction history
             transactionHistory = nil
         } else {

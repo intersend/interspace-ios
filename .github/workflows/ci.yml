@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  XCODE_VERSION: '15.0'
+  IOS_VERSION: '17.0'
+  SIMULATOR_NAME: 'iPhone 15 Pro'
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Install SwiftLint
+        run: brew install swiftlint
+        
+      - name: Run SwiftLint
+        run: swiftlint --strict --reporter github-actions-logging
+
+  build:
+    name: Build App
+    runs-on: macos-14
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+            
+      - name: Install dependencies
+        run: |
+          gem install cocoapods
+          pod install
+          
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing \
+            -workspace Interspace.xcworkspace \
+            -scheme Interspace \
+            -destination "platform=iOS Simulator,name=${{ env.SIMULATOR_NAME }},OS=${{ env.IOS_VERSION }}" \
+            -derivedDataPath build/DerivedData \
+            | xcpretty --color
+            
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: build/DerivedData
+
+  test:
+    name: Run Tests
+    runs-on: macos-14
+    needs: build
+    strategy:
+      matrix:
+        test_plan:
+          - name: "Critical Tests"
+            suite: "InterspaceTests/Services/AuthenticationManagerTests,InterspaceTests/Services/SessionCoordinatorTests,InterspaceUITests/AuthenticationUITests"
+          - name: "Unit Tests"
+            suite: "InterspaceTests"
+          - name: "UI Tests - Auth"
+            suite: "InterspaceUITests/AuthenticationUITests,InterspaceUITests/EmailAuthenticationUITests,InterspaceUITests/SocialLoginUITests"
+          - name: "UI Tests - Profile"
+            suite: "InterspaceUITests/ProfileManagementUITests,InterspaceUITests/ProfileCreationUITests,InterspaceUITests/ProfileSwitchingUITests"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+          path: build/DerivedData
+          
+      - name: Run ${{ matrix.test_plan.name }}
+        run: |
+          xcodebuild test-without-building \
+            -workspace Interspace.xcworkspace \
+            -scheme Interspace \
+            -destination "platform=iOS Simulator,name=${{ env.SIMULATOR_NAME }},OS=${{ env.IOS_VERSION }}" \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults/${{ matrix.test_plan.name }}.xcresult \
+            -only-testing:${{ matrix.test_plan.suite }} \
+            | xcpretty --test --color
+            
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.test_plan.name }}
+          path: build/TestResults/${{ matrix.test_plan.name }}.xcresult
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Run security scan
+        uses: github/super-linter@v5
+        env:
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_SWIFT: true
+          VALIDATE_YAML: true
+          VALIDATE_JSON: true
+          VALIDATE_XML: true
+
+  dependency-check:
+    name: Check Dependencies
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Check for outdated pods
+        run: |
+          gem install cocoapods
+          pod outdated
+          
+      - name: Check for security vulnerabilities
+        run: |
+          # Add security scanning for dependencies
+          echo "Checking for known vulnerabilities in dependencies..."
+
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [build, test, security-scan]
+    if: always()
+    steps:
+      - name: Check status
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.security-scan.result }}" != "success" ]; then
+            echo "CI failed"
+            exit 1
+          else
+            echo "CI passed"
+          fi

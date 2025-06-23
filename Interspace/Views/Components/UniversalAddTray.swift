@@ -10,8 +10,12 @@ enum AddSection {
 struct UniversalAddTray: View {
     @Binding var isPresented: Bool
     let initialSection: AddSection
+    var isForAuthentication: Bool = false
+    var authViewModel: AuthViewModel? = nil
     
     @ObservedObject private var profileViewModel = ProfileViewModel.shared
+    @ObservedObject private var authManager = AuthenticationManagerV2.shared
+    @ObservedObject private var sessionCoordinator = SessionCoordinator.shared
     @State private var showWalletConnection = false
     @State private var showSocialConnection = false
     @State private var selectedWalletType: WalletType?
@@ -22,6 +26,7 @@ struct UniversalAddTray: View {
     @State private var showWalletAuthorization = false
     @State private var showAddApp = false
     @State private var showProfileCreation = false
+    @State private var showWalletConnectionTray = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -56,37 +61,39 @@ struct UniversalAddTray: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
                     
-                    // Profile Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Profile")
-                            .font(.headline)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 20)
-                        
-                        VStack(spacing: 0) {
-                            // Add Profile
-                            AddOptionRow(
-                                icon: "person.crop.circle.badge.plus",
-                                iconType: .system,
-                                title: "Add Profile",
-                                iconColor: .blue,
-                                isFirst: true,
-                                isLast: true
-                            ) {
-                                HapticManager.impact(.light)
-                                showProfileCreation = true
+                    // Profile Section - only show when authenticated and not in auth mode
+                    if !isForAuthentication && authManager.isAuthenticated {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Profile")
+                                .font(.headline)
+                                .foregroundColor(.gray)
+                                .padding(.horizontal, 20)
+                            
+                            VStack(spacing: 0) {
+                                // Add Profile
+                                AddOptionRow(
+                                    icon: "person.crop.circle.badge.plus",
+                                    iconType: .system,
+                                    title: "Add Profile",
+                                    iconColor: .blue,
+                                    isFirst: true,
+                                    isLast: true
+                                ) {
+                                    HapticManager.impact(.light)
+                                    showProfileCreation = true
+                                }
                             }
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(white: 0.15))
+                            )
+                            .padding(.horizontal, 20)
                         }
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(white: 0.15))
-                        )
-                        .padding(.horizontal, 20)
                     }
                         
                     // Account Section
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Account")
+                        Text(isForAuthentication ? "Wallet" : "Account")
                             .font(.headline)
                             .foregroundColor(.gray)
                             .padding(.horizontal, 20)
@@ -103,9 +110,14 @@ struct UniversalAddTray: View {
                             ) {
                                 HapticManager.impact(.light)
                                 selectedWalletType = .metamask
-                                // Ensure wallet type is set before showing sheet
-                                DispatchQueue.main.async {
-                                    showWalletAuthorization = true
+                                // Handle authentication vs account linking
+                                if isForAuthentication {
+                                    handleWalletAuthentication(walletType: .metamask)
+                                } else {
+                                    // Ensure wallet type is set before showing sheet
+                                    DispatchQueue.main.async {
+                                        showWalletAuthorization = true
+                                    }
                                 }
                             }
                             
@@ -123,9 +135,14 @@ struct UniversalAddTray: View {
                             ) {
                                 HapticManager.impact(.light)
                                 selectedWalletType = .coinbase
-                                // Ensure wallet type is set before showing sheet
-                                DispatchQueue.main.async {
-                                    showWalletAuthorization = true
+                                // Handle authentication vs account linking
+                                if isForAuthentication {
+                                    handleWalletAuthentication(walletType: .coinbase)
+                                } else {
+                                    // Ensure wallet type is set before showing sheet
+                                    DispatchQueue.main.async {
+                                        showWalletAuthorization = true
+                                    }
                                 }
                             }
                             
@@ -143,9 +160,14 @@ struct UniversalAddTray: View {
                             ) {
                                 HapticManager.impact(.light)
                                 selectedWalletType = .walletConnect
-                                // Ensure wallet type is set before showing sheet
-                                DispatchQueue.main.async {
-                                    showWalletAuthorization = true
+                                // Handle authentication vs account linking
+                                if isForAuthentication {
+                                    handleWalletAuthentication(walletType: .walletConnect)
+                                } else {
+                                    // Ensure wallet type is set before showing sheet
+                                    DispatchQueue.main.async {
+                                        showWalletAuthorization = true
+                                    }
                                 }
                             }
                         }
@@ -168,7 +190,11 @@ struct UniversalAddTray: View {
                             isLast: false
                         ) {
                             HapticManager.impact(.light)
-                            showEmailAuth = true
+                            if isForAuthentication {
+                                handleEmailAuthentication()
+                            } else {
+                                showEmailAuth = true
+                            }
                         }
                         
                         Divider()
@@ -184,7 +210,11 @@ struct UniversalAddTray: View {
                             isLast: false
                         ) {
                             HapticManager.impact(.light)
-                            showPasskeyAuth = true
+                            if isForAuthentication {
+                                handlePasskeyAuthentication()
+                            } else {
+                                showPasskeyAuth = true
+                            }
                         }
                         
                         Divider()
@@ -200,7 +230,11 @@ struct UniversalAddTray: View {
                             isLast: true
                         ) {
                             HapticManager.impact(.light)
-                            showAppleSignIn = true
+                            if isForAuthentication {
+                                handleAppleAuthentication()
+                            } else {
+                                showAppleSignIn = true
+                            }
                         }
                     }
                     .background(
@@ -209,32 +243,34 @@ struct UniversalAddTray: View {
                     )
                     .padding(.horizontal, 20)
                     
-                    // App Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("App")
-                            .font(.headline)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 20)
-                        
-                        VStack(spacing: 0) {
-                            // Add App
-                            AddOptionRow(
-                                icon: "square.grid.2x2",
-                                iconType: .system,
-                                title: "Add App",
-                                iconColor: .orange,
-                                isFirst: true,
-                                isLast: true
-                            ) {
-                                HapticManager.impact(.light)
-                                showAddApp = true
+                    // App Section - only show when authenticated and not in auth mode
+                    if !isForAuthentication && authManager.isAuthenticated {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("App")
+                                .font(.headline)
+                                .foregroundColor(.gray)
+                                .padding(.horizontal, 20)
+                            
+                            VStack(spacing: 0) {
+                                // Add App
+                                AddOptionRow(
+                                    icon: "square.grid.2x2",
+                                    iconType: .system,
+                                    title: "Add App",
+                                    iconColor: .orange,
+                                    isFirst: true,
+                                    isLast: true
+                                ) {
+                                    HapticManager.impact(.light)
+                                    showAddApp = true
+                                }
                             }
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(white: 0.15))
+                            )
+                            .padding(.horizontal, 20)
                         }
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(white: 0.15))
-                        )
-                        .padding(.horizontal, 20)
                     }
                         
                         Spacer(minLength: 40)
@@ -277,8 +313,32 @@ struct UniversalAddTray: View {
                 )
             }
         }
+        .sheet(isPresented: $showWalletConnectionTray) {
+            // Use WalletConnectionTray for authentication
+            WalletConnectionTray(
+                isPresented: $showWalletConnectionTray,
+                isForAuthentication: true,
+                authViewModel: authViewModel ?? AuthViewModel()
+            )
+            .onDisappear {
+                // Check if authentication succeeded
+                if isForAuthentication && authManager.isAuthenticated {
+                    isPresented = false
+                }
+            }
+        }
         .sheet(isPresented: $showEmailAuth) {
-            EmailAuthView(viewModel: AuthViewModel())
+            if isForAuthentication {
+                EmailAuthView(viewModel: authViewModel ?? AuthViewModel())
+                    .onDisappear {
+                        // Check if authentication succeeded
+                        if authManager.isAuthenticated {
+                            isPresented = false
+                        }
+                    }
+            } else {
+                EmailAuthView(viewModel: AuthViewModel())
+            }
         }
         .sheet(isPresented: $showPasskeyAuth) {
             // TODO: Implement passkey authentication
@@ -306,12 +366,65 @@ struct UniversalAddTray: View {
         }
         .onAppear {
             Task {
-                await profileViewModel.loadProfile()
+                if !isForAuthentication {
+                    await profileViewModel.loadProfile()
+                }
+            }
+        }
+        .onChange(of: authManager.isAuthenticated) { newValue in
+            // Close the tray when authentication succeeds
+            if isForAuthentication && newValue {
+                isPresented = false
             }
         }
     }
     
     // MARK: - Helper Methods
+    
+    // MARK: - Authentication Handlers
+    
+    private func handleWalletAuthentication(walletType: WalletType) {
+        // For authentication mode, show the wallet connection tray
+        selectedWalletType = walletType
+        showWalletConnectionTray = true
+    }
+    
+    private func handleEmailAuthentication() {
+        // Show email auth sheet
+        showEmailAuth = true
+    }
+    
+    private func handlePasskeyAuthentication() {
+        // Initiate passkey authentication
+        Task {
+            do {
+                try await authManager.authenticateWithPasskey()
+                await MainActor.run {
+                    isPresented = false
+                }
+                HapticManager.notification(.success)
+            } catch {
+                print("Passkey authentication failed: \(error)")
+                HapticManager.notification(.error)
+            }
+        }
+    }
+    
+    private func handleAppleAuthentication() {
+        // Initiate Apple Sign In
+        Task {
+            do {
+                try await authManager.authenticateWithApple()
+                await MainActor.run {
+                    isPresented = false
+                }
+                HapticManager.notification(.success)
+            } catch {
+                print("Apple authentication failed: \(error)")
+                HapticManager.notification(.error)
+            }
+        }
+    }
     
     private func createProfile(name: String) async {
         do {

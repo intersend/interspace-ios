@@ -329,7 +329,7 @@ final class DataSyncManager: ObservableObject {
         guard !isSyncing else { return }
         
         // Validate auth token before any sync operations
-        guard await AuthenticationManager.shared.validateAuthToken() else {
+        guard await AuthenticationManagerV2.shared.validateAuthToken() else {
             print("🔄 DataSyncManager: Skipping background sync - invalid auth token")
             return
         }

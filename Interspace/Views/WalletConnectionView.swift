@@ -22,7 +22,7 @@ struct WalletConnectionView: View {
     @State private var timeoutTimer: Timer?
     
     @StateObject private var walletService = WalletService.shared
-    @StateObject private var authManager = AuthenticationManager.shared
+    @StateObject private var authManager = AuthenticationManagerV2.shared
     @StateObject private var sessionCoordinator = SessionCoordinator.shared
     
     enum ConnectionState: Equatable {
@@ -475,7 +475,8 @@ struct WalletConnectionView: View {
                 signature: signature,
                 message: message,
                 socialProvider: nil,
-                socialProfile: nil
+                socialProfile: nil,
+                oauthCode: nil
             )
             
             // Try to authenticate directly
@@ -521,7 +522,8 @@ struct WalletConnectionView: View {
                 signature: signature,
                 message: message,
                 socialProvider: nil,
-                socialProfile: nil
+                socialProfile: nil,
+                oauthCode: nil
             )
             
             // Authenticate with the wallet

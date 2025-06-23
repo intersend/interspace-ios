@@ -26,7 +26,7 @@ final class AuthViewModel: ObservableObject {
     @Published var selectedWalletType: WalletType?
     
     // Services
-    let authManager = AuthenticationManager.shared
+    let authManager = AuthenticationManagerV2.shared
     private let walletService = WalletService.shared
     
     private var cancellables = Set<AnyCancellable>()
@@ -106,7 +106,8 @@ final class AuthViewModel: ObservableObject {
                     signature: nil,
                     message: nil,
                     socialProvider: nil,
-                    socialProfile: nil
+                    socialProfile: nil,
+                    oauthCode: nil
                 )
                 
                 try await authManager.authenticate(with: config)
@@ -155,7 +156,8 @@ final class AuthViewModel: ObservableObject {
                     signature: nil,
                     message: nil,
                     socialProvider: nil,
-                    socialProfile: nil
+                    socialProfile: nil,
+                    oauthCode: nil
                 )
                 
                 try await authManager.authenticate(with: config)
@@ -217,8 +219,8 @@ final class AuthViewModel: ObservableObject {
                 
                 // Store tokens in keychain
                 if !tokens.accessToken.isEmpty {
-                    KeychainManager.shared.accessToken = tokens.accessToken
-                    KeychainManager.shared.refreshToken = tokens.refreshToken
+                    try KeychainManager.shared.save(tokens.accessToken, for: .accessToken)
+                    try KeychainManager.shared.save(tokens.refreshToken, for: .refreshToken)
                     
                     // Update authentication state
                     await MainActor.run {
@@ -301,7 +303,8 @@ final class AuthViewModel: ObservableObject {
                     signature: result.signature,
                     message: result.message, // Include the message for verification
                     socialProvider: nil,
-                    socialProfile: nil
+                    socialProfile: nil,
+                    oauthCode: nil
                 )
                 
                 try await authManager.authenticate(with: config)
@@ -438,7 +441,8 @@ final class AuthViewModel: ObservableObject {
                         signature: nil,
                         message: nil,
                         socialProvider: "apple",
-                        socialProfile: socialProfile
+                        socialProfile: socialProfile,
+                        oauthCode: nil
                     )
                     
                     try await authManager.authenticate(with: config)
@@ -472,7 +476,8 @@ final class AuthViewModel: ObservableObject {
                     signature: nil,
                     message: nil,
                     socialProvider: "google",
-                    socialProfile: nil
+                    socialProfile: nil,
+                    oauthCode: nil
                 )
                 
                 try await authManager.authenticate(with: config)

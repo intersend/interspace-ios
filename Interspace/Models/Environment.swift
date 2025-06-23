@@ -14,11 +14,11 @@ enum AppEnvironment: String, CaseIterable {
                 return url
             }
             // Fallback for development
-            return "http://localhost:3000/api/v1"
+            return "https://7d4b-184-147-176-114.ngrok-free.app/api/v1"
         case .staging:
-            return "https://staging-api.interspace.com/api/v1"
+            return "https://staging-api.interspace.fi/api/v1"
         case .production:
-            return "https://api.interspace.com/api/v1"
+            return "https://api.interspace.fi/api/v1"
         }
     }
     

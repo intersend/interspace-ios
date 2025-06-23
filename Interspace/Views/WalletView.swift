@@ -20,7 +20,7 @@ struct WalletView: View {
                 VStack(spacing: 0) {
                     // Content at top
                     VStack(spacing: DesignTokens.Spacing.xl) {
-                        if AuthenticationManager.shared.currentUser?.isGuest == true {
+                        if AuthenticationManagerV2.shared.currentUser?.isGuest == true {
                             GuestWalletState()
                         } else {
                             EmptyWalletState()

@@ -3,7 +3,7 @@ import SwiftUI
 struct ProfileView: View {
     @ObservedObject private var viewModel = ProfileViewModel.shared
     @EnvironmentObject var sessionCoordinator: SessionCoordinator
-    @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var authManager: AuthenticationManagerV2
     
     // Sheet states
     @State private var showAbout = false
@@ -463,7 +463,7 @@ struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         ProfileView()
             .environmentObject(SessionCoordinator.shared)
-            .environmentObject(AuthenticationManager.shared)
+            .environmentObject(AuthenticationManagerV2.shared)
             .preferredColorScheme(.dark)
     }
 }

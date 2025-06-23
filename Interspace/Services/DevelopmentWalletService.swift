@@ -85,7 +85,7 @@ extension ProfileViewModel {
 
 // MARK: - Development Authentication
 
-extension AuthenticationManager {
+extension AuthenticationManagerV2 {
     /// Authenticate with a development wallet (for testing)
     func authenticateWithDevelopmentWallet() async throws {
         guard EnvironmentConfiguration.shared.isDevelopmentModeEnabled else {
@@ -101,7 +101,8 @@ extension AuthenticationManager {
             signature: "dev_signature",
             message: nil,
             socialProvider: nil,
-            socialProfile: nil
+            socialProfile: nil,
+            oauthCode: nil
         )
         
         try await authenticate(with: config)
