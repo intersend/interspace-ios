@@ -174,7 +174,10 @@ final class GoogleSignInService {
         // Method 1: Get from active window scene
         if let scene = await UIApplication.shared.connectedScenes.first as? UIWindowScene {
             print("🔐 GoogleSignInService: Found window scene")
-            if let window = await scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first {
+            let window = await MainActor.run {
+                scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
+            }
+            if let window = window {
                 print("🔐 GoogleSignInService: Found window: \(window)")
                 presentingViewController = await window.rootViewController
                 
@@ -189,7 +192,10 @@ final class GoogleSignInService {
         // Method 2: Fallback to key window
         if presentingViewController == nil {
             print("🔐 GoogleSignInService: Trying fallback method for view controller")
-            if let keyWindow = await UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+            let keyWindow = await MainActor.run {
+                UIApplication.shared.windows.first(where: { $0.isKeyWindow })
+            }
+            if let keyWindow = keyWindow {
                 presentingViewController = await keyWindow.rootViewController
             }
         }
@@ -437,7 +443,7 @@ final class PasskeyService {
             body = try? JSONEncoder().encode(requestData)
         }
         
-        let result = try await APIService.shared.performRequest(
+        let response = try await APIService.shared.performRequest(
             endpoint: endpoint,
             method: .POST,
             body: body,
@@ -445,15 +451,10 @@ final class PasskeyService {
             requiresAuth: isRegistration
         )
         
-        switch result {
-        case .success(let response):
-            guard let optionsData = try? JSONEncoder().encode(response.data) else {
-                throw PasskeyError.registrationFailed
-            }
-            return (challenge: response.data.challenge, options: optionsData)
-        case .failure(let error):
-            throw error
+        guard let optionsData = try? JSONEncoder().encode(response.data) else {
+            throw PasskeyError.registrationFailed
         }
+        return (challenge: response.data.challenge, options: optionsData)
     }
     
     @available(iOS 16.0, *)
@@ -498,6 +499,12 @@ final class PasskeyService {
         }
         
         // Verify registration with server
+        let finalDeviceName: String
+        if let deviceName = deviceName {
+            finalDeviceName = deviceName
+        } else {
+            finalDeviceName = await MainActor.run { UIDevice.current.name }
+        }
         let verifyRequest = PasskeyVerifyRequest(
             response: PasskeyResponse(
                 id: passkeyResult.credentialID,
@@ -512,35 +519,23 @@ final class PasskeyService {
                 )
             ),
             challenge: challenge,
-            deviceName: deviceName ?? (await MainActor.run { UIDevice.current.name })
+            deviceName: finalDeviceName
         )
         
-        let verifyResult: Result<PasskeyVerifyResponse, APIError> = await withCheckedContinuation { continuation in
-            do {
-                let body = try JSONEncoder().encode(verifyRequest)
-                APIService.shared.request(
-                    endpoint: "/auth/passkey/register-verify",
-                    method: "POST",
-                    body: body,
-                    requiresAuth: true
-                ) { result in
-                    continuation.resume(returning: result)
-                }
-            } catch {
-                continuation.resume(returning: .failure(.decodingFailed(error)))
-            }
-        }
+        let body = try JSONEncoder().encode(verifyRequest)
+        let verifyResponse = try await APIService.shared.performRequest(
+            endpoint: "/auth/passkey/register-verify",
+            method: .POST,
+            body: body,
+            responseType: PasskeyVerifyResponse.self,
+            requiresAuth: true
+        )
         
-        switch verifyResult {
-        case .success(let response):
-            if response.success && response.data?.verified == true {
-                // Registration successful - no tokens returned for registration
-                return AuthTokens(accessToken: "", refreshToken: "", expiresIn: 0)
-            } else {
-                throw PasskeyError.registrationFailed
-            }
-        case .failure(let error):
-            throw error
+        if verifyResponse.success && verifyResponse.data?.verified == true {
+            // Registration successful - no tokens returned for registration
+            return AuthTokens(accessToken: "", refreshToken: "", expiresIn: 0)
+        } else {
+            throw PasskeyError.registrationFailed
         }
     }
     

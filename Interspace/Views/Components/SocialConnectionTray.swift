@@ -3,7 +3,7 @@ import AuthenticationServices
 
 struct SocialConnectionTray: View {
     @Binding var isPresented: Bool
-    @ObservedObject private var authManager = AuthenticationManager.shared
+    @ObservedObject private var authManager = AuthenticationManagerV2.shared
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
@@ -366,10 +366,11 @@ struct AppleSignInRow: View {
                         signature: appleIDCredential.user,
                         message: nil,
                         socialProvider: "apple",
-                        socialProfile: socialProfile
+                        socialProfile: socialProfile,
+                        oauthCode: nil
                     )
                     
-                    try await AuthenticationManager.shared.authenticate(with: config)
+                    try await AuthenticationManagerV2.shared.authenticate(with: config)
                     HapticManager.notification(.success)
                     
                 case .failure(let error):

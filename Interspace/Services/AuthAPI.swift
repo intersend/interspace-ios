@@ -148,6 +148,87 @@ final class AuthAPI {
         )
     }
     
+    // MARK: - V2 API Methods
+    
+    /// POST /auth/v2/authenticate
+    func authenticateV2(request: AuthenticationRequestV2) async throws -> AuthResponseV2 {
+        return try await apiService.performRequest(
+            endpoint: "/auth/v2/authenticate",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: AuthResponseV2.self,
+            requiresAuth: false
+        )
+    }
+    
+    /// POST /auth/v2/switch-profile
+    func switchProfileV2(profileId: String) async throws -> AuthResponseV2 {
+        struct SwitchProfileRequest: Codable {
+            let profileId: String
+        }
+        let request = SwitchProfileRequest(profileId: profileId)
+        return try await apiService.performRequest(
+            endpoint: "/auth/v2/switch-profile",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: AuthResponseV2.self
+        )
+    }
+    
+    /// POST /auth/v2/link-account
+    func linkAccountsV2(request: LinkAccountRequestV2) async throws -> AuthResponseV2 {
+        return try await apiService.performRequest(
+            endpoint: "/auth/v2/link-account",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: AuthResponseV2.self
+        )
+    }
+    
+    /// POST /auth/v2/refresh
+    func refreshTokenV2(refreshToken: String) async throws -> AuthResponseV2 {
+        let request = RefreshTokenRequest(refreshToken: refreshToken)
+        return try await apiService.performRequest(
+            endpoint: "/auth/v2/refresh",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: AuthResponseV2.self,
+            requiresAuth: false
+        )
+    }
+    
+    /// POST /auth/v2/logout
+    func logoutV2(refreshToken: String) async throws -> LogoutResponse {
+        let request = LogoutRequest(refreshToken: refreshToken)
+        return try await apiService.performRequest(
+            endpoint: "/auth/v2/logout",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: LogoutResponse.self
+        )
+    }
+    
+    /// POST /auth/v2/email/request-code
+    func sendEmailCodeV2(email: String) async throws -> EmailCodeResponse {
+        let request = SendEmailCodeRequest(email: email)
+        return try await apiService.performRequest(
+            endpoint: "/auth/v2/email/request-code",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: EmailCodeResponse.self,
+            requiresAuth: false
+        )
+    }
+    
+    /// GET /auth/v2/identity-graph
+    func getIdentityGraph() async throws -> IdentityGraphResponse {
+        return try await apiService.performRequest(
+            endpoint: "/auth/v2/identity-graph",
+            method: .GET,
+            responseType: IdentityGraphResponse.self
+        )
+    }
+    
 }
 
 // MARK: - Request Models

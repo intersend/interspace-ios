@@ -5,7 +5,7 @@ import AVFoundation
 
 struct AuthView: View {
     @StateObject private var viewModel = AuthViewModel()
-    @ObservedObject private var authManager = AuthenticationManager.shared
+    @ObservedObject private var authManager = AuthenticationManagerV2.shared
     @ObservedObject private var walletService = WalletService.shared
     @State private var showingWalletConnectScanner = false
     @State private var showingEmailAuth = false
@@ -33,7 +33,6 @@ struct AuthView: View {
                             onConnectCoinbase: connectCoinbaseWallet,
                             onConnectWalletConnect: connectWalletConnect,
                             onAuthenticateGoogle: authenticateWithGoogle,
-                            onAuthenticateApple: authenticateWithApple,
                             onAuthenticatePasskey: authenticateWithPasskey,
                             onAuthenticateGuest: authenticateAsGuest,
                             onShowEmailAuth: showEmailAuthentication,
@@ -163,29 +162,10 @@ struct AuthView: View {
     }
     
     private func authenticateWithPasskey() async {
-        if #available(iOS 16.0, *) {
-            do {
-                try await authManager.authenticateWithPasskey()
-            } catch {
-                print("🔗 AuthView: Passkey authentication error: \(error)")
-            }
-        } else {
-            // This shouldn't happen since button is hidden on iOS < 16
-            print("🔗 AuthView: Passkeys not supported on this iOS version")
-        }
-    }
-    
-    private func authenticateWithApple() async {
-        print("🔗 AuthView: User tapped Apple Sign-In button")
         do {
-            try await authManager.authenticateWithApple()
-            print("🔗 AuthView: Apple authentication completed successfully")
+            try await authManager.authenticateWithPasskey()
         } catch {
-            print("🔗 AuthView: Apple authentication error: \(error)")
-            // Don't show error alert for user cancellation (empty error message)
-            if error.localizedDescription.isEmpty {
-                print("🔗 AuthView: User cancelled Apple Sign-In")
-            }
+            print("🔗 AuthView: Passkey authentication error: \(error)")
         }
     }
     
@@ -200,7 +180,8 @@ struct AuthView: View {
                 signature: nil,
                 message: nil,
                 socialProvider: nil,
-                socialProfile: nil
+                socialProfile: nil,
+                oauthCode: nil
             )
             try await authManager.authenticate(with: config)
         } catch {
@@ -231,7 +212,7 @@ struct AuthView: View {
 
 // MARK: - Authenticated State View
 struct AuthenticatedView: View {
-    @ObservedObject private var authManager = AuthenticationManager.shared
+    @ObservedObject private var authManager = AuthenticationManagerV2.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -283,197 +264,94 @@ struct AuthenticatedView: View {
 
 // MARK: - Unauthenticated State View
 struct UnauthenticatedView: View {
-    @ObservedObject private var authManager = AuthenticationManager.shared
+    @ObservedObject private var authManager = AuthenticationManagerV2.shared
     @ObservedObject private var walletService = WalletService.shared
     @Binding var showingWalletConnectScanner: Bool
     @Binding var showWalletConnectionTray: Bool
     @Binding var showSocialConnectionTray: Bool
+    @State private var showUniversalAddTray = false
     
     let onConnectMetaMask: () async -> Void
     let onConnectCoinbase: () async -> Void
     let onConnectWalletConnect: () async -> Void
     let onAuthenticateGoogle: () async -> Void
-    let onAuthenticateApple: () async -> Void
     let onAuthenticatePasskey: () async -> Void
     let onAuthenticateGuest: () async -> Void
     let onShowEmailAuth: () -> Void
     let screenHeight: CGFloat
     
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        GeometryReader { geometry in
             VStack(spacing: 0) {
-                // Header section - starts at top with minimal spacing
-                VStack(spacing: 24) {
-                    // App logo/icon
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        DesignTokens.Colors.primary,
-                                        DesignTokens.Colors.primaryVariant
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 80, height: 80)
-                            .shadow(
-                                color: DesignTokens.Colors.primary.opacity(0.3),
-                                radius: 15,
-                                x: 0,
-                                y: 8
-                            )
+                Spacer()
+                
+                // Centered content with Apple-native styling
+                VStack(spacing: 60) {
+                    // App identity
+                    VStack(spacing: 20) {
+                        // Infinity symbol
+                        Text("∞")
+                            .font(.system(size: 90, weight: .ultraLight, design: .rounded))
+                            .foregroundColor(DesignTokens.Colors.textPrimary)
                         
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 36, weight: .medium))
-                            .foregroundColor(.white)
+                        // App name
+                        Text("Interspace")
+                            .font(.system(.largeTitle, design: .rounded))
+                            .fontWeight(.medium)
+                            .foregroundColor(DesignTokens.Colors.textPrimary)
                     }
                     
-                    VStack(spacing: DesignTokens.Spacing.md) {
-                        Text("Welcome to Interspace")
-                            .font(DesignTokens.Typography.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(DesignTokens.Colors.textPrimary)
-                            .multilineTextAlignment(.center)
-                        
-                        Text("Connect your wallet or sign in to get started with smart profiles and Web3 apps")
-                            .font(DesignTokens.Typography.body)
-                            .foregroundColor(DesignTokens.Colors.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(nil)
-                    }
-                }
-                .padding(.top, 40)
-                .padding(.horizontal, 20)
-                
-                // Authentication Options Section
-                VStack(spacing: 32) {
-                    // Primary authentication options
-                    VStack(spacing: DesignTokens.Spacing.lg) {
-                        // Connect Wallet button (preferred)
+                    // Authentication buttons
+                    VStack(spacing: 16) {
+                        // Connect Wallet - Primary action
                         Button(action: {
-                            HapticManager.impact(.medium)
+                            HapticManager.impact(.light)
                             showWalletConnectionTray = true
                         }) {
-                            HStack {
-                                Image(systemName: "wallet.pass.fill")
-                                    .font(.system(size: 22, weight: .medium))
-                                
-                                Text("Connect Wallet")
-                                    .font(DesignTokens.Typography.title3)
-                                    .fontWeight(.semibold)
-                            }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, DesignTokens.Spacing.lg)
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        DesignTokens.Colors.primary,
-                                        DesignTokens.Colors.primaryVariant
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                            Text("Connect Wallet")
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: 320)
+                                .frame(height: 50)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(DesignTokens.Colors.primary)
                                 )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md))
-                            .shadow(
-                                color: DesignTokens.Colors.primary.opacity(0.3),
-                                radius: 8,
-                                x: 0,
-                                y: 4
-                            )
                         }
                         .buttonStyle(PlainButtonStyle())
                         
-                        // Connect Social button
+                        // Add to Interspace - Secondary action
                         Button(action: {
-                            HapticManager.impact(.medium)
-                            showSocialConnectionTray = true
+                            HapticManager.impact(.light)
+                            showUniversalAddTray = true
                         }) {
-                            HStack {
-                                Image(systemName: "person.2.fill")
-                                    .font(.system(size: 20, weight: .medium))
-                                
-                                Text("Connect Social")
-                                    .font(DesignTokens.Typography.body)
-                                    .fontWeight(.medium)
-                            }
-                            .foregroundColor(DesignTokens.Colors.textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, DesignTokens.Spacing.lg)
-                            .background(
-                                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                                    .fill(DesignTokens.Colors.backgroundTertiary)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                                            .stroke(DesignTokens.Colors.borderPrimary, lineWidth: 1)
-                                    )
-                            )
+                            Text("Add to Interspace")
+                                .font(.system(size: 17, weight: .medium, design: .rounded))
+                                .foregroundColor(DesignTokens.Colors.primary)
+                                .frame(maxWidth: 320)
+                                .frame(height: 50)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(DesignTokens.Colors.backgroundSecondary)
+                                )
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
-                    
-                    // Divider
-                    HStack {
-                        Rectangle()
-                            .fill(DesignTokens.Colors.borderSecondary)
-                            .frame(height: 0.5)
-                        
-                        Text("or")
-                            .font(DesignTokens.Typography.caption1)
-                            .foregroundColor(DesignTokens.Colors.textTertiary)
-                            .padding(.horizontal, DesignTokens.Spacing.md)
-                        
-                        Rectangle()
-                            .fill(DesignTokens.Colors.borderSecondary)
-                            .frame(height: 0.5)
-                    }
-                    .padding(.vertical, DesignTokens.Spacing.md)
-                    
-                    // Alternative options
-                    VStack(spacing: DesignTokens.Spacing.md) {
-                        LiquidGlassAuthButton(
-                            title: "Continue with Email",
-                            subtitle: "Sign in with email verification",
-                            icon: "envelope.fill",
-                            walletType: nil
-                        ) {
-                            HapticManager.impact(.light)
-                            onShowEmailAuth()
-                        }
-                        
-                        if #available(iOS 16.0, *), PasskeyService.isPasskeyAvailable() {
-                            LiquidGlassAuthButton(
-                                title: "Sign in with Passkey",
-                                subtitle: "Use Face ID or Touch ID",
-                                icon: "faceid",
-                                walletType: .apple
-                            ) {
-                                Task {
-                                    await onAuthenticatePasskey()
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Guest mode button
-                    Button("Continue as Guest") {
-                        HapticManager.impact(.light)
-                        Task {
-                            await onAuthenticateGuest()
-                        }
-                    }
-                    .buttonStyle(LiquidGlassButtonStyle(variant: .ghost, size: .medium))
-                    .padding(.top, DesignTokens.Spacing.md)
-                    
                 }
-                .padding(.top, 40)
                 .padding(.horizontal, 20)
-                .padding(.bottom, 60)
+                
+                Spacer()
+                Spacer() // Extra spacer to push content up slightly
             }
-            .frame(minHeight: screenHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .sheet(isPresented: $showUniversalAddTray) {
+            UniversalAddTray(
+                isPresented: $showUniversalAddTray,
+                initialSection: .none,
+                isForAuthentication: true,
+                authViewModel: AuthViewModel()
+            )
         }
     }
 }

@@ -1,0 +1,305 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run (all, unit, ui, integration)'
+        required: false
+        default: 'all'
+
+env:
+  XCODE_VERSION: '15.0'
+  IOS_VERSION: '17.0'
+  SIMULATOR_NAME: 'iPhone 15 Pro'
+
+jobs:
+  validate-deployment:
+    name: Validate Deployment Readiness
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Make validation script executable
+        run: chmod +x ./Scripts/validate-deployment.sh
+        
+      - name: Run deployment validation
+        run: ./Scripts/validate-deployment.sh
+        
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: validation-report
+          path: build/validation-report.txt
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: macos-14
+    needs: validate-deployment
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+            
+      - name: Install dependencies
+        run: |
+          gem install cocoapods
+          pod install
+          
+      - name: Run unit tests
+        run: |
+          xcodebuild test \
+            -workspace Interspace.xcworkspace \
+            -scheme Interspace \
+            -destination "platform=iOS Simulator,name=${{ env.SIMULATOR_NAME }},OS=${{ env.IOS_VERSION }}" \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults/UnitTests.xcresult \
+            -only-testing:InterspaceTests \
+            -enableCodeCoverage YES \
+            | xcpretty --test --color
+            
+      - name: Generate coverage report
+        run: |
+          xcrun xccov view --report --json build/TestResults/UnitTests.xcresult > coverage.json
+          
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: unit-test-results
+          path: |
+            build/TestResults/UnitTests.xcresult
+            coverage.json
+
+  ui-tests:
+    name: UI Tests
+    runs-on: macos-14
+    needs: validate-deployment
+    strategy:
+      matrix:
+        test_suite:
+          - AuthenticationUITests
+          - OnboardingUITests
+          - ProfileManagementUITests
+          - ProfileCreationUITests
+          - ProfileSwitchingUITests
+          - WalletConnectionUITests
+          - TransactionHistoryUITests
+          - AppManagementUITests
+          - SettingsPrivacyUITests
+          - DeepLinkingUITests
+          - OfflineModeUITests
+          - EmailAuthenticationUITests
+          - SocialLoginUITests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+            
+      - name: Install dependencies
+        run: |
+          gem install cocoapods
+          pod install
+          
+      - name: Boot simulator
+        run: |
+          xcrun simctl boot "${{ env.SIMULATOR_NAME }}" || true
+          xcrun simctl openurl booted https://example.com
+          
+      - name: Run UI test suite - ${{ matrix.test_suite }}
+        run: |
+          xcodebuild test \
+            -workspace Interspace.xcworkspace \
+            -scheme Interspace \
+            -destination "platform=iOS Simulator,name=${{ env.SIMULATOR_NAME }},OS=${{ env.IOS_VERSION }}" \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults/${{ matrix.test_suite }}.xcresult \
+            -only-testing:InterspaceUITests/${{ matrix.test_suite }} \
+            -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 600 \
+            | xcpretty --test --color
+            
+      - name: Export test results
+        if: always()
+        run: |
+          xcrun xcresulttool get --path build/TestResults/${{ matrix.test_suite }}.xcresult \
+            --format json > build/TestResults/${{ matrix.test_suite }}-results.json
+            
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ui-test-results-${{ matrix.test_suite }}
+          path: |
+            build/TestResults/${{ matrix.test_suite }}.xcresult
+            build/TestResults/${{ matrix.test_suite }}-results.json
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: macos-14
+    needs: validate-deployment
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+            
+      - name: Install dependencies
+        run: |
+          gem install cocoapods
+          pod install
+          
+      - name: Run integration tests
+        run: |
+          xcodebuild test \
+            -workspace Interspace.xcworkspace \
+            -scheme Interspace \
+            -destination "platform=iOS Simulator,name=${{ env.SIMULATOR_NAME }},OS=${{ env.IOS_VERSION }}" \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults/IntegrationTests.xcresult \
+            -only-testing:InterspaceTests/IntegrationTests \
+            | xcpretty --test --color
+            
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results
+          path: build/TestResults/IntegrationTests.xcresult
+
+  test-report:
+    name: Generate Test Report
+    runs-on: ubuntu-latest
+    needs: [unit-tests, ui-tests, integration-tests]
+    if: always()
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v3
+        with:
+          path: test-results
+          
+      - name: Generate summary report
+        run: |
+          echo "# Test Results Summary" > test-summary.md
+          echo "" >> test-summary.md
+          echo "## Unit Tests" >> test-summary.md
+          if [ -f "test-results/unit-test-results/coverage.json" ]; then
+            echo "✅ Unit tests completed" >> test-summary.md
+          else
+            echo "❌ Unit tests failed or did not complete" >> test-summary.md
+          fi
+          echo "" >> test-summary.md
+          echo "## UI Tests" >> test-summary.md
+          for suite in test-results/ui-test-results-*; do
+            if [ -d "$suite" ]; then
+              suite_name=$(basename "$suite" | sed 's/ui-test-results-//')
+              if [ -f "$suite/*.json" ]; then
+                echo "✅ $suite_name" >> test-summary.md
+              else
+                echo "❌ $suite_name" >> test-summary.md
+              fi
+            fi
+          done
+          echo "" >> test-summary.md
+          echo "## Integration Tests" >> test-summary.md
+          if [ -d "test-results/integration-test-results" ]; then
+            echo "✅ Integration tests completed" >> test-summary.md
+          else
+            echo "❌ Integration tests failed or did not complete" >> test-summary.md
+          fi
+          
+      - name: Upload summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-summary
+          path: test-summary.md
+          
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('test-summary.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: macos-14
+    needs: validate-deployment
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Run performance tests
+        run: |
+          xcodebuild test \
+            -workspace Interspace.xcworkspace \
+            -scheme Interspace \
+            -destination "platform=iOS Simulator,name=${{ env.SIMULATOR_NAME }},OS=${{ env.IOS_VERSION }}" \
+            -only-testing:InterspaceTests/PerformanceTests \
+            -enableCodeCoverage NO \
+            | xcpretty --test --color
+            
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: build/TestResults/PerformanceTests.xcresult

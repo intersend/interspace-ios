@@ -174,7 +174,8 @@ struct WalletConnectTray: View {
                     signature: result.signature,
                     message: result.message,
                     socialProvider: nil,
-                    socialProfile: nil
+                    socialProfile: nil,
+                    oauthCode: nil
                 )
                 
                 try await viewModel.authManager.authenticate(with: config)

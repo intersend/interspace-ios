@@ -17,7 +17,7 @@ class ServiceInitializer: ObservableObject {
     // MARK: - Service Registry
     
     private var _keychainManager: KeychainManager?
-    private var _authenticationManager: AuthenticationManager?
+    private var _authenticationManagerV2: AuthenticationManagerV2?
     private var _sessionCoordinator: SessionCoordinator?
     private var _walletService: WalletService?
     private var _profileIconGenerator: ProfileIconGenerator?
@@ -43,7 +43,7 @@ class ServiceInitializer: ObservableObject {
             
             // Initialize remaining critical services
             group.addTask { @MainActor in
-                self.initializeAuthenticationManager()
+                self.initializeAuthenticationManagerV2()
             }
             
             group.addTask { @MainActor in
@@ -102,10 +102,10 @@ class ServiceInitializer: ObservableObject {
         recordInitTime("KeychainManager", start: start)
     }
     
-    private func initializeAuthenticationManager() {
+    private func initializeAuthenticationManagerV2() {
         let start = CFAbsoluteTimeGetCurrent()
-        _authenticationManager = AuthenticationManager.shared
-        recordInitTime("AuthenticationManager", start: start)
+        _authenticationManagerV2 = AuthenticationManagerV2.shared
+        recordInitTime("AuthenticationManagerV2", start: start)
     }
     
     private func initializeSessionCoordinator() {
@@ -155,11 +155,11 @@ class ServiceInitializer: ObservableObject {
         return _keychainManager!
     }
     
-    var auth: AuthenticationManager {
-        if _authenticationManager == nil {
-            initializeAuthenticationManager()
+    var auth: AuthenticationManagerV2 {
+        if _authenticationManagerV2 == nil {
+            initializeAuthenticationManagerV2()
         }
-        return _authenticationManager!
+        return _authenticationManagerV2!
     }
     
     var session: SessionCoordinator {
@@ -266,7 +266,7 @@ class ServiceInitializer: ObservableObject {
     func resetAllServices() {
         servicesQueue.sync(flags: .barrier) {
             _keychainManager = nil
-            _authenticationManager = nil
+            _authenticationManagerV2 = nil
             _sessionCoordinator = nil
             _walletService = nil
             _profileIconGenerator = nil

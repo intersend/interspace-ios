@@ -227,7 +227,7 @@ struct DeveloperSettingsView: View {
         
         // Sign out
         Task {
-            await AuthenticationManager.shared.signOut()
+            await AuthenticationManagerV2.shared.signOut()
         }
     }
     
@@ -282,9 +282,13 @@ struct TestViewsListView: View {
     var body: some View {
         NavigationView {
             List {
-                NavigationLink("Test View", destination: TestView())
-                NavigationLink("Profile Test View", destination: ProfileTestView())
-                NavigationLink("Glass Effect Test View", destination: TestGlassEffectView())
+                // Test views not implemented yet
+                // NavigationLink("Test View", destination: TestView())
+                // NavigationLink("Profile Test View", destination: ProfileTestView())
+                // NavigationLink("Glass Effect Test View", destination: TestGlassEffectView())
+                Text("No test views available")
+                    .foregroundColor(.secondary)
+                    .italic()
             }
             .navigationTitle("Test Views")
             .navigationBarItems(trailing: Button("Done") { dismiss() })

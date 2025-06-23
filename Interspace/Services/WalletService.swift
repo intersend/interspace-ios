@@ -405,7 +405,7 @@ final class WalletService: ObservableObject {
             case .walletConnect:
                 result = try await connectWalletConnect()
             case .google, .apple:
-                throw WalletError.unsupportedWallet("Social authentication should use AuthenticationManager")
+                throw WalletError.unsupportedWallet("Social authentication should use AuthenticationManagerV2")
             case .safe, .ledger, .trezor, .unknown:
                 throw WalletError.unsupportedWallet("Wallet type \(walletType.rawValue) not yet supported")
             }

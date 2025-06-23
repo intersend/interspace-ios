@@ -137,7 +137,7 @@ class APIService {
                 // Token expired, try to refresh if this is the first retry
                 if requiresAuth && retryCount == 0 {
                     // Request token refresh from AuthenticationManager
-                    await AuthenticationManager.shared.refreshTokenIfNeeded()
+                    await AuthenticationManagerV2.shared.refreshTokenIfNeeded()
                     
                     // Retry the request with new token
                     return try await performRequestWithRetry(

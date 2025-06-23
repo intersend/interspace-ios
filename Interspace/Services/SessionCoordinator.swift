@@ -21,7 +21,7 @@ final class SessionCoordinator: ObservableObject {
     
     // MARK: - Private Properties
     
-    private let authManager = AuthenticationManager.shared
+    private let authManager = AuthenticationManagerV2.shared
     private let profileAPI = ProfileAPI.shared
     private let userAPI = UserAPI.shared
     private let cacheManager = UserCacheManager.shared

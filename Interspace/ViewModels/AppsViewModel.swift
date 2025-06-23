@@ -41,7 +41,7 @@ final class AppsViewModel: ObservableObject {
         print("📱 AppsViewModel: Loading apps...")
         
         // Check if user is a guest
-        if AuthenticationManager.shared.currentUser?.isGuest == true {
+        if AuthenticationManagerV2.shared.currentUser?.isGuest == true {
             // For guest users, show placeholder apps
             apps = createGuestPlaceholderApps()
             folders = []
