@@ -296,6 +296,19 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    func linkWallet(config: WalletConnectionConfig) async throws {
+        // For account linking in V2, use the AccountLinkingService
+        guard let address = config.walletAddress else {
+            throw AuthenticationError.invalidCredentials
+        }
+        
+        try await AccountLinkingService.shared.linkAccount(
+            type: .wallet,
+            identifier: address,
+            provider: config.walletType
+        )
+    }
+    
     func linkWalletAccount(address: String, walletType: WalletType, signature: String, message: String, customName: String?) async {
         guard let activeProfile = activeProfile else { return }
         

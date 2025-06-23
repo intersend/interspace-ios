@@ -687,7 +687,7 @@ final class WalletService: ObservableObject {
     
     private func getSIWENonce() async throws -> String {
         // Call backend to get SIWE nonce
-        let url = URL(string: "\(APIService.shared.getBaseURL())/siwe/nonce")!
+        let url = URL(string: "\(APIService.shared.getBaseURL())/v2/siwe/nonce")!
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"

@@ -80,7 +80,19 @@ final class AppsViewModel: ObservableObject {
                 
             } catch {
                 print("📱 AppsViewModel: Error loading apps: \(error)")
-                handleError(error)
+                
+                // Check if it's a 404 error (new user with no apps/folders)
+                if let apiError = error as? APIError,
+                   case .invalidResponse(let statusCode) = apiError,
+                   statusCode == 404 {
+                    // This is normal for new users - just set empty arrays
+                    print("📱 AppsViewModel: No apps/folders found (new user)")
+                    apps = []
+                    folders = []
+                } else {
+                    // This is a real error
+                    handleError(error)
+                }
             }
         }
         
