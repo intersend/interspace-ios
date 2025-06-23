@@ -301,10 +301,16 @@ struct ProfileSummaryV2: Codable {
     var isActive: Bool
 }
 
+struct UserV2: Codable {
+    let id: String
+    let email: String?
+    let isGuest: Bool
+}
+
 struct AuthResponseV2: Codable {
     let success: Bool
     let account: AccountV2
-    let user: User
+    let user: UserV2
     let profiles: [ProfileSummaryV2]
     let activeProfile: ProfileSummaryV2?
     let tokens: AuthTokens
@@ -321,6 +327,19 @@ struct AuthenticationRequestV2: Codable {
     let appleAuth: AppleAuthRequest?
     let privacyMode: String?
     let deviceId: String?
+    
+    // Email-specific fields
+    let email: String?
+    let verificationCode: String?
+    
+    // Wallet-specific fields
+    let walletAddress: String?
+    let signature: String?
+    let message: String?
+    let walletType: String?
+    
+    // Social-specific fields
+    let idToken: String?
 }
 
 struct LinkAccountRequestV2: Codable {
@@ -332,6 +351,17 @@ struct LinkAccountRequestV2: Codable {
 }
 
 struct IdentityGraphResponse: Codable {
+    let success: Bool
     let accounts: [AccountV2]
-    let profiles: [ProfileSummaryV2]
+    let links: [IdentityLink]?
+    let currentAccountId: String?
+}
+
+struct IdentityLink: Codable {
+    let id: String
+    let accountAId: String
+    let accountBId: String
+    let privacyMode: String?  
+    let createdAt: String
+    let updatedAt: String
 }

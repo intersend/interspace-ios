@@ -42,7 +42,7 @@ final class AuthenticationManagerV2: ObservableObject {
     
     // Published properties
     @Published var currentAccount: AccountV2?
-    @Published var currentUser: User? // For backward compatibility
+    @Published var currentUser: UserV2?
     @Published var profiles: [ProfileSummaryV2] = []
     @Published var activeProfile: ProfileSummaryV2?
     @Published var isAuthenticated = false
@@ -90,7 +90,8 @@ final class AuthenticationManagerV2: ObservableObject {
                 
             case .wallet:
                 guard let address = config.walletAddress,
-                      let signature = config.signature else {
+                      let signature = config.signature,
+                      let message = config.message else {
                     throw AuthenticationError.invalidCredentials
                 }
                 identifier = address
@@ -118,7 +119,17 @@ final class AuthenticationManagerV2: ObservableObject {
                 oauthCode: oauthCode,
                 appleAuth: nil,
                 privacyMode: privacyMode.rawValue,
-                deviceId: UIDevice.current.identifierForVendor?.uuidString
+                deviceId: UIDevice.current.identifierForVendor?.uuidString,
+                // Email-specific fields
+                email: config.strategy == .email ? config.email : nil,
+                verificationCode: config.strategy == .email ? config.verificationCode : nil,
+                // Wallet-specific fields
+                walletAddress: config.strategy == .wallet ? config.walletAddress : nil,
+                signature: config.strategy == .wallet ? config.signature : nil,
+                message: config.strategy == .wallet ? config.message : nil,
+                walletType: config.strategy == .wallet ? config.walletType : nil,
+                // Social-specific fields
+                idToken: nil
             )
             
             // Call V2 authentication endpoint
@@ -143,7 +154,7 @@ final class AuthenticationManagerV2: ObservableObject {
             try keychainManager.saveTokens(
                 access: response.tokens.accessToken,
                 refresh: response.tokens.refreshToken,
-                expiresIn: response.tokens.expiresIn
+                expiresIn: response.tokens.expiresIn ?? 900 // Default to 15 minutes
             )
         } catch {
             print("🔐 AuthenticationManagerV2: Failed to save tokens: \(error)")
@@ -166,6 +177,34 @@ final class AuthenticationManagerV2: ObservableObject {
         if !isNewUser && activeProfile != nil {
             await ProfileViewModel.shared.loadProfile()
         }
+    }
+    
+    /// Process legacy authentication response (for SIWE)
+    private func processLegacyAuthResponse(_ response: AuthenticationResponse) async {
+        // Save tokens
+        do {
+            try keychainManager.saveTokens(
+                access: response.data.accessToken,
+                refresh: response.data.refreshToken,
+                expiresIn: response.data.expiresIn
+            )
+        } catch {
+            print("🔐 AuthenticationManagerV2: Failed to save tokens: \(error)")
+        }
+        
+        // Update API service
+        APIService.shared.setAccessToken(response.data.accessToken)
+        
+        // Update authentication state
+        isAuthenticated = true
+        
+        // Check if this is a new user based on wallet profile info
+        if let walletInfo = response.data.walletProfileInfo {
+            isNewUser = !walletInfo.isLinked || walletInfo.profileId == nil
+        }
+        
+        // Fetch current session data
+        await fetchCurrentSession()
     }
     
     // MARK: - Profile Management
@@ -272,7 +311,12 @@ final class AuthenticationManagerV2: ObservableObject {
         // For now, use legacy endpoint until backend is fully migrated
         do {
             let user = try await UserAPI.shared.getCurrentUser()
-            currentUser = user
+            // Convert User to UserV2
+            currentUser = UserV2(
+                id: user.id,
+                email: user.email,
+                isGuest: user.isGuest
+            )
             isAuthenticated = true
             
             // Load profiles
@@ -324,7 +368,7 @@ final class AuthenticationManagerV2: ObservableObject {
             try keychainManager.saveTokens(
                 access: response.tokens.accessToken,
                 refresh: response.tokens.refreshToken,
-                expiresIn: response.tokens.expiresIn
+                expiresIn: response.tokens.expiresIn ?? 900 // Default to 15 minutes
             )
             
             APIService.shared.setAccessToken(response.tokens.accessToken)
@@ -345,7 +389,7 @@ final class AuthenticationManagerV2: ObservableObject {
         // Call logout endpoint if authenticated
         if isAuthenticated, let refreshToken = keychainManager.getRefreshToken() {
             do {
-                _ = try await authAPI.logoutV2(refreshToken: refreshToken)
+                _ = try await authAPI.logoutV2()
             } catch {
                 print("🔐 AuthenticationManagerV2: Logout API call failed: \(error)")
             }
@@ -421,8 +465,14 @@ extension AuthenticationManagerV2 {
         try await authenticate(with: config)
     }
     
-    func sendEmailCode(_ email: String) async throws {
-        try await authAPI.sendEmailCodeV2(email: email)
+    func sendEmailCode(_ email: String) async throws -> EmailCodeResponse {
+        // Use V2 endpoint for email code
+        return try await authAPI.sendEmailCodeV2(email: email)
+    }
+    
+    func resendEmailCode(_ email: String) async throws -> EmailCodeResponse {
+        // Use V2 endpoint for resending email code
+        return try await authAPI.resendEmailCodeV2(email: email)
     }
     
     // MARK: - Methods for V1 Compatibility
@@ -453,16 +503,16 @@ extension AuthenticationManagerV2 {
         do {
             let user = try await authAPI.getCurrentUser()
             await MainActor.run {
-                self.currentUser = user
+                // Convert User to UserV2
+                self.currentUser = UserV2(
+                    id: user.id,
+                    email: user.email,
+                    isGuest: user.isGuest
+                )
             }
         } catch {
             print("🔐 AuthenticationManagerV2: Failed to fetch current user: \(error)")
         }
-    }
-    
-    /// Resend email verification code
-    func resendEmailCode(_ email: String) async throws {
-        try await sendEmailCode(email)
     }
     
     /// Create profile for wallet
@@ -541,7 +591,14 @@ extension AuthenticationManagerV2 {
                 oauthCode: nil,
                 appleAuth: appleAuth,
                 privacyMode: privacyMode.rawValue,
-                deviceId: UIDevice.current.identifierForVendor?.uuidString
+                deviceId: UIDevice.current.identifierForVendor?.uuidString,
+                email: nil,
+                verificationCode: nil,
+                walletAddress: nil,
+                signature: nil,
+                message: nil,
+                walletType: nil,
+                idToken: nil
             )
             
             let response = try await authAPI.authenticateV2(request: request)
