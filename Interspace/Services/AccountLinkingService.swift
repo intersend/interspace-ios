@@ -19,23 +19,28 @@ final class AccountLinkingService: ObservableObject {
     // MARK: - Account Linking Methods
     
     /// Link a new account to the current account
-    func linkAccount(type: AccountType, identifier: String, provider: String? = nil) async throws {
+    func linkAccount(type: AccountType, identifier: String, provider: String? = nil, linkType: String = "direct", privacyMode: String = "linked") async throws {
         isLoading = true
         error = nil
         
         do {
             let request = LinkAccountRequestV2(
-                strategy: type.rawValue,
-                identifier: identifier,
-                credential: nil,
-                oauthCode: nil,
-                appleAuth: nil
+                targetType: type.rawValue,
+                targetIdentifier: identifier,
+                targetProvider: provider,
+                linkType: linkType,
+                privacyMode: privacyMode,
+                verificationCode: nil // Only needed for email linking
             )
             
             let response = try await authAPI.linkAccountsV2(request: request)
             
-            // The auth manager will handle the response internally
-            // Just refresh the identity graph to get updated accounts
+            // Update local state with the new linked account
+            if !linkedAccounts.contains(where: { $0.id == response.linkedAccount.id }) {
+                linkedAccounts.append(response.linkedAccount)
+            }
+            
+            // Refresh the identity graph to get updated accounts
             await refreshIdentityGraph()
             
             isLoading = false
@@ -111,22 +116,38 @@ final class AccountLinkingService: ObservableObject {
     
     /// Link email account
     func linkEmailAccount(email: String, verificationCode: String) async throws {
-        // First verify the email code
-        let config = WalletConnectionConfig(
-            strategy: .email,
-            walletType: nil,
-            email: email,
-            verificationCode: verificationCode,
-            walletAddress: nil,
-            signature: nil,
-            message: nil,
-            socialProvider: nil,
-            socialProfile: nil,
-            oauthCode: nil
-        )
+        // For email linking when already authenticated, we pass the verification code
+        // directly to the link-accounts endpoint which will verify it
         
-        // This will link the account if user is already authenticated
-        try await authManager.authenticate(with: config)
+        isLoading = true
+        error = nil
+        
+        do {
+            let request = LinkAccountRequestV2(
+                targetType: AccountType.email.rawValue,
+                targetIdentifier: email,
+                targetProvider: nil,
+                linkType: "direct",
+                privacyMode: "linked",
+                verificationCode: verificationCode
+            )
+            
+            let response = try await authAPI.linkAccountsV2(request: request)
+            
+            // Update local state with the new linked account
+            if !linkedAccounts.contains(where: { $0.id == response.linkedAccount.id }) {
+                linkedAccounts.append(response.linkedAccount)
+            }
+            
+            // Refresh the identity graph to get updated accounts
+            await refreshIdentityGraph()
+            
+            isLoading = false
+        } catch {
+            isLoading = false
+            self.error = error
+            throw error
+        }
     }
     
     // MARK: - Wallet Linking
@@ -164,12 +185,12 @@ final class AccountLinkingService: ObservableObject {
     
     /// Check if a specific account type is already linked
     func isAccountTypeLinked(_ type: AccountType) -> Bool {
-        linkedAccounts.contains { $0.strategy == type.rawValue }
+        linkedAccounts.contains { $0.accountType == type.rawValue }
     }
     
     /// Get accounts of a specific type
     func getAccountsOfType(_ type: AccountType) -> [AccountV2] {
-        linkedAccounts.filter { $0.strategy == type.rawValue }
+        linkedAccounts.filter { $0.accountType == type.rawValue }
     }
     
     /// Get primary account

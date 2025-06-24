@@ -76,7 +76,7 @@ class AuthService {
         do {
             let body = try JSONEncoder().encode(authRequest)
             apiService.request(
-                endpoint: "/v2/auth/authenticate",
+                endpoint: "/auth/authenticate",
                 method: "POST",
                 body: body,
                 completion: completion
