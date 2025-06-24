@@ -49,6 +49,7 @@ enum MPCError: LocalizedError, Equatable {
     // Generic
     case unknown(Error)
     
+<<<<<<< HEAD
     static func == (lhs: MPCError, rhs: MPCError) -> Bool {
         switch (lhs, rhs) {
         case (.sdkNotInitialized, .sdkNotInitialized),
@@ -90,6 +91,8 @@ enum MPCError: LocalizedError, Equatable {
         }
     }
     
+=======
+>>>>>>> origin/main
     var errorDescription: String? {
         switch self {
         case .sdkNotInitialized:
