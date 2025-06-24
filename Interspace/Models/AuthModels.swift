@@ -10,8 +10,6 @@ enum AuthStrategy: String, CaseIterable, Codable {
     case google = "google"
     case apple = "apple"
     case passkey = "passkey"
-    case guest = "guest"
-    case testWallet = "testWallet"
     
     var displayName: String {
         switch self {
@@ -20,8 +18,6 @@ enum AuthStrategy: String, CaseIterable, Codable {
         case .google: return "Google"
         case .apple: return "Apple"
         case .passkey: return "Passkey"
-        case .guest: return "Guest"
-        case .testWallet: return "Test Wallet"
         }
     }
     
@@ -32,8 +28,6 @@ enum AuthStrategy: String, CaseIterable, Codable {
         case .google: return "globe"
         case .apple: return "apple.logo"
         case .passkey: return "person.crop.circle.fill.badge.checkmark"
-        case .guest: return "person.fill"
-        case .testWallet: return "testtube.2"
         }
     }
     
@@ -44,8 +38,6 @@ enum AuthStrategy: String, CaseIterable, Codable {
         case .google: return "Continue with Google account"
         case .apple: return "Continue with Apple ID"
         case .passkey: return "Use biometric authentication"
-        case .guest: return "Browse without an account"
-        case .testWallet: return "Development testing only"
         }
     }
 }

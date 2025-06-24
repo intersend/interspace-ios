@@ -34,7 +34,6 @@ struct AuthView: View {
                             onConnectWalletConnect: connectWalletConnect,
                             onAuthenticateGoogle: authenticateWithGoogle,
                             onAuthenticatePasskey: authenticateWithPasskey,
-                            onAuthenticateGuest: authenticateAsGuest,
                             onShowEmailAuth: showEmailAuthentication,
                             screenHeight: geometry.size.height
                         )
@@ -169,26 +168,6 @@ struct AuthView: View {
         }
     }
     
-    private func authenticateAsGuest() async {
-        do {
-            let config = WalletConnectionConfig(
-                strategy: .guest,
-                walletType: nil,
-                email: nil,
-                verificationCode: nil,
-                walletAddress: nil,
-                signature: nil,
-                message: nil,
-                socialProvider: nil,
-                socialProfile: nil,
-                oauthCode: nil
-            )
-            try await authManager.authenticate(with: config)
-        } catch {
-            print("Guest authentication error: \(error)")
-        }
-    }
-    
     private func showEmailAuthentication() {
         showingEmailAuth = true
     }
@@ -276,7 +255,6 @@ struct UnauthenticatedView: View {
     let onConnectWalletConnect: () async -> Void
     let onAuthenticateGoogle: () async -> Void
     let onAuthenticatePasskey: () async -> Void
-    let onAuthenticateGuest: () async -> Void
     let onShowEmailAuth: () -> Void
     let screenHeight: CGFloat
     

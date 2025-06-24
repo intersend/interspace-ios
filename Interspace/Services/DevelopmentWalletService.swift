@@ -93,7 +93,7 @@ extension AuthenticationManagerV2 {
         }
         
         let config = WalletConnectionConfig(
-            strategy: .testWallet,
+            strategy: .wallet,
             walletType: "development",
             email: nil,
             verificationCode: nil,
