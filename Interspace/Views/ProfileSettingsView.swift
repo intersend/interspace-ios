@@ -8,6 +8,7 @@ struct ProfileSettingsView: View {
     @State private var editedName: String
     @State private var showDeleteConfirmation = false
     @State private var showRenameSheet = false
+    @State private var showWalletSecurity = false
     @State private var isUpdating = false
     
     init(profile: SmartProfile, viewModel: ProfileViewModel) {
@@ -123,27 +124,70 @@ struct ProfileSettingsView: View {
                                 iconColor: DesignTokens.Colors.textSecondary,
                                 showChevron: true,
                                 isFirst: false,
-                                isLast: !profile.isActive
+                                isLast: false
                             ) {
                                 // Navigate to apps management
-                            }
-                            
-                            if !profile.isActive {
-                                ActionRow(
-                                    title: "Delete Profile",
-                                    subtitle: "Permanently remove this profile",
-                                    icon: "trash",
-                                    iconColor: DesignTokens.Colors.error,
-                                    isFirst: false,
-                                    isLast: true
-                                ) {
-                                    showDeleteConfirmation = true
-                                }
                             }
                         }
                         .background(DesignTokens.GlassEffect.thin)
                         .cornerRadius(DesignTokens.CornerRadius.lg)
                         .padding(.horizontal, DesignTokens.Spacing.screenPadding)
+                        
+                        // Advanced Section
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                            Text("ADVANCED")
+                                .font(DesignTokens.Typography.caption)
+                                .foregroundColor(DesignTokens.Colors.textTertiary)
+                                .padding(.horizontal, DesignTokens.Spacing.screenPadding)
+                                .padding(.bottom, DesignTokens.Spacing.xs)
+                            
+                            VStack(spacing: 0) {
+                                // Wallet Security
+                                ActionRow(
+                                    title: "Wallet Security",
+                                    subtitle: "Manage MPC wallet security settings",
+                                    icon: "lock.shield",
+                                    iconColor: DesignTokens.Colors.primary,
+                                    showChevron: true,
+                                    isFirst: true,
+                                    isLast: !profile.isDevelopmentWallet && profile.isActive
+                                ) {
+                                    showWalletSecurity = true
+                                }
+                                
+                                // Export Key Share
+                                if !profile.isDevelopmentWallet {
+                                    ActionRow(
+                                        title: "Export Key Share",
+                                        subtitle: "Backup your MPC key share",
+                                        icon: "square.and.arrow.up",
+                                        iconColor: DesignTokens.Colors.textSecondary,
+                                        showChevron: true,
+                                        isFirst: false,
+                                        isLast: profile.isActive
+                                    ) {
+                                        // Handle key share export
+                                    }
+                                }
+                                
+                                if !profile.isActive {
+                                    ActionRow(
+                                        title: "Delete Profile",
+                                        subtitle: "Permanently remove this profile",
+                                        icon: "trash",
+                                        iconColor: DesignTokens.Colors.error,
+                                        isFirst: false,
+                                        isLast: true
+                                    ) {
+                                        showDeleteConfirmation = true
+                                    }
+                                }
+                            }
+                            .background(DesignTokens.GlassEffect.thin)
+                            .cornerRadius(DesignTokens.CornerRadius.lg)
+                            .padding(.horizontal, DesignTokens.Spacing.screenPadding)
+                        }
+                        .padding(.top, DesignTokens.Spacing.md)
                         
                         Spacer(minLength: DesignTokens.Spacing.xl)
                     }
@@ -185,6 +229,9 @@ struct ProfileSettingsView: View {
                     }
                 }
             )
+        }
+        .sheet(isPresented: $showWalletSecurity) {
+            WalletSecurityView(profile: profile)
         }
     }
     

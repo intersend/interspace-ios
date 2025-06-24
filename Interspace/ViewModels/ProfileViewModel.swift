@@ -16,8 +16,15 @@ class ProfileViewModel: ObservableObject {
     @Published var error: Error?
     @Published var showDeveloperSettings = false
     
+    // MPC Wallet State
+    @Published var mpcWalletInfo: WalletInfo?
+    @Published var isGeneratingMPCWallet = false
+    @Published var isSigningTransaction = false
+    @Published var mpcOperationError: MPCError?
+    
     private let profileAPI = ProfileAPI.shared
     private let userAPI = UserAPI.shared
+    private let mpcWalletService = MPCWalletService.shared
     private var versionTapCount = 0
     private var tapResetTimer: Timer?
     private var hasLoadedInitialData = false
@@ -83,8 +90,11 @@ class ProfileViewModel: ObservableObject {
             // Load social accounts for the user
             async let socialTask = loadSocialAccounts()
             
-            // Wait for both to complete
-            let _ = await (accountsTask, socialTask)
+            // Check MPC wallet status
+            async let mpcTask = checkMPCWalletStatus()
+            
+            // Wait for all to complete
+            let _ = await (accountsTask, socialTask, mpcTask)
             
         } catch {
             await MainActor.run {
@@ -447,6 +457,209 @@ class ProfileViewModel: ObservableObject {
                 isLoading = false
             }
         }
+    }
+    
+    // MARK: - MPC Wallet Management
+    
+    /// Generate MPC wallet for the active profile
+    func generateMPCWallet() async {
+        guard let activeProfile = activeProfile else { return }
+        guard MPCWalletService.isEnabled else { return }
+        
+        isGeneratingMPCWallet = true
+        mpcOperationError = nil
+        
+        do {
+            let walletInfo = try await mpcWalletService.generateWallet(for: activeProfile.id)
+            
+            await MainActor.run {
+                self.mpcWalletInfo = walletInfo
+                isGeneratingMPCWallet = false
+            }
+            
+            // Reload profile to reflect wallet creation
+            await loadProfile()
+            
+        } catch let error as MPCError {
+            await MainActor.run {
+                self.mpcOperationError = error
+                self.showError(error)
+                isGeneratingMPCWallet = false
+            }
+        } catch {
+            await MainActor.run {
+                self.mpcOperationError = .unknown(error)
+                self.showError(error)
+                isGeneratingMPCWallet = false
+            }
+        }
+    }
+    
+    /// Sign a transaction using MPC
+    func signTransaction(_ transaction: TransactionRequest) async throws -> String {
+        guard let activeProfile = activeProfile else {
+            throw MPCError.profileNotFound
+        }
+        
+        isSigningTransaction = true
+        mpcOperationError = nil
+        
+        defer {
+            Task { @MainActor in
+                isSigningTransaction = false
+            }
+        }
+        
+        do {
+            let signature = try await mpcWalletService.signTransaction(
+                profileId: activeProfile.id,
+                transaction: transaction
+            )
+            return signature
+        } catch let error as MPCError {
+            await MainActor.run {
+                self.mpcOperationError = error
+                self.showError(error)
+            }
+            throw error
+        } catch {
+            let mpcError = MPCError.unknown(error)
+            await MainActor.run {
+                self.mpcOperationError = mpcError
+                self.showError(mpcError)
+            }
+            throw mpcError
+        }
+    }
+    
+    /// Check if active profile has MPC wallet
+    func checkMPCWalletStatus() async {
+        guard let activeProfile = activeProfile else { return }
+        guard MPCWalletService.isEnabled else { return }
+        
+        let hasWallet = await mpcWalletService.hasWallet(for: activeProfile.id)
+        if hasWallet {
+            let info = await mpcWalletService.getWalletInfo(for: activeProfile.id)
+            await MainActor.run {
+                self.mpcWalletInfo = info
+            }
+        } else {
+            await MainActor.run {
+                self.mpcWalletInfo = nil
+            }
+        }
+    }
+    
+    /// Rotate MPC keys
+    func rotateMPCKeys() async {
+        guard let activeProfile = activeProfile else { return }
+        
+        isLoading = true
+        mpcOperationError = nil
+        
+        do {
+            try await mpcWalletService.rotateKey(for: activeProfile.id)
+            
+            await MainActor.run {
+                isLoading = false
+            }
+            
+            // Reload wallet info
+            await checkMPCWalletStatus()
+            
+        } catch let error as MPCError {
+            await MainActor.run {
+                self.mpcOperationError = error
+                self.showError(error)
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                self.mpcOperationError = .unknown(error)
+                self.showError(error)
+                isLoading = false
+            }
+        }
+    }
+    
+    /// Create MPC wallet backup
+    func createMPCBackup(rsaPublicKey: String, label: String) async throws -> BackupData {
+        guard let activeProfile = activeProfile else {
+            throw MPCError.profileNotFound
+        }
+        
+        isLoading = true
+        mpcOperationError = nil
+        
+        defer {
+            Task { @MainActor in
+                isLoading = false
+            }
+        }
+        
+        do {
+            let backup = try await mpcWalletService.createBackup(
+                profileId: activeProfile.id,
+                rsaPublicKey: rsaPublicKey,
+                label: label
+            )
+            return backup
+        } catch let error as MPCError {
+            await MainActor.run {
+                self.mpcOperationError = error
+                self.showError(error)
+            }
+            throw error
+        } catch {
+            let mpcError = MPCError.unknown(error)
+            await MainActor.run {
+                self.mpcOperationError = mpcError
+                self.showError(mpcError)
+            }
+            throw mpcError
+        }
+    }
+    
+    /// Export MPC private key (critical operation)
+    func exportMPCPrivateKey(clientEncryptionKey: Data) async throws -> ExportData {
+        guard let activeProfile = activeProfile else {
+            throw MPCError.profileNotFound
+        }
+        
+        isLoading = true
+        mpcOperationError = nil
+        
+        defer {
+            Task { @MainActor in
+                isLoading = false
+            }
+        }
+        
+        do {
+            let exportData = try await mpcWalletService.exportKey(
+                profileId: activeProfile.id,
+                clientEncryptionKey: clientEncryptionKey
+            )
+            return exportData
+        } catch let error as MPCError {
+            await MainActor.run {
+                self.mpcOperationError = error
+                self.showError(error)
+            }
+            throw error
+        } catch {
+            let mpcError = MPCError.unknown(error)
+            await MainActor.run {
+                self.mpcOperationError = mpcError
+                self.showError(mpcError)
+            }
+            throw mpcError
+        }
+    }
+    
+    /// Clear MPC error state
+    func clearMPCError() {
+        mpcOperationError = nil
     }
     
     // MARK: - Developer Mode
