@@ -406,6 +406,8 @@ final class WalletService: ObservableObject {
                 result = try await connectWalletConnect()
             case .google, .apple:
                 throw WalletError.unsupportedWallet("Social authentication should use AuthenticationManagerV2")
+            case .mpc:
+                throw WalletError.unsupportedWallet("MPC wallets should use MPCWalletService")
             case .safe, .ledger, .trezor, .unknown:
                 throw WalletError.unsupportedWallet("Wallet type \(walletType.rawValue) not yet supported")
             }
@@ -885,6 +887,8 @@ final class WalletService: ObservableObject {
             return true // Always available as it uses QR codes
         case .google, .apple:
             return true // Social authentication is always available
+        case .mpc:
+            return true // MPC wallets are always available
         case .safe, .ledger, .trezor, .unknown:
             return false // Not yet supported
         }
