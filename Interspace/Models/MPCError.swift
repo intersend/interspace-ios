@@ -31,7 +31,6 @@ enum MPCError: LocalizedError {
     case operationInProgress
     case operationCancelled(String)
     case profileNotFound
-    case userCancelled
     
     // Storage Errors
     case storageError(String)

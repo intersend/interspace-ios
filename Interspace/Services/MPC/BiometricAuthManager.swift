@@ -1,6 +1,7 @@
 import Foundation
 import LocalAuthentication
 import Combine
+import UIKit
 
 // MARK: - BiometricAuthManager
 

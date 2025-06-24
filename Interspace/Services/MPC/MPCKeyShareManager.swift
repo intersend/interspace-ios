@@ -1,5 +1,9 @@
 import Foundation
-import silentshardduo
+// TODO: Import Silence Labs SDK when added to project
+// import silentshard
+
+// Using placeholder types for now
+// Remove this import when Silence Labs SDK is properly integrated
 
 // MARK: - MPCKeyShareManager
 
