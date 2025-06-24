@@ -270,17 +270,48 @@ final class DataSyncManager: ObservableObject {
         endpoint: String,
         requiresAuth: Bool
     ) async throws -> T {
-        let data = try await apiService.performRequest(
-            endpoint: endpoint,
-            method: .GET,
-            responseType: type,
-            requiresAuth: requiresAuth
-        )
-        
-        // Cache the data
-        try await cacheData(data, type: type, key: endpoint)
-        
-        return data
+        // Handle wrapped responses for specific endpoints
+        if endpoint.contains("/balance") && type == UnifiedBalance.self {
+            let response = try await apiService.performRequest(
+                endpoint: endpoint,
+                method: .GET,
+                responseType: BalanceResponse.self,
+                requiresAuth: requiresAuth
+            )
+            let data = response.data as! T
+            try await cacheData(data, type: type, key: endpoint)
+            return data
+        } else if endpoint == "profiles" && type == ProfilesResponse.self {
+            // For profiles endpoint, fetch the wrapped response directly
+            let data = try await apiService.performRequest(
+                endpoint: endpoint,
+                method: .GET,
+                responseType: type,
+                requiresAuth: requiresAuth
+            )
+            try await cacheData(data, type: type, key: endpoint)
+            return data
+        } else if endpoint.contains("/apps") && type == AppsResponse.self {
+            // For apps endpoint, fetch the wrapped response directly
+            let data = try await apiService.performRequest(
+                endpoint: endpoint,
+                method: .GET,
+                responseType: type,
+                requiresAuth: requiresAuth
+            )
+            try await cacheData(data, type: type, key: endpoint)
+            return data
+        } else {
+            // Default behavior for other endpoints
+            let data = try await apiService.performRequest(
+                endpoint: endpoint,
+                method: .GET,
+                responseType: type,
+                requiresAuth: requiresAuth
+            )
+            try await cacheData(data, type: type, key: endpoint)
+            return data
+        }
     }
     
     private func fetchFromCache<T: Codable>(

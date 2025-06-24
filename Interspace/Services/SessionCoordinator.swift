@@ -557,9 +557,8 @@ final class SessionCoordinator: ObservableObject {
             sessionState = .loading
             
             // Check if development mode is enabled
-            // For now, always use development mode for initial profile creation
-            // since MPC setup is not implemented yet
-            let isDevelopmentMode = true // TODO: Use EnvironmentConfiguration.shared.isDevelopmentModeEnabled when MPC is ready
+            // Use actual development mode setting
+            let isDevelopmentMode = EnvironmentConfiguration.shared.isDevelopmentModeEnabled
             
             // In V2, profiles are created automatically during authentication
             // This method is only called if something went wrong

@@ -18,7 +18,7 @@ enum AppEnvironment: String, CaseIterable {
         case .staging:
             return "https://staging-api.interspace.fi/api"
         case .production:
-            return "https://7d4b-184-147-176-114.ngrok-free.app/api/v2"
+            return "https://staging-api.interspace.fi/api/v2"
         }
     }
     
@@ -76,9 +76,16 @@ class EnvironmentConfiguration: ObservableObject {
         #endif
         
         // Load other settings
+        #if DEBUG
         self.showDebugOverlay = UserDefaults.standard.bool(forKey: "com.interspace.showDebugOverlay")
         self.enableMockData = UserDefaults.standard.bool(forKey: "com.interspace.enableMockData")
         self.enableDetailedLogging = UserDefaults.standard.bool(forKey: "com.interspace.enableDetailedLogging")
+        #else
+        // Force disable all debug features in release builds
+        self.showDebugOverlay = false
+        self.enableMockData = false
+        self.enableDetailedLogging = false
+        #endif
     }
     
     func setEnvironment(_ environment: AppEnvironment) {
@@ -97,18 +104,24 @@ class EnvironmentConfiguration: ObservableObject {
     }
     
     func toggleDebugOverlay() {
+        #if DEBUG
         showDebugOverlay.toggle()
         UserDefaults.standard.set(showDebugOverlay, forKey: "com.interspace.showDebugOverlay")
+        #endif
     }
     
     func toggleMockData() {
+        #if DEBUG
         enableMockData.toggle()
         UserDefaults.standard.set(enableMockData, forKey: "com.interspace.enableMockData")
+        #endif
     }
     
     func toggleDetailedLogging() {
+        #if DEBUG
         enableDetailedLogging.toggle()
         UserDefaults.standard.set(enableDetailedLogging, forKey: "com.interspace.enableDetailedLogging")
+        #endif
     }
 }
 

@@ -134,25 +134,32 @@ class ProfileViewModel: ObservableObject {
     }
     
     private func loadEmailAccounts() async {
-        do {
-            // Get identity graph from AccountLinkingService
-            let linkingService = AccountLinkingService.shared
-            await linkingService.refreshIdentityGraph()
-            
-            // Filter email accounts from the linked accounts
-            let emailAccounts = linkingService.linkedAccounts.filter { account in
-                account.accountType == "email"
-            }
-            
-            await MainActor.run {
-                self.emailAccounts = emailAccounts
-            }
-        } catch {
-            print("Error loading email accounts: \(error)")
+        // Get identity graph from AccountLinkingService
+        let linkingService = AccountLinkingService.shared
+        
+        // Only proceed if authenticated
+        guard AuthenticationManagerV2.shared.isAuthenticated else {
+            print("ProfileViewModel: Not authenticated, skipping email accounts load")
             await MainActor.run {
                 self.emailAccounts = []
             }
+            return
         }
+        
+        // Refresh identity graph
+        await linkingService.refreshIdentityGraph()
+        
+        // Filter email accounts from the linked accounts
+        // linkedAccounts contains AccountV2 objects from identity graph
+        let emailAccounts = linkingService.linkedAccounts.filter { account in
+            account.accountType == "email"
+        }
+        
+        await MainActor.run {
+            self.emailAccounts = emailAccounts
+        }
+        
+        print("ProfileViewModel: Loaded \(emailAccounts.count) email accounts")
     }
     
     func refreshProfile() async {

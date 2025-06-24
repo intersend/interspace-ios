@@ -215,6 +215,7 @@
 				Components/Springboard/SpringboardEditMode.swift,
 				Components/SpringboardFolderView.swift,
 				Components/SpringboardGrid.swift,
+				Components/StandardToolbarButtons.swift,
 				Components/StatefulAuthorizationTray.swift,
 				Components/UniversalAddTray.swift,
 				Components/VerificationCodeField.swift,

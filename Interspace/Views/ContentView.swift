@@ -329,7 +329,13 @@ struct OnboardingView: View {
 }
 
 struct MainTabView: View {
-    @State private var selectedTab: Tab = .apps
+    @State private var selectedTab: Tab = .apps {
+        didSet {
+            if oldValue != selectedTab {
+                HapticManager.impact(.light)
+            }
+        }
+    }
     
     enum Tab: String, CaseIterable {
         case apps = "Apps"
@@ -380,10 +386,9 @@ struct MainTabView: View {
             .tag(Tab.profile)
             
             // Wallet Tab
-            NavigationView {
+            NavigationStack {
                 WalletView()
             }
-            .navigationViewStyle(StackNavigationViewStyle())
             .tabItem {
                 Label("Wallet", systemImage: selectedTab == .wallet ? Tab.wallet.selectedIcon : Tab.wallet.icon)
             }
@@ -392,6 +397,8 @@ struct MainTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity) // Force TabView to fill
         .edgesIgnoringSafeArea(.all) // Ignore safe areas
         .accentColor(DesignTokens.Colors.primary)
+        .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8), value: selectedTab)
+        .preferredColorScheme(.dark) // Consistent dark mode
         .onAppear {
             // Configure tab bar for native iOS appearance
             let tabAppearance = UITabBarAppearance()
@@ -415,20 +422,22 @@ struct MainTabView: View {
             
             // Configure navigation bar for proper full-screen layout
             let navAppearance = UINavigationBarAppearance()
-            navAppearance.configureWithDefaultBackground()
-            navAppearance.backgroundColor = UIColor(DesignTokens.Colors.backgroundPrimary)
+            navAppearance.configureWithOpaqueBackground()
+            navAppearance.backgroundColor = UIColor.black.withAlphaComponent(0.9)
             navAppearance.titleTextAttributes = [
-                .foregroundColor: UIColor(DesignTokens.Colors.textPrimary),
+                .foregroundColor: UIColor.white,
                 .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
             ]
             navAppearance.largeTitleTextAttributes = [
-                .foregroundColor: UIColor(DesignTokens.Colors.textPrimary),
+                .foregroundColor: UIColor.white,
                 .font: UIFont.systemFont(ofSize: 34, weight: .bold)
             ]
+            navAppearance.shadowColor = .clear
             
             UINavigationBar.appearance().standardAppearance = navAppearance
             UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
             UINavigationBar.appearance().compactAppearance = navAppearance
+            UINavigationBar.appearance().tintColor = UIColor.white
         }
     }
 }
