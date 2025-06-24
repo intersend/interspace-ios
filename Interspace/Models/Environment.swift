@@ -14,7 +14,7 @@ enum AppEnvironment: String, CaseIterable {
                 return url
             }
             // Fallback for development
-            return "https://7d4b-184-147-176-114.ngrok-free.app/api"
+            return "https://staging-api.interspace.fi/api"
         case .staging:
             return "https://staging-api.interspace.fi/api"
         case .production:
@@ -55,7 +55,7 @@ class EnvironmentConfiguration: ObservableObject {
             self.currentEnvironment = environment
         } else {
             #if DEBUG
-            self.currentEnvironment = .development
+            self.currentEnvironment = .production
             #else
             self.currentEnvironment = .production
             #endif
