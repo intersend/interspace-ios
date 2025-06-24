@@ -38,7 +38,7 @@ struct WebProgressBar: View {
         .onAppear {
             animatedProgress = progress
         }
-        .onChange(of: progress) { oldValue, newValue in
+        .onChange(of: progress) { newValue in
             animatedProgress = newValue
         }
     }

@@ -206,7 +206,8 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
                             Image(systemName: "link.circle.fill")
                                 .font(.system(size: 60))
                                 .foregroundColor(walletType.primaryColor)
-                                .symbolEffect(.pulse)
+                                .scaleEffect(connectionState == .linking ? 1.1 : 1.0)
+                                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: connectionState == .linking)
                             
                             Text(isForAuthentication ? "Setting up your account..." : "Adding to your profile...")
                                 .font(.body)

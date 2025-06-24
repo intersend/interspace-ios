@@ -60,7 +60,7 @@ struct ProfileNotificationsView: View {
                         }
                         .toggleStyle(SwitchToggleStyle(tint: .green))
                         .listRowBackground(Color(white: 0.1))
-                        .onChange(of: pushNotificationsEnabled) { oldValue, newValue in
+                        .onChange(of: pushNotificationsEnabled) { newValue in
                             if newValue {
                                 requestNotificationPermission()
                             }
@@ -200,7 +200,6 @@ struct ProfileNotificationsView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.ultraThinMaterial)
         .preferredColorScheme(.dark)
     }
     

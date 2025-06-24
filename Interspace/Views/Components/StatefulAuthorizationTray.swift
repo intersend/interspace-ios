@@ -34,7 +34,8 @@ struct StatefulAuthorizationTray<Content: View>: View {
             content
                 .padding(.bottom, 40)
         }
-        .presentationBackground(.ultraThinMaterial)
+        .background(Color.black.opacity(0.001))
+        .background(Material.ultraThinMaterial)
         .preferredColorScheme(.dark)
         .interactiveDismissDisabled()
     }

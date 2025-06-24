@@ -150,7 +150,8 @@ struct ProfileAboutView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.ultraThinMaterial)
+        .background(Color.black.opacity(0.001))
+        .background(Material.ultraThinMaterial)
         .preferredColorScheme(.dark)
     }
 }

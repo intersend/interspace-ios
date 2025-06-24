@@ -61,7 +61,7 @@ struct ProfileSecurityView: View {
                         }
                         .toggleStyle(SwitchToggleStyle(tint: .blue))
                         .listRowBackground(Color(white: 0.1))
-                        .onChange(of: biometricLockEnabled) { oldValue, newValue in
+                        .onChange(of: biometricLockEnabled) { newValue in
                             if newValue {
                                 authenticateWithBiometrics()
                             }
@@ -127,7 +127,8 @@ struct ProfileSecurityView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.ultraThinMaterial)
+        .background(Color.black.opacity(0.001))
+        .background(Material.ultraThinMaterial)
         .preferredColorScheme(.dark)
         .onAppear {
             checkBiometricType()

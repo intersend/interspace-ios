@@ -83,7 +83,7 @@ struct VerificationCodeField: View {
             .animation(.easeInOut(duration: 0.2), value: pasteboardHasCode)
             .animation(.easeInOut(duration: 0.2), value: codeDigits)
         }
-        .onChange(of: codeDigits) { oldDigits, newDigits in
+        .onChange(of: codeDigits) { newDigits in
             let newCode = newDigits.joined()
             code = newCode
             
@@ -92,7 +92,7 @@ struct VerificationCodeField: View {
                 onComplete()
             }
         }
-        .onChange(of: code) { oldCode, newCode in
+        .onChange(of: code) { newCode in
             // Sync external code changes to individual digits
             if newCode.count <= 6 && newCode.allSatisfy({ $0.isNumber }) {
                 for index in 0..<6 {

@@ -263,11 +263,11 @@ struct UniversalAddTray: View {
                 }
             }
         }
-        .presentationBackground(.regularMaterial)
+        .background(Color.black.opacity(0.001))
+        .background(Material.regularMaterial)
         .preferredColorScheme(.dark)
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
-        .presentationCornerRadius(28)
         .sheet(isPresented: $showWalletAuthorization) {
             if let walletType = selectedWalletType {
                 if isForAuthentication {
@@ -333,18 +333,21 @@ struct UniversalAddTray: View {
         .sheet(isPresented: $showPasskeyAuth) {
             // TODO: Implement passkey authentication
             Text("Passkey Authentication")
-                .presentationBackground(.ultraThinMaterial)
+                .background(Color.black.opacity(0.001))
+                .background(Material.ultraThinMaterial)
                 .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showAppleSignIn) {
             // TODO: Implement Apple Sign In
             Text("Apple Sign In")
-                .presentationBackground(.ultraThinMaterial)
+                .background(Color.black.opacity(0.001))
+                .background(Material.ultraThinMaterial)
                 .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showAddApp) {
             AddAppView(viewModel: AppsViewModel())
-                .presentationBackground(.ultraThinMaterial)
+                .background(Color.black.opacity(0.001))
+                .background(Material.ultraThinMaterial)
                 .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showProfileCreation) {
@@ -540,9 +543,9 @@ struct WalletAuthorizationTray: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .presentationDetents([.height(320)])
-        .presentationBackground(.regularMaterial)
+        .background(Color.black.opacity(0.001))
+        .background(Material.regularMaterial)
         .preferredColorScheme(.dark)
-        .presentationCornerRadius(28)
         .presentationDragIndicator(.visible)
     }
 }

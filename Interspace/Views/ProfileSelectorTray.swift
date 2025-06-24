@@ -89,7 +89,6 @@ struct ProfileSelectorTray: View {
             }
             .presentationDetents([.height(UIScreen.main.bounds.height * 0.7)])
             .presentationDragIndicator(.hidden)
-            .presentationCornerRadius(28)
             .interactiveDismissDisabled(false)
         }
         .alert("Create New Profile", isPresented: $showCreateProfile) {

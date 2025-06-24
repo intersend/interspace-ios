@@ -147,7 +147,6 @@ struct ConnectionLoadingView: View {
                 Image(systemName: icon)
                     .font(.system(size: 36))
                     .foregroundColor(iconColor)
-                    .symbolEffect(.pulse)
             }
             
             VStack(spacing: 8) {

@@ -20,7 +20,7 @@ struct WebViewTransition: ViewModifier {
                 animationProgress = 1
             }
         }
-        .onChange(of: isPresented) { oldValue, newValue in
+        .onChange(of: isPresented) { newValue in
             animationProgress = newValue ? 1 : 0
         }
     }
@@ -49,6 +49,7 @@ struct WebViewTransition: ViewModifier {
 }
 
 // MARK: - Zoom Navigation Transition
+@available(iOS 17.0, *)
 struct ZoomNavigationTransition: Transition {
     let sourceID: AnyHashable
     let namespace: Namespace.ID
@@ -57,6 +58,16 @@ struct ZoomNavigationTransition: Transition {
         content
             .scaleEffect(phase == .identity ? 1 : 0.8)
             .opacity(phase == .identity ? 1 : 0)
+    }
+}
+
+// iOS 16 compatible transition using AnyTransition
+extension AnyTransition {
+    static func zoomNavigation(sourceID: AnyHashable, namespace: Namespace.ID) -> AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 0.8).combined(with: .opacity),
+            removal: .scale(scale: 0.8).combined(with: .opacity)
+        )
     }
 }
 
@@ -91,7 +102,7 @@ struct AppIconToBrowserTransition: ViewModifier {
                 }
             }
         }
-        .onChange(of: isPresented) { oldValue, newValue in
+        .onChange(of: isPresented) { newValue in
             if newValue {
                 // Start the transition
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
