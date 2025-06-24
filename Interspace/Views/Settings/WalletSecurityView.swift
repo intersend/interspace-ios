@@ -101,7 +101,7 @@ struct WalletSecurityView: View {
                         }
                         
                         // Emergency Actions
-                        if !profile.isDevelopmentWallet {
+                        if !(profile.isDevelopmentWallet ?? false) {
                             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                                 Text("EMERGENCY")
                                     .font(DesignTokens.Typography.caption)
@@ -250,13 +250,13 @@ struct SecurityStatusCard: View {
                 SecurityFeatureRow(
                     icon: "key.horizontal",
                     title: "MPC Key Protection",
-                    isEnabled: !profile.isDevelopmentWallet
+                    isEnabled: !(profile.isDevelopmentWallet ?? false)
                 )
                 
                 SecurityFeatureRow(
                     icon: "lock.rotation",
                     title: "Key Rotation Available",
-                    isEnabled: !profile.isDevelopmentWallet
+                    isEnabled: !(profile.isDevelopmentWallet ?? false)
                 )
             }
         }
@@ -276,7 +276,7 @@ struct SecurityStatusCard: View {
             score += 0.3
         }
         
-        if !profile.isDevelopmentWallet {
+        if !(profile.isDevelopmentWallet ?? false) {
             score += 0.2
         }
         
