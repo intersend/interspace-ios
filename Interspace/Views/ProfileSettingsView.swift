@@ -150,13 +150,13 @@ struct ProfileSettingsView: View {
                                     iconColor: DesignTokens.Colors.primary,
                                     showChevron: true,
                                     isFirst: true,
-                                    isLast: !profile.isDevelopmentWallet && profile.isActive
+                                    isLast: !(profile.isDevelopmentWallet ?? false) && profile.isActive
                                 ) {
                                     showWalletSecurity = true
                                 }
                                 
                                 // Export Key Share
-                                if !profile.isDevelopmentWallet {
+                                if !(profile.isDevelopmentWallet ?? false) {
                                     ActionRow(
                                         title: "Export Key Share",
                                         subtitle: "Backup your MPC key share",

@@ -188,7 +188,9 @@ final class MPCSessionManager: NSObject, ObservableObject {
                 self.receiveMessage() // Continue receiving
                 
             case .failure(let error):
-                self.handleError(error)
+                Task { @MainActor in
+                    self.handleError(error)
+                }
             }
         }
     }
