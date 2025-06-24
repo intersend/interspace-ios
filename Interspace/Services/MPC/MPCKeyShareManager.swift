@@ -244,7 +244,9 @@ final class MPCKeyShareManager {
     private func deriveAddress(from publicKey: String) -> String {
         // Convert public key to Ethereum address
         // This is a simplified version - you might need to use a proper library
-        let publicKeyData = Data(hex: publicKey)
+        guard let publicKeyData = Data(hex: publicKey) else {
+            return "0x0000000000000000000000000000000000000000" // Return zero address if invalid
+        }
         let hash = publicKeyData.sha3(.keccak256)
         let address = "0x" + hash.suffix(20).hexString
         return address

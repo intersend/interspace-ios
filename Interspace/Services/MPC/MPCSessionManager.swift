@@ -37,7 +37,9 @@ final class MPCSessionManager: NSObject, ObservableObject {
     }
     
     deinit {
-        disconnect()
+        Task { @MainActor in
+            disconnect()
+        }
     }
     
     // MARK: - Public Methods

@@ -335,7 +335,12 @@ final class MPCWalletService: ObservableObject {
         // )
         
         // Temporary placeholder
-        return BackupData(verifiableBackup: "placeholder_backup")
+        return BackupData(
+            keyId: UUID().uuidString,
+            algorithm: "ECDSA",
+            verifiableBackup: "placeholder_backup",
+            timestamp: Date()
+        )
     }
     
     private func exportKeyViaBackend(

@@ -234,10 +234,6 @@ extension MPCError {
         return .biometricAuthFailed
     }
     
-    static var userCancelled: MPCError {
-        return .operationCancelled("User cancelled authentication")
-    }
-    
     static var systemCancelled: MPCError {
         return .operationCancelled("System cancelled authentication")
     }
