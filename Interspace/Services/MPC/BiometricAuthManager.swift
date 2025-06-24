@@ -99,6 +99,8 @@ final class BiometricAuthManager: ObservableObject {
             return "Face ID"
         case .touchID:
             return "Touch ID"
+        case .opticID:
+            return "Optic ID"
         case .none:
             return "Biometric Authentication"
         @unknown default:
@@ -113,6 +115,8 @@ final class BiometricAuthManager: ObservableObject {
             return "faceid"
         case .touchID:
             return "touchid"
+        case .opticID:
+            return "opticid"
         case .none:
             return "lock.fill"
         @unknown default:
@@ -185,9 +189,7 @@ extension BiometricAuthManager {
         
         // Disable fallback to passcode for MPC operations
         if #available(iOS 11.0, *) {
-            authContext.biometryType == .faceID ?
-                authContext.localizedFallbackTitle = "" :
-                authContext.localizedFallbackTitle = ""
+            authContext.localizedFallbackTitle = ""
         }
         
         do {
@@ -249,24 +251,4 @@ extension MPCError {
     }
 }
 
-// MARK: - Haptic Feedback Manager
-
-struct HapticManager {
-    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.prepare()
-        generator.notificationOccurred(type)
-    }
-    
-    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        let generator = UIImpactFeedbackGenerator(style: style)
-        generator.prepare()
-        generator.impactOccurred()
-    }
-    
-    static func selection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.prepare()
-        generator.selectionChanged()
-    }
-}
+// HapticManager is already defined in DesignTokens.swift
