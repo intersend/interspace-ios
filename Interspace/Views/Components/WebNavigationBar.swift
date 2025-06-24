@@ -362,7 +362,7 @@ struct SearchField: View {
                 .onSubmit {
                     onSubmit()
                 }
-                .onChange(of: isFocused) { oldValue, newValue in
+                .onChange(of: isFocused) { newValue in
                     isSearchFieldFocused = newValue
                     if newValue {
                         searchText = currentURL

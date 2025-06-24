@@ -85,7 +85,7 @@ struct AddAppView: View {
                                     addApp()
                                 }
                             }
-                            .onChange(of: appUrl) { _, newValue in
+                            .onChange(of: appUrl) { newValue in
                                 // Auto-generate app name from URL if name is empty
                                 if appName.isEmpty, let url = URL(string: newValue) {
                                     appName = url.host?.replacingOccurrences(of: "www.", with: "").capitalized ?? ""
@@ -130,7 +130,6 @@ struct AddAppView: View {
             .padding(.bottom, 40)
         }
         .presentationDetents([.height(440)])
-        .presentationBackground(.ultraThinMaterial)
         .preferredColorScheme(.dark)
         .onAppear {
             // Auto-focus the text field

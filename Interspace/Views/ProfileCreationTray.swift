@@ -92,7 +92,8 @@ struct ProfileCreationTray: View {
             .padding(.bottom, 40)
         }
         .presentationDetents([.height(360)])
-        .presentationBackground(.ultraThinMaterial)
+        .background(Color.black.opacity(0.001))
+        .background(Material.ultraThinMaterial)
         .preferredColorScheme(.dark)
         .onAppear {
             // Auto-focus the text field

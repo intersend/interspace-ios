@@ -32,7 +32,6 @@ struct EmailAuthenticationView: View {
                                             endPoint: .bottomTrailing
                                         )
                                     )
-                                    .symbolEffect(.bounce, value: viewModel.animationTrigger)
                                 
                                 Text(viewModel.currentStep == .email ? "Sign in with Email" : "Verify Your Email")
                                     .font(.largeTitle)

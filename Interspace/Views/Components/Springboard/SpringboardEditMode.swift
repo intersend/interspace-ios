@@ -22,7 +22,7 @@ struct WiggleModifier: ViewModifier {
                     startWiggle()
                 }
             }
-            .onChange(of: isActive) { _, newValue in
+            .onChange(of: isActive) { newValue in
                 if newValue {
                     startWiggle()
                 } else {

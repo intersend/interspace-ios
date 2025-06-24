@@ -91,8 +91,6 @@ struct SpringboardGrid: View {
                         }
                     }
                 }
-                .scrollTargetBehavior(.paging)
-                .scrollPosition(id: $currentPage)
                 .scrollDisabled(isEditMode && draggedItem != nil)
                 
                 Spacer()
@@ -113,7 +111,7 @@ struct SpringboardGrid: View {
                 HapticManager.impact(.light)
             }
         }
-        .onChange(of: isEditMode) { oldValue, newValue in
+        .onChange(of: isEditMode) { newValue in
             if newValue {
                 HapticManager.impact(.light)
             } else {

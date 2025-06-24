@@ -189,7 +189,8 @@ struct AccountDetailView: View {
                 Text("Are you sure you want to remove this account? This action cannot be undone.")
             }
         }
-        .presentationBackground(.ultraThinMaterial)
+        .background(Color.black.opacity(0.001))
+        .background(Material.ultraThinMaterial)
         .preferredColorScheme(.dark)
     }
     

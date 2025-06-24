@@ -39,7 +39,6 @@ struct EmailLinkingView: View {
                                         .foregroundStyle(.white, .blue)
                                         .offset(x: 25, y: 25)
                                 }
-                                .symbolEffect(.bounce, value: viewModel.animationTrigger)
                                 
                                 Text(viewModel.currentStep == .email ? "Link Email Account" : "Verify Your Email")
                                     .font(.largeTitle)

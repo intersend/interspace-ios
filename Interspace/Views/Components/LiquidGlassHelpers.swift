@@ -94,13 +94,11 @@ struct WalletSelectionView: View {
             }
             .navigationTitle("Select Wallet")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+            .navigationBarItems(leading: 
+                Button("Cancel") {
+                    dismiss()
                 }
-            }
+            )
         }
     }
 }
@@ -142,13 +140,11 @@ struct SocialSelectionView: View {
             }
             .navigationTitle("Connect Social Account")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+            .navigationBarItems(leading: 
+                Button("Cancel") {
+                    dismiss()
                 }
-            }
+            )
         }
     }
 }
@@ -177,7 +173,7 @@ struct AppSelectionView: View {
                             .textFieldStyle(LiquidGlassTextFieldStyle())
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
-                            .onChange(of: url) { _, newValue in
+                            .onChange(of: url) { newValue in
                                 validateURL(newValue)
                             }
                     }
@@ -244,13 +240,11 @@ struct AppSelectionView: View {
             }
             .navigationTitle("Add App")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+            .navigationBarItems(leading: 
+                Button("Cancel") {
+                    dismiss()
                 }
-            }
+            )
         }
     }
     
@@ -334,13 +328,11 @@ struct ContactSelectionView: View {
             }
             .navigationTitle("Add Contact")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+            .navigationBarItems(leading: 
+                Button("Cancel") {
+                    dismiss()
                 }
-            }
+            )
         }
     }
 }

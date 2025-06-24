@@ -214,7 +214,6 @@ struct AuthExpiryOverlay: View {
                 Image(systemName: "lock.shield")
                     .font(.system(size: 48))
                     .foregroundColor(.white)
-                    .symbolEffect(.pulse)
                 
                 Text("Session Expired")
                     .font(DesignTokens.Typography.headlineSmall)
