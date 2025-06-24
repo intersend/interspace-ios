@@ -104,10 +104,6 @@ final class AuthenticationManagerV2: ObservableObject {
                 }
                 oauthCode = code
                 
-            case .guest:
-                // No additional data needed
-                break
-                
             default:
                 throw AuthenticationError.unknown("Unsupported authentication strategy")
             }
@@ -656,7 +652,7 @@ extension AuthenticationManagerV2 {
         let devMessage = "Development authentication for testing"
         
         let config = WalletConnectionConfig(
-            strategy: .testWallet,
+            strategy: .wallet,
             walletType: "development",
             email: nil,
             verificationCode: nil,

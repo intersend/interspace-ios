@@ -71,8 +71,6 @@ final class AuthViewModel: ObservableObject {
             showWalletTray = true
         case .email:
             break // Show email input
-        case .guest:
-            authenticateAsGuest()
         case .passkey:
             if #available(iOS 16.0, *) {
                 authenticateWithPasskey()
@@ -85,32 +83,6 @@ final class AuthViewModel: ObservableObject {
         }
     }
     
-    func authenticateAsGuest() {
-        isAuthenticationInProgress = true
-        
-        Task {
-            do {
-                let config = WalletConnectionConfig(
-                    strategy: .guest,
-                    walletType: nil,
-                    email: nil,
-                    verificationCode: nil,
-                    walletAddress: nil,
-                    signature: nil,
-                    message: nil,
-                    socialProvider: nil,
-                    socialProfile: nil,
-                    oauthCode: nil
-                )
-                
-                try await authManager.authenticate(with: config)
-                isAuthenticationInProgress = false
-            } catch {
-                print("Guest authentication error: \(error)")
-                isAuthenticationInProgress = false
-            }
-        }
-    }
     
     
     // MARK: - Passkey Authentication
