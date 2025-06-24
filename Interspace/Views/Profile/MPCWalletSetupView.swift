@@ -668,7 +668,7 @@ final class MPCWalletSetupViewModel: ObservableObject {
     }
     
     func generateWallet() async throws {
-        guard let profileId = profileViewModel?.selectedProfile?.id else { return }
+        guard let profileId = profileViewModel?.activeProfile?.id else { return }
         
         isGeneratingWallet = true
         defer { isGeneratingWallet = false }
@@ -704,14 +704,21 @@ final class MPCWalletSetupViewModel: ObservableObject {
     }
     
     func completeSetup() async {
-        guard let profileId = profileViewModel?.selectedProfile?.id,
+        guard let profileId = profileViewModel?.activeProfile?.id,
               let walletInfo = generatedWallet else { return }
         
         isProcessing = true
         defer { isProcessing = false }
         
-        // Update profile with new wallet
-        await profileViewModel?.updateProfileWallet(walletInfo)
+        // Store MPC wallet info in view model
+        profileViewModel?.mpcWalletInfo = walletInfo
+        
+        // Link the wallet address to the profile
+        await profileViewModel?.linkAccount(
+            address: walletInfo.address,
+            walletType: .mpc,
+            customName: "MPC Wallet"
+        )
         
         // Save preferences
         UserDefaults.standard.set(biometricEnabled, forKey: "mpc_biometric_enabled_\(profileId)")
