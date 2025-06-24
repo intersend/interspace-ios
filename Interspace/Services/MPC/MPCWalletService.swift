@@ -195,8 +195,8 @@ final class MPCWalletService: ObservableObject {
         }
         
         do {
-            // Step 1: Retrieve key share
-            guard let keyShare = try await secureStorage.retrieveKeyShare(for: profileId) else {
+            // Step 1: Verify key share exists
+            guard try await secureStorage.hasKeyShare(for: profileId) else {
                 throw MPCError.keyShareNotFound
             }
             
@@ -242,7 +242,7 @@ final class MPCWalletService: ObservableObject {
             // Step 3: Additional confirmation
             let confirmed = await showExportWarning()
             guard confirmed else {
-                throw MPCError.userCancelled
+                throw MPCError.operationCancelled("User cancelled the operation")
             }
             
             // Step 4: Call backend API
@@ -294,8 +294,11 @@ final class MPCWalletService: ObservableObject {
     
     private func fetchCloudPublicKey() async throws -> String {
         // Call backend API to get cloud public key
-        // This would be implemented based on your API structure
-        return try await ProfileAPI.shared.getCloudPublicKey()
+        // TODO: Implement ProfileAPI.getCloudPublicKey()
+        // return try await ProfileAPI.shared.getCloudPublicKey()
+        
+        // Temporary placeholder - this should come from the backend
+        return "placeholder_cloud_public_key"
     }
     
     private func notifyBackendOfKeyGeneration(
@@ -304,16 +307,18 @@ final class MPCWalletService: ObservableObject {
         address: String
     ) async throws {
         // Notify backend that key generation is complete
-        try await ProfileAPI.shared.confirmKeyGeneration(
-            profileId: profileId,
-            publicKey: publicKey,
-            address: address
-        )
+        // TODO: Implement ProfileAPI.confirmKeyGeneration
+        // try await ProfileAPI.shared.confirmKeyGeneration(
+        //     profileId: profileId,
+        //     publicKey: publicKey,
+        //     address: address
+        // )
     }
     
     private func notifyBackendOfKeyRotation(profileId: String) async throws {
         // Notify backend that key rotation is complete
-        try await ProfileAPI.shared.confirmKeyRotation(profileId: profileId)
+        // TODO: Implement ProfileAPI.confirmKeyRotation
+        // try await ProfileAPI.shared.confirmKeyRotation(profileId: profileId)
     }
     
     private func createBackupViaBackend(
@@ -322,10 +327,19 @@ final class MPCWalletService: ObservableObject {
         label: String
     ) async throws -> BackupData {
         // Call backend MPC backup endpoint
-        return try await ProfileAPI.shared.createMPCBackup(
-            profileId: profileId,
-            rsaPublicKey: rsaPublicKey,
-            label: label
+        // TODO: Implement ProfileAPI.createMPCBackup
+        // return try await ProfileAPI.shared.createMPCBackup(
+        //     profileId: profileId,
+        //     rsaPublicKey: rsaPublicKey,
+        //     label: label
+        // )
+        
+        // Temporary placeholder
+        return BackupData(
+            keyId: UUID().uuidString,
+            algorithm: "ECDSA",
+            verifiableBackup: "placeholder_backup",
+            timestamp: Date()
         )
     }
     
@@ -334,9 +348,16 @@ final class MPCWalletService: ObservableObject {
         clientEncryptionKey: Data
     ) async throws -> ServerExportData {
         // Call backend MPC export endpoint
-        return try await ProfileAPI.shared.exportMPCKey(
-            profileId: profileId,
-            clientEncryptionKey: clientEncryptionKey.base64EncodedString()
+        // TODO: Implement ProfileAPI.exportMPCKey
+        // return try await ProfileAPI.shared.exportMPCKey(
+        //     profileId: profileId,
+        //     clientEncryptionKey: clientEncryptionKey.base64EncodedString()
+        // )
+        
+        // Temporary placeholder
+        return ServerExportData(
+            encryptedServerShare: "placeholder_encrypted_share",
+            serverPublicKey: [UInt8](repeating: 0, count: 32)
         )
     }
     

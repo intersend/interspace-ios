@@ -240,18 +240,22 @@ final class AuthenticationManagerV2: ObservableObject {
         }
         
         let request = LinkAccountRequestV2(
-            strategy: type.rawValue,
-            identifier: identifier,
-            credential: nil,
-            oauthCode: nil,
-            appleAuth: nil
+            targetType: type.rawValue,
+            targetIdentifier: identifier,
+            targetProvider: provider,
+            linkType: "direct",
+            privacyMode: "linked",
+            verificationCode: nil // Only needed for email linking
         )
         
         do {
             let response = try await authAPI.linkAccountsV2(request: request)
             
-            // Update accessible profiles
-            profiles = response.profiles
+            // The link was successful
+            print("🔐 AuthenticationManagerV2: Successfully linked account: \(response.linkedAccount.identifier)")
+            
+            // Notify that accounts have been updated
+            NotificationCenter.default.post(name: .accountsUpdated, object: nil)
         } catch {
             print("🔐 AuthenticationManagerV2: Failed to link account: \(error)")
             throw error
@@ -669,5 +673,11 @@ extension AuthenticationManagerV2 {
         throw AuthenticationError.unknown("Development authentication not available in release builds")
         #endif
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let accountsUpdated = Notification.Name("accountsUpdated")
 }
 

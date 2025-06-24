@@ -52,12 +52,12 @@ final class WalletViewModel: ObservableObject {
                     targetProfileId = profileId
                 } else {
                     // Use DataSyncManager for profiles with caching
-                    let profiles: [SmartProfile] = try await dataSyncManager.fetch(
-                        type: [SmartProfile].self,
+                    let profilesResponse: ProfilesResponse = try await dataSyncManager.fetch(
+                        type: ProfilesResponse.self,
                         endpoint: "profiles",
                         policy: .cacheFirst
                     )
-                    guard let activeProfile = profiles.first(where: { $0.isActive }) else {
+                    guard let activeProfile = profilesResponse.data.first(where: { $0.isActive }) else {
                         throw WalletViewError.noBalance
                     }
                     targetProfileId = activeProfile.id

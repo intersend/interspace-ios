@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - MPCError
 
-enum MPCError: LocalizedError {
+enum MPCError: LocalizedError, Equatable {
     // SDK Errors
     case sdkNotInitialized
     case sdkInitializationFailed(String)
@@ -49,6 +49,50 @@ enum MPCError: LocalizedError {
     // Generic
     case unknown(Error)
     
+<<<<<<< HEAD
+    static func == (lhs: MPCError, rhs: MPCError) -> Bool {
+        switch (lhs, rhs) {
+        case (.sdkNotInitialized, .sdkNotInitialized),
+             (.keyShareNotFound, .keyShareNotFound),
+             (.biometricAuthFailed, .biometricAuthFailed),
+             (.authenticationFailed, .authenticationFailed),
+             (.sessionExpired, .sessionExpired),
+             (.websocketConnectionFailed, .websocketConnectionFailed),
+             (.websocketNotConnected, .websocketNotConnected),
+             (.networkTimeout, .networkTimeout),
+             (.requestTimeout, .requestTimeout),
+             (.operationInProgress, .operationInProgress),
+             (.profileNotFound, .profileNotFound),
+             (.userCancelled, .userCancelled),
+             (.encryptionFailed, .encryptionFailed),
+             (.decryptionFailed, .decryptionFailed),
+             (.invalidConfiguration, .invalidConfiguration),
+             (.invalidData, .invalidData):
+            return true
+            
+        case (.sdkInitializationFailed(let a), .sdkInitializationFailed(let b)),
+             (.keyGenerationFailed(let a), .keyGenerationFailed(let b)),
+             (.keyRotationFailed(let a), .keyRotationFailed(let b)),
+             (.derivationFailed(let a), .derivationFailed(let b)),
+             (.signingFailed(let a), .signingFailed(let b)),
+             (.backupFailed(let a), .backupFailed(let b)),
+             (.exportFailed(let a), .exportFailed(let b)),
+             (.operationCancelled(let a), .operationCancelled(let b)),
+             (.storageError(let a), .storageError(let b)),
+             (.configurationError(let a), .configurationError(let b)),
+             (.serializationError(let a), .serializationError(let b)):
+            return a == b
+            
+        case (.unknown(let a), .unknown(let b)):
+            return (a as NSError) == (b as NSError)
+            
+        default:
+            return false
+        }
+    }
+    
+=======
+>>>>>>> origin/main
     var errorDescription: String? {
         switch self {
         case .sdkNotInitialized:

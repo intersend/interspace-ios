@@ -102,12 +102,17 @@ struct ProfileView: View {
                     profileHeaderSection
                     
                     // Empty state or account sections
-                    if viewModel.linkedAccounts.isEmpty && viewModel.socialAccounts.isEmpty {
+                    if viewModel.linkedAccounts.isEmpty && viewModel.socialAccounts.isEmpty && viewModel.emailAccounts.isEmpty {
                         emptyStateView
                     } else {
                         // Linked Wallets Section
                         if !viewModel.linkedAccounts.isEmpty {
                             linkedWalletsSection
+                        }
+                        
+                        // Email Accounts Section
+                        if !viewModel.emailAccounts.isEmpty {
+                            emailAccountsSection
                         }
                         
                         // Social Accounts Section
@@ -121,6 +126,9 @@ struct ProfileView: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
+                .refreshable {
+                    await viewModel.refreshProfile()
+                }
             }
             .background(Color.black)
             .navigationBarHidden(true)
@@ -239,7 +247,7 @@ struct ProfileView: View {
     // MARK: - Linked Wallets Section
     
     private var linkedWalletsSection: some View {
-        Section(header: Text("ACCOUNTS")
+        Section(header: Text("WALLETS")
             .font(.system(size: 13, weight: .medium))
             .foregroundColor(.gray)) {
             ForEach(viewModel.linkedAccounts) { account in
@@ -249,6 +257,44 @@ struct ProfileView: View {
                     WalletAccountRow(account: account, isAddressHidden: isAddressHidden)
                 }
                 .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))
+    }
+    
+    // MARK: - Email Accounts Section
+    
+    private var emailAccountsSection: some View {
+        Section(header: Text("EMAIL ACCOUNTS")
+            .font(.system(size: 13, weight: .medium))
+            .foregroundColor(.gray)) {
+            ForEach(viewModel.emailAccounts) { account in
+                HStack {
+                    Image(systemName: "envelope.fill")
+                        .foregroundColor(.blue)
+                        .frame(width: 40, height: 40)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.identifier)
+                            .font(.body)
+                            .foregroundColor(.white)
+                        
+                        HStack {
+                            if account.verified == true {
+                                Label("Verified", systemImage: "checkmark.seal.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            } else {
+                                Label("Unverified", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.vertical, 8)
             }
         }
         .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))

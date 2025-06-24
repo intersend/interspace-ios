@@ -10,6 +10,7 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
     case trezor = "trezor"
     case google = "google"
     case apple = "apple"
+    case mpc = "mpc"
     case unknown = "unknown"
     
     var id: String { rawValue }
@@ -32,6 +33,8 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "Google"
         case .apple:
             return "Apple"
+        case .mpc:
+            return "MPC Wallet"
         case .unknown:
             return "Unknown"
         }
@@ -55,6 +58,8 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "g.circle"
         case .apple:
             return "apple.logo"
+        case .mpc:
+            return "lock.shield.fill"
         case .unknown:
             return "wallet.pass"
         }
@@ -78,6 +83,8 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "google"
         case .apple:
             return "apple"
+        case .mpc:
+            return "mpc"
         case .unknown:
             return "wallet"
         }
@@ -101,6 +108,8 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return DesignTokens.Colors.google
         case .apple:
             return DesignTokens.Colors.apple
+        case .mpc:
+            return DesignTokens.Colors.primary
         case .unknown:
             return DesignTokens.Colors.primary
         }

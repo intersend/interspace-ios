@@ -13,7 +13,7 @@ final class WalletAPI {
     /// GET /profiles/:id/balance
     func getUnifiedBalance(profileId: String) async throws -> UnifiedBalance {
         let response: BalanceResponse = try await apiService.performRequest(
-            endpoint: "/v2/profiles/\(profileId)/balance",
+            endpoint: "/profiles/\(profileId)/balance",
             method: .GET,
             responseType: BalanceResponse.self
         )
@@ -23,7 +23,7 @@ final class WalletAPI {
     /// GET /profiles/:id/orby-rpc-url
     func getOrbyRPCUrl(profileId: String, chainId: Int) async throws -> String {
         let response: OrbyRPCResponse = try await apiService.performRequest(
-            endpoint: "/v2/profiles/\(profileId)/orby-rpc-url?chainId=\(chainId)",
+            endpoint: "/profiles/\(profileId)/orby-rpc-url?chainId=\(chainId)",
             method: .GET,
             responseType: OrbyRPCResponse.self
         )
@@ -33,7 +33,7 @@ final class WalletAPI {
     /// GET /profiles/:id/gas-tokens
     func getAvailableGasTokens(profileId: String) async throws -> GasTokensResponse {
         return try await apiService.performRequest(
-            endpoint: "/v2/profiles/\(profileId)/gas-tokens",
+            endpoint: "/profiles/\(profileId)/gas-tokens",
             method: .GET,
             responseType: GasTokensResponse.self
         )
@@ -42,7 +42,7 @@ final class WalletAPI {
     /// POST /profiles/:id/gas-tokens/preference
     func setPreferredGasToken(profileId: String, request: GasTokenPreferenceRequest) async throws -> GasTokenPreferenceResponse {
         return try await apiService.performRequest(
-            endpoint: "/v2/profiles/\(profileId)/gas-tokens/preference",
+            endpoint: "/profiles/\(profileId)/gas-tokens/preference",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: GasTokenPreferenceResponse.self
@@ -54,7 +54,7 @@ final class WalletAPI {
     /// GET /profiles/:id/transactions
     func getTransactionHistory(profileId: String, page: Int = 1, limit: Int = 20) async throws -> TransactionHistory {
         let response: TransactionHistoryResponse = try await apiService.performRequest(
-            endpoint: "/v2/profiles/\(profileId)/transactions?page=\(page)&limit=\(limit)",
+            endpoint: "/profiles/\(profileId)/transactions?page=\(page)&limit=\(limit)",
             method: .GET,
             responseType: TransactionHistoryResponse.self
         )
@@ -64,7 +64,7 @@ final class WalletAPI {
     /// POST /profiles/:id/intent
     func createIntent(profileId: String, request: CreateIntentRequest) async throws -> IntentResponse {
         return try await apiService.performRequest(
-            endpoint: "/v2/profiles/\(profileId)/intent",
+            endpoint: "/profiles/\(profileId)/intent",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: IntentResponse.self
@@ -75,7 +75,7 @@ final class WalletAPI {
     func submitSignedOperations(operationSetId: String, signedOperations: [SignedOperation]) async throws -> SubmitOperationsResponse {
         let request = SubmitOperationsRequest(signedOperations: signedOperations)
         return try await apiService.performRequest(
-            endpoint: "/v2/operations/\(operationSetId)/submit",
+            endpoint: "/operations/\(operationSetId)/submit",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: SubmitOperationsResponse.self
@@ -85,7 +85,7 @@ final class WalletAPI {
     /// GET /operations/:operationSetId/status
     func getOperationStatus(operationSetId: String) async throws -> OperationStatus {
         let response: OperationStatusResponse = try await apiService.performRequest(
-            endpoint: "/v2/operations/\(operationSetId)/status",
+            endpoint: "/operations/\(operationSetId)/status",
             method: .GET,
             responseType: OperationStatusResponse.self
         )
@@ -97,7 +97,7 @@ final class WalletAPI {
     /// GET /profiles/:profileId/accounts
     func getLinkedAccounts(profileId: String) async throws -> [LinkedAccount] {
         let response: LinkedAccountsResponse = try await apiService.performRequest(
-            endpoint: "/v2/profiles/\(profileId)/accounts",
+            endpoint: "/profiles/\(profileId)/accounts",
             method: .GET,
             responseType: LinkedAccountsResponse.self
         )
@@ -107,7 +107,7 @@ final class WalletAPI {
     /// POST /profiles/:profileId/accounts
     func linkAccount(profileId: String, request: LinkAccountRequest) async throws -> LinkedAccount {
         let response: LinkedAccountResponse = try await apiService.performRequest(
-            endpoint: "/v2/profiles/\(profileId)/accounts",
+            endpoint: "/profiles/\(profileId)/accounts",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: LinkedAccountResponse.self
@@ -118,7 +118,7 @@ final class WalletAPI {
     /// PUT /accounts/:accountId
     func updateLinkedAccount(accountId: String, request: UpdateAccountRequest) async throws -> LinkedAccount {
         let response: LinkedAccountResponse = try await apiService.performRequest(
-            endpoint: "/v2/accounts/\(accountId)",
+            endpoint: "/accounts/\(accountId)",
             method: .PUT,
             body: try JSONEncoder().encode(request),
             responseType: LinkedAccountResponse.self
@@ -129,7 +129,7 @@ final class WalletAPI {
     /// DELETE /accounts/:accountId
     func unlinkAccount(accountId: String) async throws -> DeleteResponse {
         return try await apiService.performRequest(
-            endpoint: "/v2/accounts/\(accountId)",
+            endpoint: "/accounts/\(accountId)",
             method: .DELETE,
             responseType: DeleteResponse.self
         )
@@ -140,7 +140,7 @@ final class WalletAPI {
     /// POST /accounts/:accountId/allowances
     func grantTokenAllowance(accountId: String, request: GrantAllowanceRequest) async throws -> TokenAllowance {
         let response: AllowanceResponse = try await apiService.performRequest(
-            endpoint: "/v2/accounts/\(accountId)/allowances",
+            endpoint: "/accounts/\(accountId)/allowances",
             method: .POST,
             body: try JSONEncoder().encode(request),
             responseType: AllowanceResponse.self
@@ -151,7 +151,7 @@ final class WalletAPI {
     /// GET /accounts/:accountId/allowances
     func getTokenAllowances(accountId: String) async throws -> [TokenAllowance] {
         let response: AllowancesResponse = try await apiService.performRequest(
-            endpoint: "/v2/accounts/\(accountId)/allowances",
+            endpoint: "/accounts/\(accountId)/allowances",
             method: .GET,
             responseType: AllowancesResponse.self
         )
@@ -161,7 +161,7 @@ final class WalletAPI {
     /// DELETE /allowances/:allowanceId
     func revokeTokenAllowance(allowanceId: String) async throws -> DeleteResponse {
         return try await apiService.performRequest(
-            endpoint: "/v2/allowances/\(allowanceId)",
+            endpoint: "/allowances/\(allowanceId)",
             method: .DELETE,
             responseType: DeleteResponse.self
         )

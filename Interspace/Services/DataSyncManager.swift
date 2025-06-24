@@ -347,13 +347,13 @@ final class DataSyncManager: ObservableObject {
             // Sync based on current session state
             if let activeProfile = await SessionCoordinator.shared.activeProfile {
                 // Prefetch common data with staggered requests to prevent UI lag
-                async let userFetch: Void = self.fetchInBackground(type: User.self, endpoint: "users/me", policy: .cacheAndNetwork)
-                async let profilesFetch: Void = self.fetchInBackground(type: [SmartProfile].self, endpoint: "profiles", policy: .cacheAndNetwork)
+                async let userFetch: Void = self.fetchInBackground(type: UserResponse.self, endpoint: "users/me", policy: .cacheAndNetwork)
+                async let profilesFetch: Void = self.fetchInBackground(type: ProfilesResponse.self, endpoint: "profiles", policy: .cacheAndNetwork)
                 
                 // Small delay between requests to prevent overwhelming the system
                 try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
                 
-                async let appsFetch: Void = self.fetchInBackground(type: [BookmarkedApp].self, endpoint: "profiles/\(activeProfile.id)/apps", policy: .cacheFirst)
+                async let appsFetch: Void = self.fetchInBackground(type: AppsResponse.self, endpoint: "profiles/\(activeProfile.id)/apps", policy: .cacheFirst)
                 
                 // Wait for all fetches to complete
                 _ = await (userFetch, profilesFetch, appsFetch)

@@ -164,6 +164,7 @@ enum AuthenticationError: LocalizedError, Identifiable {
     case networkError(String)
     case walletConnectionFailed(String)
     case emailVerificationFailed
+    case invalidVerificationCode
     case tokenExpired
     case unknown(String)
     case passkeyNotSupported
@@ -182,6 +183,8 @@ enum AuthenticationError: LocalizedError, Identifiable {
             return "walletConnectionFailed-\(message)"
         case .emailVerificationFailed:
             return "emailVerificationFailed"
+        case .invalidVerificationCode:
+            return "invalidVerificationCode"
         case .tokenExpired:
             return "tokenExpired"
         case .unknown(let message):
@@ -208,6 +211,8 @@ enum AuthenticationError: LocalizedError, Identifiable {
         case .walletConnectionFailed(let message):
             return "Wallet connection failed: \(message)"
         case .emailVerificationFailed:
+            return "Email verification failed. Please try again."
+        case .invalidVerificationCode:
             return "Invalid verification code. Please check the code and try again."
         case .tokenExpired:
             return "Your session has expired. Please sign in again."
@@ -275,13 +280,20 @@ struct AppleUserInfo: Codable {
 
 // MARK: - V2 API Models
 
-struct AccountV2: Codable {
+struct AccountV2: Codable, Identifiable {
     let id: String
-    let strategy: String
+    let type: String?  // Backend uses 'type'
+    let strategy: String?  // For compatibility
     let identifier: String
     let metadata: [String: String]?
-    let createdAt: String
-    let updatedAt: String
+    let verified: Bool?
+    let createdAt: String?
+    let updatedAt: String?
+    
+    // Computed property to get the account type
+    var accountType: String {
+        return type ?? strategy ?? "unknown"
+    }
 }
 
 struct ProfileSummaryV2: Codable {
@@ -335,11 +347,25 @@ struct AuthenticationRequestV2: Codable {
 }
 
 struct LinkAccountRequestV2: Codable {
-    let strategy: String
-    let identifier: String?
-    let credential: String?
-    let oauthCode: String?
-    let appleAuth: AppleAuthRequest?
+    let targetType: String
+    let targetIdentifier: String
+    let targetProvider: String?
+    let linkType: String?
+    let privacyMode: String?
+    let verificationCode: String? // For email linking
+}
+
+struct LinkAccountResponseV2: Codable {
+    let success: Bool
+    let link: IdentityLink
+    let linkedAccount: AccountV2
+    let accessibleProfiles: [ProfileSummary]
+}
+
+struct ProfileSummary: Codable {
+    let id: String
+    let name: String
+    let linkedAccountsCount: Int
 }
 
 struct IdentityGraphResponse: Codable {

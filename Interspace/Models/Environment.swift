@@ -18,7 +18,7 @@ enum AppEnvironment: String, CaseIterable {
         case .staging:
             return "https://staging-api.interspace.fi/api"
         case .production:
-            return "https://api.interspace.fi/api"
+            return "https://7d4b-184-147-176-114.ngrok-free.app/api/v2"
         }
     }
     

@@ -509,12 +509,12 @@ final class AppsViewModel: ObservableObject {
         if !NetworkMonitor.shared.isConnected {
             do {
                 // Get active profile
-                let profiles: [SmartProfile] = try await dataSyncManager.fetch(
-                    type: [SmartProfile].self,
+                let profilesResponse: ProfilesResponse = try await dataSyncManager.fetch(
+                    type: ProfilesResponse.self,
                     endpoint: "profiles",
                     policy: .cacheOnly // Use cache only since we're offline
                 )
-                guard let activeProfile = profiles.first(where: { $0.isActive }) else {
+                guard let activeProfile = profilesResponse.data.first(where: { $0.isActive }) else {
                     print("No active profile found for offline operation")
                     return
                 }
@@ -552,12 +552,12 @@ final class AppsViewModel: ObservableObject {
         if !NetworkMonitor.shared.isConnected {
             do {
                 // Get active profile
-                let profiles: [SmartProfile] = try await dataSyncManager.fetch(
-                    type: [SmartProfile].self,
+                let profilesResponse: ProfilesResponse = try await dataSyncManager.fetch(
+                    type: ProfilesResponse.self,
                     endpoint: "profiles",
                     policy: .cacheOnly // Use cache only since we're offline
                 )
-                guard let activeProfile = profiles.first(where: { $0.isActive }) else {
+                guard let activeProfile = profilesResponse.data.first(where: { $0.isActive }) else {
                     print("No active profile found for offline operation")
                     return
                 }

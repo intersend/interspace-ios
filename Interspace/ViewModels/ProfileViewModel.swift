@@ -11,6 +11,7 @@ class ProfileViewModel: ObservableObject {
     @Published var activeProfile: SmartProfile?
     @Published var linkedAccounts: [LinkedAccount] = []
     @Published var socialAccounts: [SocialAccount] = []
+    @Published var emailAccounts: [AccountV2] = [] // Email accounts from identity graph
     @Published var isLoading = false
     @Published var showError = false
     @Published var error: Error?
@@ -90,11 +91,14 @@ class ProfileViewModel: ObservableObject {
             // Load social accounts for the user
             async let socialTask = loadSocialAccounts()
             
+            // Load email accounts from identity graph
+            async let emailTask = loadEmailAccounts()
+            
             // Check MPC wallet status
             async let mpcTask = checkMPCWalletStatus()
             
             // Wait for all to complete
-            let _ = await (accountsTask, socialTask, mpcTask)
+            let _ = await (accountsTask, socialTask, emailTask, mpcTask)
             
         } catch {
             await MainActor.run {
@@ -126,6 +130,28 @@ class ProfileViewModel: ObservableObject {
             }
         } catch {
             print("Error loading social accounts: \(error)")
+        }
+    }
+    
+    private func loadEmailAccounts() async {
+        do {
+            // Get identity graph from AccountLinkingService
+            let linkingService = AccountLinkingService.shared
+            await linkingService.refreshIdentityGraph()
+            
+            // Filter email accounts from the linked accounts
+            let emailAccounts = linkingService.linkedAccounts.filter { account in
+                account.accountType == "email"
+            }
+            
+            await MainActor.run {
+                self.emailAccounts = emailAccounts
+            }
+        } catch {
+            print("Error loading email accounts: \(error)")
+            await MainActor.run {
+                self.emailAccounts = []
+            }
         }
     }
     

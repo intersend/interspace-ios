@@ -153,6 +153,9 @@ struct WalletConnectTray: View {
         case .google, .apple:
             // Social authentication not handled here
             break
+        case .mpc:
+            // MPC wallets handled separately
+            break
         case .safe, .ledger, .trezor, .unknown:
             // These wallet types not yet supported
             break
@@ -292,6 +295,8 @@ struct WalletRow: View {
             return "Ledger"
         case .trezor:
             return "Trezor"
+        case .mpc:
+            return "MPC Wallet"
         case .unknown:
             return "Unknown"
         }

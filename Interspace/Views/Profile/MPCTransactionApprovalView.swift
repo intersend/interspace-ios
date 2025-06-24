@@ -242,13 +242,13 @@ struct MPCTransactionApprovalView: View {
                 .foregroundColor(.white)
             
             VStack(spacing: 12) {
-                DetailRow(title: "Network", value: transaction.network)
+                MPCDetailRow(title: "Network", value: transaction.network)
                 
                 if let gasEstimate = transaction.gasEstimate {
-                    DetailRow(title: "Estimated Gas", value: gasEstimate)
+                    MPCDetailRow(title: "Estimated Gas", value: gasEstimate)
                 }
                 
-                DetailRow(title: "Nonce", value: "\(transaction.nonce ?? 0)")
+                MPCDetailRow(title: "Nonce", value: "\(transaction.nonce ?? 0)")
                 
                 if let data = transaction.data {
                     VStack(alignment: .leading, spacing: 8) {
@@ -268,7 +268,7 @@ struct MPCTransactionApprovalView: View {
                     }
                 }
                 
-                DetailRow(
+                MPCDetailRow(
                     title: "Timestamp",
                     value: DateFormatter.localizedString(
                         from: Date(),
@@ -360,7 +360,7 @@ struct MPCTransactionApprovalView: View {
 
 // MARK: - Supporting Views
 
-struct DetailRow: View {
+private struct MPCDetailRow: View {
     let title: String
     let value: String
     
