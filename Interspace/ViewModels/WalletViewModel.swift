@@ -66,7 +66,7 @@ final class WalletViewModel: ObservableObject {
                 // Use DataSyncManager for balance with network-first policy (5 min cache)
                 unifiedBalance = try await dataSyncManager.fetch(
                     type: UnifiedBalance.self,
-                    endpoint: "wallets/\(targetProfileId)/balance",
+                    endpoint: "profiles/\(targetProfileId)/balance",
                     policy: .networkFirst
                 )
                 
@@ -91,19 +91,19 @@ final class WalletViewModel: ObservableObject {
         } else {
             do {
                 // Get active profile from cache first
-                let profiles: [SmartProfile] = try await dataSyncManager.fetch(
-                    type: [SmartProfile].self,
+                let profilesResponse: ProfilesResponse = try await dataSyncManager.fetch(
+                    type: ProfilesResponse.self,
                     endpoint: "profiles",
                     policy: .cacheFirst
                 )
-                guard let activeProfile = profiles.first(where: { $0.isActive }) else {
+                guard let activeProfile = profilesResponse.data.first(where: { $0.isActive }) else {
                     throw WalletViewError.noBalance
                 }
                 
                 // Force refresh balance from network
                 unifiedBalance = try await dataSyncManager.fetch(
                     type: UnifiedBalance.self,
-                    endpoint: "wallets/\(activeProfile.id)/balance",
+                    endpoint: "profiles/\(activeProfile.id)/balance",
                     policy: .networkOnly,
                     forceRefresh: true
                 )

@@ -7,6 +7,10 @@ struct WalletView: View {
     @State private var showReceiveSheet = false
     @State private var selectedToken: UnifiedBalance.TokenBalance?
     @State private var showSettings = false
+    @State private var showUniversalAddTray = false
+    @State private var showAbout = false
+    @State private var showSecurity = false
+    @State private var showNotifications = false
     
     var body: some View {
         NavigationStack {
@@ -42,63 +46,30 @@ struct WalletView: View {
                 LiquidGlassLoadingOverlay()
             }
             }
-            .navigationTitle("Wallet")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitle("Wallet")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        // Plus Button
-                        Button(action: {
-                            HapticManager.impact(.light)
-                            showReceiveSheet = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color(white: 0.15))
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Ellipsis Menu Button
-                        Menu {
-                            Button(action: {
-                                showTransactionHistory = true
-                            }) {
-                                Label("Transaction History", systemImage: "clock.arrow.circlepath")
-                            }
-                            
-                            Button(action: {
-                                showSettings = true
-                            }) {
-                                Label("Settings", systemImage: "gear")
-                            }
-                            
-                            Divider()
-                            
-                            Button(action: {
-                                Task {
-                                    await viewModel.refreshBalance()
-                                }
-                            }) {
-                                Label("Refresh", systemImage: "arrow.clockwise")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color(white: 0.15))
-                                )
-                        }
-                    }
+                    StandardToolbarButtons(
+                        showUniversalAddTray: $showUniversalAddTray,
+                        showAbout: $showAbout,
+                        showSecurity: $showSecurity,
+                        showNotifications: $showNotifications,
+                        initialSection: .wallet
+                    )
                 }
             }
+        }
+        .sheet(isPresented: $showUniversalAddTray) {
+            UniversalAddTray(isPresented: $showUniversalAddTray, initialSection: .wallet)
+        }
+        .sheet(isPresented: $showAbout) {
+            ProfileAboutView()
+        }
+        .sheet(isPresented: $showSecurity) {
+            ProfileSecurityView(showDeleteConfirmation: .constant(false))
+        }
+        .sheet(isPresented: $showNotifications) {
+            ProfileNotificationsView()
         }
         .sheet(isPresented: $showTransactionHistory) {
             Text("Transaction History - Coming Soon")

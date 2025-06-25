@@ -8,6 +8,10 @@ struct AppsView: View {
     @State private var selectedApp: BookmarkedApp?
     @State private var selectedFolder: AppFolder?
     @State private var showSettings = false
+    @State private var showUniversalAddTray = false
+    @State private var showAbout = false
+    @State private var showSecurity = false
+    @State private var showNotifications = false
     
     var body: some View {
         NavigationStack {
@@ -45,66 +49,30 @@ struct AppsView: View {
                 }
             }
             }
-            .navigationTitle("Apps")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitle("Apps")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        // Plus Button
-                        Button(action: {
-                            HapticManager.impact(.light)
-                            showAddApp = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color(white: 0.15))
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Ellipsis Menu Button
-                        Menu {
-                            Button(action: {
-                                showSettings = true
-                            }) {
-                                Label("Settings", systemImage: "gear")
-                            }
-                            
-                            Button(action: {
-                                // Show app library
-                            }) {
-                                Label("App Library", systemImage: "square.grid.3x3")
-                            }
-                            
-                            Divider()
-                            
-                            Button(action: {
-                                Task {
-                                    await viewModel.refreshData()
-                                }
-                            }) {
-                                Label("Refresh", systemImage: "arrow.clockwise")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color(white: 0.15))
-                                )
-                        }
-                    }
+                    StandardToolbarButtons(
+                        showUniversalAddTray: $showUniversalAddTray,
+                        showAbout: $showAbout,
+                        showSecurity: $showSecurity,
+                        showNotifications: $showNotifications,
+                        initialSection: .app
+                    )
                 }
             }
         }
-        .sheet(isPresented: $showAddApp) {
-            AddAppView(viewModel: viewModel)
+        .sheet(isPresented: $showUniversalAddTray) {
+            UniversalAddTray(isPresented: $showUniversalAddTray, initialSection: .app)
+        }
+        .sheet(isPresented: $showAbout) {
+            ProfileAboutView()
+        }
+        .sheet(isPresented: $showSecurity) {
+            ProfileSecurityView(showDeleteConfirmation: .constant(false))
+        }
+        .sheet(isPresented: $showNotifications) {
+            ProfileNotificationsView()
         }
         .fullScreenCover(item: $selectedFolder) { folder in
             SpringboardFolderView(

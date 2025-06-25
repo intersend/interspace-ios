@@ -1,0 +1,31 @@
+// Build Configuration Settings Template
+// Copy this file to BuildConfiguration.xcconfig and fill in your values
+// DO NOT commit BuildConfiguration.xcconfig to version control
+
+// API Configuration
+// Development - Your local or staging API URL
+API_BASE_URL_DEBUG = YOUR_STAGING_API_URL_HERE
+// Production - Your production API URL
+API_BASE_URL_RELEASE = YOUR_PRODUCTION_API_URL_HERE
+
+// Set the appropriate URL based on configuration
+API_BASE_URL = $(API_BASE_URL_$(CONFIGURATION))
+
+// Google Sign-In Configuration
+// Get these from https://console.cloud.google.com/
+GOOGLE_CLIENT_ID = YOUR_GOOGLE_CLIENT_ID_HERE
+GOOGLE_REVERSED_CLIENT_ID = YOUR_GOOGLE_REVERSED_CLIENT_ID_HERE
+// Server client ID is the Web OAuth client ID used by backend to validate tokens
+// This should match the GOOGLE_CLIENT_ID configured in your backend
+GOOGLE_SERVER_CLIENT_ID = YOUR_GOOGLE_SERVER_CLIENT_ID_HERE
+
+// Wallet Configuration
+// Get your Infura API key from https://infura.io
+INFURA_API_KEY = YOUR_INFURA_API_KEY_HERE
+// Get your WalletConnect project ID from https://cloud.walletconnect.com
+WALLETCONNECT_PROJECT_ID = YOUR_WALLETCONNECT_PROJECT_ID_HERE
+
+// Swift Active Compilation Conditions
+SWIFT_ACTIVE_COMPILATION_CONDITIONS_DEBUG = DEBUG
+SWIFT_ACTIVE_COMPILATION_CONDITIONS_RELEASE = RELEASE
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(SWIFT_ACTIVE_COMPILATION_CONDITIONS_$(CONFIGURATION))

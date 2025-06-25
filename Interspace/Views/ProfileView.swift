@@ -24,78 +24,9 @@ struct ProfileView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Custom Profile Header
-                HStack {
-                    Text("Profile")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 12) {
-                        // Plus Button
-                        Button(action: {
-                            HapticManager.impact(.light)
-                            showUniversalAddTray = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color(white: 0.15))
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Ellipsis Menu Button
-                        Menu {
-                            Button(action: {
-                                showAbout = true
-                            }) {
-                                Label("About", systemImage: "info.circle")
-                            }
-                            
-                            Button(action: {
-                                showSecurity = true
-                            }) {
-                                Label("Security", systemImage: "lock.circle")
-                            }
-                            
-                            Button(action: {
-                                showNotifications = true
-                            }) {
-                                Label("Notifications", systemImage: "bell.circle")
-                            }
-                            
-                            Divider()
-                            
-                            Button(role: .destructive, action: {
-                                HapticManager.impact(.medium)
-                                Task {
-                                    await sessionCoordinator.logout()
-                                }
-                            }) {
-                                Label("Sign Out", systemImage: "arrow.right.square")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color(white: 0.15))
-                                )
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 10)
+            ZStack {
+                Color.black
+                    .ignoresSafeArea()
                 
                 List {
                     // Profile Header Section
@@ -130,8 +61,18 @@ struct ProfileView: View {
                     await viewModel.refreshProfile()
                 }
             }
-            .background(Color.black)
-            .navigationBarHidden(true)
+            .navigationBarTitle("Profile")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    StandardToolbarButtons(
+                        showUniversalAddTray: $showUniversalAddTray,
+                        showAbout: $showAbout,
+                        showSecurity: $showSecurity,
+                        showNotifications: $showNotifications,
+                        initialSection: .none
+                    )
+                }
+            }
         }
         .preferredColorScheme(.dark) // iOS 26 Liquid Glass is optimized for dark mode
         .sheet(isPresented: $showAbout) {
@@ -269,30 +210,28 @@ struct ProfileView: View {
             .font(.system(size: 13, weight: .medium))
             .foregroundColor(.gray)) {
             ForEach(viewModel.emailAccounts) { account in
-                HStack {
+                HStack(spacing: 16) {
+                    // Email Icon with background circle
                     Image(systemName: "envelope.fill")
+                        .font(.system(size: 20))
                         .foregroundColor(.blue)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color.blue.opacity(0.15))
+                        )
                     
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(account.identifier)
-                            .font(.body)
-                            .foregroundColor(.white)
-                        
-                        HStack {
-                            if account.verified == true {
-                                Label("Verified", systemImage: "checkmark.seal.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                            } else {
-                                Label("Unverified", systemImage: "exclamationmark.triangle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                    }
+                    // Email address
+                    Text(account.identifier)
+                        .font(.body)
+                        .foregroundColor(.white)
                     
                     Spacer()
+                    
+                    // Chevron
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
                 }
                 .padding(.vertical, 8)
             }
