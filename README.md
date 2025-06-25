@@ -1,178 +1,144 @@
-# Interspace iOS
+# Orby Wallet Injection Browser
 
-<p align="center">
-  <img src="docs/images/app-icon.png" alt="Interspace Logo" width="120" height="120">
-</p>
+A minimal iOS browser with Web3 wallet injection capabilities for testing decentralized applications (dApps). This browser implements EIP-6963 (Multi Injected Provider Discovery) and other wallet standards to help test wallet integrations.
 
-<p align="center">
-  <a href="https://developer.apple.com/swift/">
-    <img src="https://img.shields.io/badge/Swift-5.9-orange.svg" alt="Swift 5.9">
-  </a>
-  <a href="https://developer.apple.com/xcode/">
-    <img src="https://img.shields.io/badge/Xcode-15.0+-blue.svg" alt="Xcode 15.0+">
-  </a>
-  <a href="https://developer.apple.com/documentation/ios-ipados-release-notes">
-    <img src="https://img.shields.io/badge/iOS-16.0+-green.svg" alt="iOS 16.0+">
-  </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
-  </a>
-</p>
+## Features
 
-Interspace is an open-source iOS application that provides a secure, privacy-first platform for managing digital identities, social profiles, and cryptocurrency wallets. Built with SwiftUI and modern iOS development practices.
+- **Minimal Browser**: Stripped-down WebView with essential navigation
+- **EIP-6963 Support**: Multi Injected Provider Discovery
+- **EIP-1193 Support**: Ethereum Provider JavaScript API
+- **Multiple Wallet Providers**: Impersonate MetaMask, Coinbase, Trust, Rainbow, and WalletConnect
+- **Configurable Testing**: Control wallet address, chain ID, and auto-connect behavior
+- **Debug Logging**: Monitor all wallet interactions and RPC calls
+- **Mock Responses**: Realistic responses for common Web3 methods
 
-## ✨ Features
-
-- 🆔 **Multi-Profile Management**: Create and manage multiple digital identities
-- 🔐 **Privacy-First Design**: Your data stays on your device
-- 👛 **Wallet Integration**: Connect MetaMask, Coinbase Wallet, and more
-- 🌐 **Social Account Linking**: Connect Twitter, Discord, Instagram, and other platforms
-- 🔑 **Secure Authentication**: Support for email, Google Sign-In, Apple Sign-In, and Passkeys
-- 🎨 **Beautiful UI**: Modern SwiftUI interface with smooth animations
-- 🌓 **Dark Mode Support**: Fully adaptive to system appearance
-- 🔒 **End-to-End Security**: Military-grade encryption and security practices
-
-## 📋 Prerequisites
-
-- macOS 13.0 or later
-- Xcode 15.0 or later
-- iOS 16.0+ deployment target
-- CocoaPods 1.12.0+ (for dependency management)
-- Active Apple Developer account (for device testing)
-
-### Required API Keys
-
-To run the app, you'll need to obtain the following API keys:
-
-1. **Google OAuth**: [Google Cloud Console](https://console.cloud.google.com/)
-2. **Infura**: [Infura Dashboard](https://infura.io/)
-3. **WalletConnect**: [WalletConnect Cloud](https://cloud.walletconnect.com/)
-
-## 🚀 Quick Start
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/interspace-ios.git
-   cd interspace-ios
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pod install
-   ```
-
-3. **Configure the project**
-   ```bash
-   # Copy configuration templates
-   cp Interspace/Supporting/BuildConfiguration.xcconfig.template Interspace/Supporting/BuildConfiguration.xcconfig
-   cp Interspace/GoogleService-Info.plist.template Interspace/GoogleService-Info.plist
-   cp .env.example .env
-   cp .xcode.env.local.template .xcode.env.local
-   ```
-
-4. **Add your API keys**
-   - Edit `BuildConfiguration.xcconfig` with your API keys
-   - Update `GoogleService-Info.plist` with your Firebase configuration
-   - Configure `.env` with your environment variables
-
-5. **Open the project**
-   ```bash
-   open Interspace.xcworkspace
-   ```
-
-6. **Select your development team**
-   - Open project settings in Xcode
-   - Select your development team under "Signing & Capabilities"
-
-7. **Build and run**
-   - Select your target device or simulator
-   - Press `Cmd+R` to build and run
-
-## 📖 Documentation
-
-- [Architecture Overview](docs/ARCHITECTURE.md) - System design and architecture
-- [Development Guide](docs/DEVELOPMENT.md) - Detailed development setup
-- [API Documentation](docs/API.md) - Backend API integration
-- [Deployment Guide](docs/DEPLOYMENT.md) - Release and deployment process
-- [Security Policy](SECURITY.md) - Security practices and vulnerability reporting
-
-## 🏗️ Project Structure
+## Project Structure
 
 ```
-interspace-ios/
-├── Interspace/              # Main application code
-│   ├── Models/             # Data models
-│   ├── Views/              # SwiftUI views
-│   ├── ViewModels/         # View models (MVVM)
-│   ├── Services/           # Business logic and API services
-│   ├── Extensions/         # Swift extensions
-│   ├── Supporting/         # Supporting files (Info.plist, etc.)
-│   └── Assets.xcassets/    # Images and colors
-├── InterspaceTests/        # Unit tests
-├── InterspaceUITests/      # UI tests
-├── docs/                   # Documentation
-├── scripts/                # Build and utility scripts
-└── Pods/                   # CocoaPods dependencies (git-ignored)
+OrbySample/
+├── OrbySampleApp.swift          # App entry point
+├── Views/
+│   └── ContentView.swift        # Main container
+├── Browser/
+│   ├── MinimalBrowserView.swift # Browser UI
+│   ├── InjectedWebView.swift    # WebView with injection
+│   └── WalletInjector.swift     # Injection configuration
+└── WalletInjection/
+    ├── EIP6963Provider.swift    # EIP-6963 implementation
+    ├── WalletProviderScripts.swift # JavaScript generation
+    └── MockWalletProvider.swift # Mock RPC responses
 ```
 
-## 🧪 Testing
+## Quick Start
 
-Run the test suite:
+### 1. Open in Xcode
 
-```bash
-# Unit tests
-xcodebuild test -workspace Interspace.xcworkspace -scheme Interspace -destination 'platform=iOS Simulator,name=iPhone 15'
+Since the project file needs to be regenerated for the minimal structure, you'll need to create a new Xcode project:
 
-# UI tests
-xcodebuild test -workspace Interspace.xcworkspace -scheme InterspaceUITests -destination 'platform=iOS Simulator,name=iPhone 15'
+1. Open Xcode
+2. Create a new iOS App project
+3. Name it "OrbySample"
+4. Choose SwiftUI interface
+5. Replace the generated files with the files from this directory
+6. Add files to the project target
+
+### 2. Configure Bundle Identifier
+
+Set the bundle identifier to something unique like `com.orby.wallet-injection-browser`
+
+### 3. Run the App
+
+1. Select a simulator or device
+2. Build and run (⌘R)
+3. The browser will launch with Uniswap loaded by default
+
+## Using the Wallet Injection
+
+### Access Wallet Settings
+
+Tap the wallet icon in the navigation bar to configure:
+
+- **Provider Type**: Choose which wallet to impersonate
+- **Wallet Address**: Set the test address
+- **Chain ID**: Select the network
+- **Auto-Connect**: Automatically connect on page load
+- **Debug Logging**: Enable console logging
+
+### Testing with dApps
+
+1. Navigate to any dApp (e.g., Uniswap, OpenSea, etc.)
+2. The selected wallet provider will be injected automatically
+3. Click "Connect Wallet" on the dApp
+4. The wallet will appear in the list (if EIP-6963 is supported)
+5. Monitor the Xcode console for debug output
+
+### Supported RPC Methods
+
+The mock provider supports common methods:
+- `eth_requestAccounts` / `eth_accounts`
+- `eth_chainId` / `net_version`
+- `eth_getBalance`
+- `eth_blockNumber`
+- `eth_sendTransaction`
+- `personal_sign` / `eth_sign`
+- `eth_signTypedData_v4`
+- `wallet_addEthereumChain`
+- `wallet_switchEthereumChain`
+
+## Customization
+
+### Adding New Wallet Providers
+
+1. Add the provider to the `WalletProvider` enum in `WalletInjector.swift`
+2. Configure its `EIP6963ProviderInfo` with appropriate metadata
+3. Set provider-specific flags in `WalletProviderScripts.swift`
+
+### Modifying Mock Responses
+
+Edit `MockWalletProvider.swift` to customize RPC responses:
+
+```swift
+case "eth_getBalance":
+    return "0x1BC16D674EC80000" // 2 ETH in wei
 ```
 
-## 🤝 Contributing
+### Testing Events
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+The provider emits standard events:
+- `connect`
+- `disconnect`
+- `accountsChanged`
+- `chainChanged`
 
-### Development Workflow
+## Debug Tips
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. **Enable Debug Logging**: Toggle in wallet settings to see all RPC calls
+2. **Check Console**: View Xcode console for injection status and errors
+3. **Test Multiple Providers**: Switch between wallets to test compatibility
+4. **Verify EIP-6963**: Look for "eip6963:announceProvider" events in console
 
-### Code Style
+## Common Issues
 
-- Follow Swift API Design Guidelines
-- Use SwiftLint for code consistency
-- Write unit tests for new features
-- Update documentation as needed
+### Provider Not Detected
+- Ensure the dApp supports EIP-6963 or legacy injection
+- Check that JavaScript injection is enabled
+- Verify the provider type matches what the dApp expects
 
-## 🔒 Security
+### Connection Failures
+- Some dApps validate addresses - use realistic test addresses
+- Ensure chain ID matches the dApp's expectations
+- Check console for specific error messages
 
-Security is our top priority. Please review our [Security Policy](SECURITY.md) for:
+## Next Steps
 
-- Vulnerability reporting procedures
-- Security best practices
-- Responsible disclosure policy
+This minimal browser provides a foundation for testing wallet injection. You can:
 
-**Never commit sensitive information like API keys or passwords to the repository.**
+1. Add more sophisticated mock responses
+2. Implement actual wallet functionality
+3. Add transaction simulation
+4. Create automated testing scripts
+5. Extend provider compatibility
 
-## 📄 License
+## Support
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [SwiftUI](https://developer.apple.com/xcode/swiftui/) - Apple's modern UI framework
-- [WalletConnect](https://walletconnect.com/) - Open protocol for wallet connections
-- [Google Sign-In](https://developers.google.com/identity) - Authentication services
-- All our amazing contributors and the open-source community
-
-## 📬 Contact
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/interspace-ios/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/interspace-ios/discussions)
-- **Email**: support@interspace.app
-
----
-
-<p align="center">Made with ❤️ by the Interspace Team</p>
+For questions or issues, please contact the Interspace team or create an issue in the repository.
