@@ -1,8 +1,6 @@
 import Foundation
 import Combine
 import WalletConnectSign
-import WalletConnectNetworking
-import WalletConnectRelay
 
 @MainActor
 final class WalletConnectService: ObservableObject {
@@ -52,18 +50,8 @@ final class WalletConnectService: ObservableObject {
             )
         )
         
-        // Configure networking
-        Networking.configure(
-            groupIdentifier: "group.com.interspace",
-            projectId: projectId,
-            socketFactory: DefaultSocketFactory()
-        )
-        
-        // Configure pairing
-        Pair.configure(metadata: metadata)
-        
-        // Configure Sign client
-        Sign.configure(crypto: DefaultCryptoProvider())
+        // Configure Sign client with metadata and project ID
+        Sign.configure(metadata: metadata, projectId: projectId)
         
         print("✅ WalletConnectService: Configured with project ID: \(projectId)")
     }
@@ -72,15 +60,15 @@ final class WalletConnectService: ObservableObject {
         // Subscribe to session proposals
         Sign.instance.sessionProposalPublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] (proposal, _) in
-                self?.handleSessionProposal(proposal)
+            .sink { [weak self] proposal in
+                self?.handleSessionProposal(proposal.proposal)
             }
             .store(in: &cancellables)
         
         // Subscribe to session requests
         Sign.instance.sessionRequestPublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] (request, _) in
+            .sink { [weak self] request in
                 self?.handleSessionRequest(request)
             }
             .store(in: &cancellables)
@@ -96,7 +84,7 @@ final class WalletConnectService: ObservableObject {
         // Subscribe to session deletions
         Sign.instance.sessionDeletePublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] (topic, _) in
+            .sink { [weak self] (topic, reason) in
                 self?.handleSessionDeleted(topic: topic)
             }
             .store(in: &cancellables)
@@ -115,10 +103,12 @@ final class WalletConnectService: ObservableObject {
         
         do {
             // Parse the URI
-            let pairingURI = WalletConnectURI(string: uri)
+            guard let pairingURI = WalletConnectURI(string: uri) else {
+                throw WalletConnectError.invalidURI
+            }
             
             // Pair with the wallet
-            try await Pair.instance.pair(uri: pairingURI!)
+            try await Pair.instance.pair(uri: pairingURI)
             
             print("✅ WalletConnectService: Paired with URI")
             
@@ -141,11 +131,10 @@ final class WalletConnectService: ObservableObject {
         currentAddress = address
         
         // Create personal_sign request
-        let params = AnyCodable([message, address])
         let request = Request(
             topic: session.topic,
             method: "personal_sign",
-            params: params,
+            params: AnyCodable([message, address]),
             chainId: Blockchain("eip155:1")! // Ethereum mainnet
         )
         
@@ -160,6 +149,7 @@ final class WalletConnectService: ObservableObject {
                     print("✅ WalletConnectService: Sent signing request")
                 } catch {
                     print("❌ WalletConnectService: Failed to send request: \(error)")
+                    self.signingCompletion = nil
                     continuation.resume(throwing: WalletConnectError.signingFailed(error.localizedDescription))
                 }
             }
@@ -270,7 +260,7 @@ final class WalletConnectService: ObservableObject {
             // For now, we'll support Ethereum mainnet
             let accounts = Set(requiredNamespace.chains?.compactMap { chain in
                 if let address = getCurrentWalletAddress() {
-                    return Account("\(chain.absoluteString):\(address)")
+                    return Account(blockchain: chain, address: address)!
                 }
                 return nil
             } ?? [])
@@ -438,21 +428,9 @@ enum WalletConnectError: LocalizedError {
 // MARK: - Extensions
 
 extension WalletConnectService {
-    /// Handle response from wallet for signing requests
-    func handleSigningResponse(_ response: Response) {
-        switch response.result {
-        case .response(let value):
-            if let signature = try? value.get(String.self) {
-                signingCompletion?(.success(signature))
-                signingCompletion = nil
-            } else {
-                signingCompletion?(.failure(WalletConnectError.invalidResponse))
-                signingCompletion = nil
-            }
-            
-        case .error(let error):
-            signingCompletion?(.failure(WalletConnectError.signingFailed(error.message)))
-            signingCompletion = nil
-        }
+    /// Handle response events from wallet
+    private func setupResponseHandling() {
+        // Response handling is done through the continuation in signMessage
+        // The wallet will respond through the WalletConnect protocol
     }
 }

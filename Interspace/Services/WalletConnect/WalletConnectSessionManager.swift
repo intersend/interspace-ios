@@ -126,7 +126,8 @@ final class WalletConnectSessionManager: ObservableObject {
     
     private func loadStoredSessions() {
         do {
-            if let data = try keychainManager.getData(for: kStoredSessionsKey) {
+            if let dataString = try keychainManager.load(for: kStoredSessionsKey),
+               let data = dataString.data(using: .utf8) {
                 let decoder = JSONDecoder()
                 activeSessions = try decoder.decode([WalletConnectSessionInfo].self, from: data)
                 hasActiveSessions = !activeSessions.isEmpty
@@ -147,7 +148,7 @@ final class WalletConnectSessionManager: ObservableObject {
         do {
             let encoder = JSONEncoder()
             let data = try encoder.encode(activeSessions)
-            try keychainManager.saveData(data, for: kStoredSessionsKey)
+            try keychainManager.save(String(data: data, encoding: .utf8) ?? "", for: kStoredSessionsKey)
             print("✅ WalletConnectSessionManager: Saved \(activeSessions.count) sessions to keychain")
         } catch {
             print("❌ WalletConnectSessionManager: Failed to save sessions: \(error)")

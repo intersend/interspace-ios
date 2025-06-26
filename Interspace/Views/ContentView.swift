@@ -387,7 +387,7 @@ struct MainTabView: View {
             
             // Wallet Tab
             NavigationStack {
-                WalletView()
+                WalletViewRedesigned()
             }
             .tabItem {
                 Label("Wallet", systemImage: selectedTab == .wallet ? Tab.wallet.selectedIcon : Tab.wallet.icon)
