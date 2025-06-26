@@ -153,7 +153,7 @@ final class WalletConnectService: ObservableObject {
         currentAddress = address
         
         // Create personal_sign request
-        let blockchain = Blockchain("eip155:1")! // Ethereum mainnet
+        let blockchain = try Blockchain("eip155:1") // Ethereum mainnet
         let request = Request(
             topic: session.topic,
             method: "personal_sign",
@@ -494,14 +494,55 @@ extension WalletConnectService {
 
 // MARK: - Socket Factory
 
-extension WebSocket: WebSocketConnecting { }
+// Create a wrapper to adapt Starscream's WebSocket to WalletConnectRelay's WebSocketConnecting
+class WebSocketAdapter: WebSocketConnecting {
+    private let socket: WebSocket
+    
+    var isConnected: Bool {
+        socket.isConnected
+    }
+    
+    var onConnect: (() -> Void)?
+    var onDisconnect: ((Error?) -> Void)?
+    var onText: ((String) -> Void)?
+    
+    init(url: URL) {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 5
+        socket = WebSocket(request: request)
+        
+        socket.onEvent = { [weak self] event in
+            switch event {
+            case .connected:
+                self?.onConnect?()
+            case .disconnected(let reason, _):
+                self?.onDisconnect?(nil)
+            case .text(let string):
+                self?.onText?(string)
+            case .error(let error):
+                self?.onDisconnect?(error)
+            default:
+                break
+            }
+        }
+    }
+    
+    func connect() {
+        socket.connect()
+    }
+    
+    func disconnect() {
+        socket.disconnect()
+    }
+    
+    func write(string: String) {
+        socket.write(string: string)
+    }
+}
 
 struct DefaultSocketFactory: WebSocketFactory {
     func create(with url: URL) -> WebSocketConnecting {
-        let socket = WebSocket(url: url)
-        let queue = DispatchQueue(label: "com.interspace.walletconnect.sockets", qos: .utility, attributes: .concurrent)
-        socket.callbackQueue = queue
-        return socket
+        return WebSocketAdapter(url: url)
     }
 }
 
