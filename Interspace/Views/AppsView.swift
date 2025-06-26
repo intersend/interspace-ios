@@ -14,27 +14,42 @@ struct AppsView: View {
     @State private var showNotifications = false
     
     var body: some View {
-        NavigationStack {
-            ZStack {
+        ZStack {
             // Native iPhone-style background
             Color.black
                 .ignoresSafeArea(.all)
             
-            if viewModel.apps.isEmpty && viewModel.folders.isEmpty && !viewModel.isLoading {
-                emptyStateView
-            } else {
-                // Main springboard grid
-                SpringboardGrid(
-                    apps: $viewModel.apps,
-                    folders: $viewModel.folders,
-                    isEditMode: $isEditMode,
-                    onAppTap: handleAppTap,
-                    onFolderTap: handleFolderTap,
-                    onAddApp: {
-                        showAddApp = true
-                    },
-                    viewModel: viewModel
-                )
+            VStack(spacing: 0) {
+                // Custom large title header that mimics native iOS style
+                HStack(alignment: .bottom) {
+                    Text("Apps")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+                
+                if viewModel.apps.isEmpty && viewModel.folders.isEmpty && !viewModel.isLoading {
+                    emptyStateView
+                } else {
+                    // Main springboard grid
+                    SpringboardGrid(
+                        apps: $viewModel.apps,
+                        folders: $viewModel.folders,
+                        isEditMode: $isEditMode,
+                        onAppTap: handleAppTap,
+                        onFolderTap: handleFolderTap,
+                        onAddApp: {
+                            showAddApp = true
+                        },
+                        viewModel: viewModel
+                    )
+                }
+                
+                Spacer()
             }
             
             // Loading overlay
@@ -48,18 +63,18 @@ struct AppsView: View {
                         .scaleEffect(1.5)
                 }
             }
-            }
-            .navigationBarTitle("Apps")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    StandardToolbarButtons(
-                        showUniversalAddTray: $showUniversalAddTray,
-                        showAbout: $showAbout,
-                        showSecurity: $showSecurity,
-                        showNotifications: $showNotifications,
-                        initialSection: .app
-                    )
-                }
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                StandardToolbarButtons(
+                    showUniversalAddTray: $showUniversalAddTray,
+                    showAbout: $showAbout,
+                    showSecurity: $showSecurity,
+                    showNotifications: $showNotifications,
+                    initialSection: .app
+                )
             }
         }
         .sheet(isPresented: $showUniversalAddTray) {
