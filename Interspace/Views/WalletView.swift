@@ -13,12 +13,7 @@ struct WalletView: View {
     @State private var showNotifications = false
     
     var body: some View {
-        NavigationStack {
-        ZStack {
-            // Clean iOS background
-            DesignTokens.Colors.backgroundPrimary
-                .ignoresSafeArea(.all)
-            
+        ScrollView {
             if viewModel.unifiedBalance == nil && !viewModel.isLoading {
                 // Empty State or Guest State
                 VStack(spacing: 0) {
@@ -33,30 +28,74 @@ struct WalletView: View {
                     .padding(.horizontal, DesignTokens.Spacing.screenPadding)
                     .padding(.top, 80)
                     
-                    Spacer()
+                    Spacer(minLength: UIScreen.main.bounds.height - 400)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity)
             } else {
-                // Main wallet content
-                mainContentView
-            }
-            
-            // Loading Overlay
-            if viewModel.isLoading {
-                LiquidGlassLoadingOverlay()
-            }
-            }
-            .navigationBarTitle("Wallet")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    StandardToolbarButtons(
-                        showUniversalAddTray: $showUniversalAddTray,
-                        showAbout: $showAbout,
-                        showSecurity: $showSecurity,
-                        showNotifications: $showNotifications,
-                        initialSection: .wallet
+                // Main wallet content - extract from mainContentView
+                LazyVStack(spacing: DesignTokens.Spacing.lg) {
+                    // Header with Profile Info
+                    if let balance = viewModel.unifiedBalance {
+                        ProfileHeaderView(balance: balance)
+                            .padding(.top, DesignTokens.Spacing.md)
+                    }
+                    
+                    // Total Balance Card
+                    if let balance = viewModel.unifiedBalance {
+                        TotalBalanceCard(balance: balance) {
+                            showTransactionHistory = true
+                        }
+                    }
+                    
+                    // Quick Actions
+                    QuickActionsRow(
+                        onSend: { showSendSheet = true },
+                        onReceive: { showReceiveSheet = true },
+                        onScan: { /* QR Scanner */ },
+                        onSwap: { /* Swap functionality */ }
                     )
+                    
+                    // Gas Analysis
+                    if let gasAnalysis = viewModel.unifiedBalance?.gasAnalysis {
+                        GasAnalysisCard(gasAnalysis: gasAnalysis)
+                    }
+                    
+                    // Token List
+                    if let tokens = viewModel.unifiedBalance?.unifiedBalance.tokens {
+                        TokenListSection(
+                            tokens: tokens,
+                            onTokenTap: { token in
+                                selectedToken = token
+                            }
+                        )
+                    }
+                    
+                    Spacer(minLength: DesignTokens.Spacing.xxxl)
                 }
+            }
+        }
+        .background(DesignTokens.Colors.backgroundPrimary)
+        .refreshable {
+            await viewModel.refreshBalance()
+        }
+        .overlay(
+            Group {
+                if viewModel.isLoading {
+                    LiquidGlassLoadingOverlay()
+                }
+            }
+        )
+        .navigationTitle("Wallet")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                StandardToolbarButtons(
+                    showUniversalAddTray: $showUniversalAddTray,
+                    showAbout: $showAbout,
+                    showSecurity: $showSecurity,
+                    showNotifications: $showNotifications,
+                    initialSection: .wallet
+                )
             }
         }
         .sheet(isPresented: $showUniversalAddTray) {
@@ -98,56 +137,6 @@ struct WalletView: View {
             if let error = viewModel.error {
                 Text(error.localizedDescription)
             }
-        }
-    }
-    
-    // MARK: - Main Content View
-    
-    @ViewBuilder
-    private var mainContentView: some View {
-        ScrollView {
-            LazyVStack(spacing: DesignTokens.Spacing.lg) {
-                // Header with Profile Info
-                if let balance = viewModel.unifiedBalance {
-                    ProfileHeaderView(balance: balance)
-                        .padding(.top, DesignTokens.Spacing.md)
-                }
-                
-                // Total Balance Card
-                if let balance = viewModel.unifiedBalance {
-                    TotalBalanceCard(balance: balance) {
-                        showTransactionHistory = true
-                    }
-                }
-                
-                // Quick Actions
-                QuickActionsRow(
-                    onSend: { showSendSheet = true },
-                    onReceive: { showReceiveSheet = true },
-                    onScan: { /* QR Scanner */ },
-                    onSwap: { /* Swap functionality */ }
-                )
-                
-                // Gas Analysis
-                if let gasAnalysis = viewModel.unifiedBalance?.gasAnalysis {
-                    GasAnalysisCard(gasAnalysis: gasAnalysis)
-                }
-                
-                // Token List
-                if let tokens = viewModel.unifiedBalance?.unifiedBalance.tokens {
-                    TokenListSection(
-                        tokens: tokens,
-                        onTokenTap: { token in
-                            selectedToken = token
-                        }
-                    )
-                }
-                
-                Spacer(minLength: DesignTokens.Spacing.xxxl)
-            }
-        }
-        .refreshable {
-            await viewModel.refreshBalance()
         }
     }
 }

@@ -395,7 +395,6 @@ struct MainTabView: View {
             .tag(Tab.wallet)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity) // Force TabView to fill
-        .edgesIgnoringSafeArea(.all) // Ignore safe areas
         .accentColor(DesignTokens.Colors.primary)
         .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8), value: selectedTab)
         .preferredColorScheme(.dark) // Consistent dark mode
@@ -420,10 +419,10 @@ struct MainTabView: View {
             UITabBar.appearance().standardAppearance = tabAppearance
             UITabBar.appearance().scrollEdgeAppearance = tabAppearance
             
-            // Configure navigation bar for proper full-screen layout
+            // Configure navigation bar for native Apple dark mode look
             let navAppearance = UINavigationBarAppearance()
-            navAppearance.configureWithOpaqueBackground()
-            navAppearance.backgroundColor = UIColor.black.withAlphaComponent(0.9)
+            navAppearance.configureWithDefaultBackground()
+            navAppearance.backgroundColor = UIColor.black
             navAppearance.titleTextAttributes = [
                 .foregroundColor: UIColor.white,
                 .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
@@ -432,12 +431,12 @@ struct MainTabView: View {
                 .foregroundColor: UIColor.white,
                 .font: UIFont.systemFont(ofSize: 34, weight: .bold)
             ]
-            navAppearance.shadowColor = .clear
             
             UINavigationBar.appearance().standardAppearance = navAppearance
             UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
             UINavigationBar.appearance().compactAppearance = navAppearance
             UINavigationBar.appearance().tintColor = UIColor.white
+            UINavigationBar.appearance().prefersLargeTitles = true
         }
     }
 }

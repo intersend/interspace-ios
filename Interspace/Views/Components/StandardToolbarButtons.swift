@@ -100,26 +100,3 @@ struct StandardToolbarButtons: View {
     }
 }
 
-// MARK: - Navigation Bar Title Modifier
-struct NavigationBarTitleModifier: ViewModifier {
-    let title: String
-    
-    func body(content: Content) -> some View {
-        content
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-            }
-    }
-}
-
-extension View {
-    func navigationBarTitle(_ title: String) -> some View {
-        self.modifier(NavigationBarTitleModifier(title: title))
-    }
-}

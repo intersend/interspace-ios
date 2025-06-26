@@ -23,55 +23,50 @@ struct ProfileView: View {
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.black
-                    .ignoresSafeArea()
-                
-                List {
-                    // Profile Header Section
-                    profileHeaderSection
-                    
-                    // Empty state or account sections
-                    if viewModel.linkedAccounts.isEmpty && viewModel.socialAccounts.isEmpty && viewModel.emailAccounts.isEmpty {
-                        emptyStateView
-                    } else {
-                        // Linked Wallets Section
-                        if !viewModel.linkedAccounts.isEmpty {
-                            linkedWalletsSection
-                        }
-                        
-                        // Email Accounts Section
-                        if !viewModel.emailAccounts.isEmpty {
-                            emailAccountsSection
-                        }
-                        
-                        // Social Accounts Section
-                        if !viewModel.socialAccounts.isEmpty {
-                            socialAccountsSection
-                        }
-                    }
-                    
-                    // Bottom Actions
-                    bottomActionsSection
+        List {
+            // Profile Header Section
+            profileHeaderSection
+            
+            // Empty state or account sections
+            if viewModel.linkedAccounts.isEmpty && viewModel.socialAccounts.isEmpty && viewModel.emailAccounts.isEmpty {
+                emptyStateView
+            } else {
+                // Linked Wallets Section
+                if !viewModel.linkedAccounts.isEmpty {
+                    linkedWalletsSection
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                .refreshable {
-                    await viewModel.refreshProfile()
+                
+                // Email Accounts Section
+                if !viewModel.emailAccounts.isEmpty {
+                    emailAccountsSection
+                }
+                
+                // Social Accounts Section
+                if !viewModel.socialAccounts.isEmpty {
+                    socialAccountsSection
                 }
             }
-            .navigationBarTitle("Profile")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    StandardToolbarButtons(
-                        showUniversalAddTray: $showUniversalAddTray,
-                        showAbout: $showAbout,
-                        showSecurity: $showSecurity,
-                        showNotifications: $showNotifications,
-                        initialSection: .none
-                    )
-                }
+            
+            // Bottom Actions
+            bottomActionsSection
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color.black)
+        .refreshable {
+            await viewModel.refreshProfile()
+        }
+        .navigationTitle("Profile")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                StandardToolbarButtons(
+                    showUniversalAddTray: $showUniversalAddTray,
+                    showAbout: $showAbout,
+                    showSecurity: $showSecurity,
+                    showNotifications: $showNotifications,
+                    initialSection: .none
+                )
             }
         }
         .preferredColorScheme(.dark) // iOS 26 Liquid Glass is optimized for dark mode
