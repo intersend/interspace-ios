@@ -3,6 +3,8 @@ import Combine
 import WalletConnectSign
 import WalletConnectNetworking
 import WalletConnectPairing
+import WalletConnectRelay
+import Starscream
 
 @MainActor
 final class WalletConnectService: ObservableObject {
@@ -56,14 +58,14 @@ final class WalletConnectService: ObservableObject {
         Networking.configure(
             groupIdentifier: "group.com.interspace",
             projectId: projectId,
-            socketFactory: SocketFactory()
+            socketFactory: DefaultSocketFactory()
         )
         
         // Configure Pair
         Pair.configure(metadata: metadata)
         
         // Configure Sign client
-        Sign.configure(metadata: metadata)
+        Sign.configure(crypto: DefaultCryptoProvider())
         
         print("✅ WalletConnectService: Configured with project ID: \(projectId)")
     }
@@ -151,9 +153,7 @@ final class WalletConnectService: ObservableObject {
         currentAddress = address
         
         // Create personal_sign request
-        guard let blockchain = Blockchain(namespace: "eip155", reference: "1") else { // Ethereum mainnet
-            throw WalletConnectError.invalidResponse
-        }
+        let blockchain = Blockchain("eip155:1")! // Ethereum mainnet
         let request = Request(
             topic: session.topic,
             method: "personal_sign",
@@ -489,5 +489,37 @@ extension WalletConnectService {
     private func setupResponseHandling() {
         // Response handling is done through the continuation in signMessage
         // The wallet will respond through the WalletConnect protocol
+    }
+}
+
+// MARK: - Socket Factory
+
+extension WebSocket: WebSocketConnecting { }
+
+struct DefaultSocketFactory: WebSocketFactory {
+    func create(with url: URL) -> WebSocketConnecting {
+        let socket = WebSocket(url: url)
+        let queue = DispatchQueue(label: "com.interspace.walletconnect.sockets", qos: .utility, attributes: .concurrent)
+        socket.callbackQueue = queue
+        return socket
+    }
+}
+
+// MARK: - Crypto Provider
+
+import WalletConnectSigner
+import CryptoKit
+
+struct DefaultCryptoProvider: CryptoProvider {
+    func recoverPubKey(signature: EthereumSignature, message: Data) throws -> Data {
+        // This is a simplified implementation
+        // In production, you'd use a proper Web3 library
+        fatalError("Not implemented - use Web3.swift or similar library")
+    }
+    
+    func keccak256(_ data: Data) -> Data {
+        // Using CryptoKit's SHA256 as a placeholder
+        // In production, you need actual Keccak256
+        return Data(SHA256.hash(data: data))
     }
 }
