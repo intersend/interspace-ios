@@ -21,6 +21,8 @@ final class WalletService: ObservableObject {
     
     // WalletConnect SDK
     private var isWalletKitConfigured = false
+    private let walletConnectService = WalletConnectService.shared
+    private let walletConnectSessionManager = WalletConnectSessionManager.shared
     
     // Connection state management
     private(set) var isConnectionInProgress = false
@@ -294,30 +296,11 @@ final class WalletService: ObservableObject {
             return
         }
         
-        // TODO: Implement proper WalletConnect configuration when API is available
-        /*
-        Networking.configure(
-            groupIdentifier: "group.com.interspace.walletconnect",
-            projectId: projectId,
-            socketFactory: DefaultSocketFactory()
-        )
-        
-        let metadata = AppMetadata(
-            name: "Interspace",
-            description: "Your Digital Universe",
-            url: "https://interspace.fi",
-            icons: ["https://interspace.fi/icon.png"],
-            redirect: try! AppMetadata.Redirect(native: "interspace://wc", universal: nil, linkMode: true)
-        )
-        
-        WalletKit.configure(
-            metadata: metadata,
-            crypto: DefaultCryptoProvider(),
-            environment: .production
-        )
-        */
-        
+        // WalletConnectService handles its own initialization
+        // Just mark as configured if project ID exists
         isWalletKitConfigured = true
+        
+        print("💰 WalletService: WalletConnect configured")
     }
     
     // MARK: - Debug Methods
@@ -765,28 +748,63 @@ final class WalletService: ObservableObject {
             throw WalletError.sdkNotInitialized
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            Task { @MainActor in
-                // Parse the WalletConnect URI
-                guard uri.hasPrefix("wc:") else {
-                    continuation.resume(throwing: WalletError.connectionFailed("Invalid WalletConnect URI"))
-                    return
-                }
-                
-                // For now, we'll return a mock result since the full WalletConnect implementation
-                // requires proper session handling and approval flow
-                // TODO: Implement proper WalletConnect session management
-                
-                let mockResult = WalletConnectionResult(
-                    address: "0x_walletconnect_address",
-                    signature: "0x_walletconnect_signature",
-                    message: "WalletConnect authentication",
-                    walletType: .walletConnect
-                )
-                
-                continuation.resume(returning: mockResult)
-            }
+        print("💰 WalletService: Connecting with WalletConnect URI")
+        
+        // Connect using WalletConnectService
+        try await walletConnectService.connect(uri: uri)
+        
+        // Wait for session to be established
+        // This is a bit hacky but works for now
+        var attempts = 0
+        while walletConnectService.sessions.isEmpty && attempts < 30 {
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            attempts += 1
         }
+        
+        guard let session = walletConnectService.sessions.first else {
+            throw WalletError.connectionFailed("Failed to establish WalletConnect session")
+        }
+        
+        // Extract address from session
+        guard let firstAccount = session.namespaces.values.flatMap({ $0.accounts }).first else {
+            throw WalletError.noAccountsFound
+        }
+        
+        let components = firstAccount.absoluteString.split(separator: ":")
+        guard components.count >= 3 else {
+            throw WalletError.connectionFailed("Invalid account format")
+        }
+        
+        let address = String(components[2])
+        
+        // Store session info
+        walletConnectSessionManager.storeSession(session, walletName: session.peer.name)
+        
+        // Get SIWE nonce and create message
+        let nonce = try await getSIWENonce()
+        let message = createSIWEMessage(address: address, nonce: nonce, chainId: 1)
+        
+        // Sign message via WalletConnect
+        print("💰 WalletService: Requesting signature via WalletConnect")
+        let signature = try await walletConnectService.signMessage(message, address: address)
+        
+        // Create connection result
+        let result = WalletConnectionResult(
+            address: address,
+            signature: signature,
+            message: message,
+            walletType: .walletConnect
+        )
+        
+        // Update UI state
+        await MainActor.run {
+            self.connectionStatus = .connected
+            self.connectedWallet = .walletConnect
+            self.walletAddress = address
+        }
+        
+        print("💰 WalletService: WalletConnect connection successful")
+        return result
     }
     
     // Method to handle session proposals (would be called from AppDelegate/SceneDelegate)
@@ -861,16 +879,12 @@ final class WalletService: ObservableObject {
         // coinbaseSDK.resetSession()
         
         // Disconnect WalletConnect sessions
-        // TODO: Implement proper WalletConnect disconnect when API is available
-        /*
         if isWalletKitConfigured {
             Task {
-                for session in WalletKit.instance.getSessions() {
-                    try? await WalletKit.instance.disconnect(topic: session.topic)
-                }
+                await walletConnectService.disconnect()
+                walletConnectSessionManager.refreshSessions()
             }
         }
-        */
         
         print("💰 WalletService: Disconnect completed")
     }

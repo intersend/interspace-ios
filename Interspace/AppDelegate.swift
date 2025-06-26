@@ -3,6 +3,7 @@ import metamask_ios_sdk
 // Temporarily disabled - Coinbase SDK causing crashes
 // import CoinbaseWalletSDK
 import GoogleSignIn
+import WalletConnectSign
 
 public class AppDelegate: UIResponder, UIApplicationDelegate {
   public var window: UIWindow?
@@ -135,17 +136,18 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
          return true
      }
     
-//     Check for WalletConnect URLs
-//     if url.absoluteString.contains("wc") {
-//         print("📱 AppDelegate: Handling WalletConnect URL")
-//         // Handle WalletConnect URLs
-//         do {
-//             try WalletKit.instance.dispatchEnvelope(url.absoluteString)
-//             return true
-//         } catch {
-//             print("📱 AppDelegate: WalletConnect URL handling error: \(error)")
-//         }
-//     }
+    // Check for WalletConnect URLs
+    if url.scheme == "interspace" && url.host == "walletconnect" {
+        print("📱 AppDelegate: Handling WalletConnect deep link")
+        // WalletConnect SDK handles these internally
+        return true
+    }
+    
+    // Check for WalletConnect universal links
+    if url.absoluteString.contains("walletconnect") {
+        print("📱 AppDelegate: Detected WalletConnect universal link")
+        return true
+    }
     
     print("📱 AppDelegate: URL not handled by any service")
     return false
