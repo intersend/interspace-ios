@@ -215,6 +215,7 @@
 				Components/LoadingSkeletons.swift,
 				Components/NativeCodeInput.swift,
 				Components/ProfileSelectorCard.swift,
+				Components/QRCodeScannerView.swift,
 				Components/SafariNavigationBar.swift,
 				Components/SocialConnectionTray.swift,
 				Components/Springboard/SpringboardEditMode.swift,

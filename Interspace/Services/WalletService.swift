@@ -72,6 +72,9 @@ final class WalletService: ObservableObject {
             // Wait for MetaMask to complete
             _ = await (metamaskSetup)
             
+            // Setup WalletConnect
+            setupWalletConnect()
+            
             isInitialized = true
             let duration = CFAbsoluteTimeGetCurrent() - startTime
             print("💼 WalletService: SDK initialization completed in \(String(format: "%.2f", duration))s")
