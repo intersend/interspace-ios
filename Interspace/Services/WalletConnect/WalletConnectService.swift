@@ -56,14 +56,14 @@ final class WalletConnectService: ObservableObject {
         Networking.configure(
             groupIdentifier: "group.com.interspace",
             projectId: projectId,
-            socketFactory: DefaultSocketFactory()
+            socketFactory: SocketFactory()
         )
         
         // Configure Pair
         Pair.configure(metadata: metadata)
         
-        // Configure Sign client with default crypto
-        Sign.configure(crypto: DefaultCryptoProvider())
+        // Configure Sign client
+        Sign.configure(metadata: metadata)
         
         print("✅ WalletConnectService: Configured with project ID: \(projectId)")
     }
@@ -122,8 +122,10 @@ final class WalletConnectService: ObservableObject {
         }
         
         do {
-            // Parse the URI - use the throwing initializer
-            let pairingURI = try WalletConnectURI(string: uri)
+            // Parse the URI
+            guard let pairingURI = WalletConnectURI(string: uri) else {
+                throw WalletConnectError.invalidURI
+            }
             
             // Pair with the wallet
             try await Pair.instance.pair(uri: pairingURI)
@@ -149,7 +151,9 @@ final class WalletConnectService: ObservableObject {
         currentAddress = address
         
         // Create personal_sign request
-        let blockchain = try Blockchain(namespace: "eip155", reference: "1") // Ethereum mainnet
+        guard let blockchain = Blockchain(namespace: "eip155", reference: "1") else { // Ethereum mainnet
+            throw WalletConnectError.invalidResponse
+        }
         let request = Request(
             topic: session.topic,
             method: "personal_sign",
@@ -279,7 +283,7 @@ final class WalletConnectService: ObservableObject {
         for (key, requiredNamespace) in proposal.requiredNamespaces {
             // For dApp use case, we need to provide empty accounts
             // The wallet will provide its accounts after approval
-            let accounts = Set<Account>()
+            let accounts: [Account] = []
             
             // Include all required methods and events
             let methods = requiredNamespace.methods
