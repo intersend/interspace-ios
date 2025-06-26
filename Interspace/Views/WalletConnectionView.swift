@@ -65,6 +65,7 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
     @State private var connectionStartTime: Date?
     @State private var showRetryButton = false
     @State private var timeoutTimer: Timer?
+    @State private var showQRScanner = false
     
     @StateObject private var walletService = WalletService.shared
     @StateObject private var authManager = AuthenticationManagerV2.shared
@@ -357,6 +358,13 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
             // Clean up timer
             timeoutTimer?.invalidate()
         }
+        .sheet(isPresented: $showQRScanner) {
+            QRCodeScannerView { uri in
+                Task {
+                    await handleWalletConnectURI(uri)
+                }
+            }
+        }
     }
     
     private func connectWallet() {
@@ -391,7 +399,20 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
                     connectionState = .waitingForUser
                 }
                 
-                let result = try await walletService.connectWallet(walletType)
+                let result: WalletConnectionResult
+                
+                if walletType == .walletConnect {
+                    // For WalletConnect, we need to show QR scanner
+                    await MainActor.run {
+                        showQRScanner = true
+                        connectionState = .idle // Reset state while showing scanner
+                        isConnecting = false
+                        hasStartedConnection = false
+                    }
+                    return // Exit early, connection will continue from QR scanner
+                } else {
+                    result = try await walletService.connectWallet(walletType)
+                }
                 
                 await MainActor.run {
                     connectedAddress = result.address
@@ -575,6 +596,76 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
             await MainActor.run {
                 connectionError = "Failed to complete setup: \(error.localizedDescription)"
                 connectionState = .error(error.localizedDescription)
+            }
+        }
+    }
+    
+    private func handleWalletConnectURI(_ uri: String) async {
+        showQRScanner = false
+        
+        // Reset connection state
+        await MainActor.run {
+            hasStartedConnection = true
+            isConnecting = true
+            connectionError = nil
+            connectionState = .connecting
+            connectionStartTime = Date()
+            showRetryButton = false
+        }
+        
+        // Start timeout monitoring
+        startTimeoutMonitoring()
+        
+        do {
+            // Small delay to show the "Connecting" state
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            await MainActor.run {
+                connectionState = .waitingForUser
+            }
+            
+            // Connect using WalletConnect URI
+            let result = try await walletService.connectWithWalletConnectURI(uri)
+            
+            await MainActor.run {
+                connectedAddress = result.address
+                walletSignature = result.signature
+                walletMessage = result.message
+                HapticManager.notification(.success)
+            }
+            
+            // Proceed with linking/auth
+            await MainActor.run {
+                connectionState = .linking
+            }
+            
+            if isForAuthentication {
+                try await performAuthentication()
+            } else {
+                try await performLinking()
+            }
+            
+            // Success!
+            await MainActor.run {
+                connectionState = .success
+                isConnecting = false
+            }
+            
+        } catch let error as WalletError {
+            await MainActor.run {
+                connectionError = error.localizedDescription
+                connectionState = .error(error.localizedDescription)
+                isConnecting = false
+                hasStartedConnection = false
+                HapticManager.notification(.error)
+            }
+        } catch {
+            await MainActor.run {
+                connectionError = error.localizedDescription
+                connectionState = .error(error.localizedDescription)
+                isConnecting = false
+                hasStartedConnection = false
+                HapticManager.notification(.error)
             }
         }
     }
