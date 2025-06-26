@@ -29,7 +29,7 @@ final class WalletConnectSessionManager: ObservableObject {
             peerName: session.peer.name,
             peerDescription: session.peer.description ?? "",
             peerUrl: session.peer.url ?? "",
-            peerIcon: session.peer.icons?.first,
+            peerIcon: session.peer.icons.first,
             walletName: walletName ?? session.peer.name,
             accounts: extractAccounts(from: session),
             chainIds: extractChainIds(from: session),
