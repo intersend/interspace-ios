@@ -6,8 +6,11 @@ struct WalletViewRedesigned: View {
     @State private var showSendSheet = false
     @State private var showReceiveSheet = false
     @State private var selectedToken: UnifiedBalance.TokenBalance?
-    @State private var showSettings = false
     @State private var showUniversalAddTray = false
+    @State private var showAbout = false
+    @State private var showSecurity = false
+    @State private var showNotifications = false
+    @State private var showSettings = false
     @State private var searchText = ""
     @State private var isSearching = false
     @State private var scrollOffset: CGFloat = 0
@@ -20,67 +23,67 @@ struct WalletViewRedesigned: View {
             VStack(spacing: 0) {
                 // Main Content
                 VStack(spacing: 0) {
-                            // Balance Section
-                            if let balance = viewModel.unifiedBalance {
-                                BalanceDisplaySection(
-                                    balance: balance,
-                                    onSend: {
-                                        selectedToken = nil
-                                        showSendSheet = true
-                                    },
-                                    onReceive: {
-                                        showReceiveSheet = true
-                                    },
-                                    onSwap: {
-                                        // Swap functionality
+                    // Balance Section
+                    if let balance = viewModel.unifiedBalance {
+                        BalanceDisplaySection(
+                            balance: balance,
+                            onSend: {
+                                selectedToken = nil
+                                showSendSheet = true
+                            },
+                            onReceive: {
+                                showReceiveSheet = true
+                            },
+                            onSwap: {
+                                // Swap functionality
+                            }
+                        )
+                    } else if viewModel.isLoading {
+                        BalanceLoadingSkeleton()
+                            .padding(.top, WalletDesign.Spacing.regular)
+                    }
+                    
+                    // Search Bar (appears on scroll)
+                    if isSearching {
+                        SearchBar(text: $searchText)
+                            .padding(.horizontal, WalletDesign.Spacing.regular)
+                            .padding(.vertical, WalletDesign.Spacing.tight)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    
+                    // Content Sections
+                    if let balance = viewModel.unifiedBalance {
+                        // Tokens Section
+                        EnhancedTokenSection(
+                            tokens: filteredTokens(balance.unifiedBalance.tokens),
+                            expandedTokenId: $expandedTokenId,
+                            onTokenTap: { token in
+                                withAnimation(WalletDesign.Animation.spring) {
+                                    if expandedTokenId == token.standardizedTokenId {
+                                        expandedTokenId = nil
+                                    } else {
+                                        expandedTokenId = token.standardizedTokenId
                                     }
-                                )
-                            } else if viewModel.isLoading {
-                                BalanceLoadingSkeleton()
-                                    .padding(.top, WalletDesign.Spacing.regular)
+                                }
+                                HapticManager.impact(.light)
+                            },
+                            onSendToken: { token in
+                                selectedToken = token
+                                showSendSheet = true
                             }
-                            
-                            // Search Bar (appears on scroll)
-                            if isSearching {
-                                SearchBar(text: $searchText)
-                                    .padding(.horizontal, WalletDesign.Spacing.regular)
-                                    .padding(.vertical, WalletDesign.Spacing.tight)
-                                    .transition(.move(edge: .top).combined(with: .opacity))
-                            }
-                            
-                            // Content Sections
-                            if let balance = viewModel.unifiedBalance {
-                                // Tokens Section
-                                EnhancedTokenSection(
-                                    tokens: filteredTokens(balance.unifiedBalance.tokens),
-                                    expandedTokenId: $expandedTokenId,
-                                    onTokenTap: { token in
-                                        withAnimation(WalletDesign.Animation.spring) {
-                                            if expandedTokenId == token.standardizedTokenId {
-                                                expandedTokenId = nil
-                                            } else {
-                                                expandedTokenId = token.standardizedTokenId
-                                            }
-                                        }
-                                        HapticManager.impact(.light)
-                                    },
-                                    onSendToken: { token in
-                                        selectedToken = token
-                                        showSendSheet = true
-                                    }
-                                )
-                                
-                                // NFT Gallery
-                                NFTGallerySection()
-                                
-                                // Recent Transactions
-                                RecentTransactionsSection(
-                                    onSeeAll: { showTransactionHistory = true }
-                                )
-                            }
-                            
-                            // Bottom padding
-                            Spacer(minLength: 20)
+                        )
+                        
+                        // NFT Gallery
+                        NFTGallerySection()
+                        
+                        // Recent Transactions
+                        RecentTransactionsSection(
+                            onSeeAll: { showTransactionHistory = true }
+                        )
+                    }
+                    
+                    // Bottom padding
+                    Spacer(minLength: 20)
                 }
             }
         }
@@ -89,22 +92,16 @@ struct WalletViewRedesigned: View {
         }
         .background(Color(UIColor.systemBackground))
         .navigationTitle("Wallet")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: WalletDesign.Spacing.tight) {
-                    Button(action: { showUniversalAddTray = true }) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(.primary)
-                    }
-                    
-                    Button(action: { showSettings = true }) {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(.primary)
-                    }
-                }
+                StandardToolbarButtons(
+                    showUniversalAddTray: $showUniversalAddTray,
+                    showAbout: $showAbout,
+                    showSecurity: $showSecurity,
+                    showNotifications: $showNotifications,
+                    initialSection: .wallet
+                )
             }
         }
         .sheet(isPresented: $showUniversalAddTray) {
@@ -118,6 +115,15 @@ struct WalletViewRedesigned: View {
         }
         .sheet(isPresented: $showReceiveSheet) {
             ReceiveSheet()
+        }
+        .sheet(isPresented: $showAbout) {
+            ProfileAboutView()
+        }
+        .sheet(isPresented: $showSecurity) {
+            ProfileSecurityView(showDeleteConfirmation: .constant(false))
+        }
+        .sheet(isPresented: $showNotifications) {
+            ProfileNotificationsView()
         }
         .onAppear {
             Task {
@@ -195,6 +201,7 @@ struct BalanceDisplaySection: View {
             .padding(.horizontal, WalletDesign.Spacing.regular)
         }
         .padding(.vertical, WalletDesign.Spacing.regular)
+        .padding(.top, WalletDesign.Spacing.tight)
     }
 }
 

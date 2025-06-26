@@ -17,6 +17,8 @@
 		789C7C922E02421B00FF5B32 /* metamask-ios-sdk in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C912E02421B00FF5B32 /* metamask-ios-sdk */; };
 		789C7C952E02423600FF5B32 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C942E02423600FF5B32 /* GoogleSignIn */; };
 		789C7C972E02424200FF5B32 /* CoinbaseWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C962E02424200FF5B32 /* CoinbaseWalletSDK */; };
+		78CFACFE2E0DEBD900999473 /* ReownWalletKit in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFACFD2E0DEBD900999473 /* ReownWalletKit */; };
+		78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFACFF2E0DEBD900999473 /* WalletConnect */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -158,6 +160,8 @@
 				UserAPI.swift,
 				UserCacheManager.swift,
 				WalletAPI.swift,
+				WalletConnect/WalletConnectService.swift,
+				WalletConnect/WalletConnectSessionManager.swift,
 				WalletService.swift,
 			);
 			target = 13B07F861A680F5B00A75B9A /* Interspace */;
@@ -290,10 +294,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */,
 				7855085C2E09898B00EDDF1C /* silentshardduo in Frameworks */,
 				789C7C972E02424200FF5B32 /* CoinbaseWalletSDK in Frameworks */,
 				785508562E09898B00EDDF1C /* c2dkls in Frameworks */,
 				789C7C922E02421B00FF5B32 /* metamask-ios-sdk in Frameworks */,
+				78CFACFE2E0DEBD900999473 /* ReownWalletKit in Frameworks */,
 				789C7C952E02423600FF5B32 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2648,6 +2654,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7861E7282E02317E005D228A /* XCRemoteSwiftPackageReference "wallet-mobile-sdk" */;
 			productName = CoinbaseWalletSDK;
+		};
+		78CFACFD2E0DEBD900999473 /* ReownWalletKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownWalletKit;
+		};
+		78CFACFF2E0DEBD900999473 /* WalletConnect */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = WalletConnect;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

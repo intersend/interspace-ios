@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 // Protocol for wallet connection handling
 protocol WalletConnectionHandler: ObservableObject {
