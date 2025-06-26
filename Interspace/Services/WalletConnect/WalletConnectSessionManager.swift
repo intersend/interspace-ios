@@ -27,14 +27,14 @@ final class WalletConnectSessionManager: ObservableObject {
         let sessionInfo = WalletConnectSessionInfo(
             topic: session.topic,
             peerName: session.peer.name,
-            peerDescription: session.peer.description,
-            peerUrl: session.peer.url,
-            peerIcon: session.peer.icons.first,
+            peerDescription: session.peer.description ?? "",
+            peerUrl: session.peer.url ?? "",
+            peerIcon: session.peer.icons?.first,
             walletName: walletName ?? session.peer.name,
             accounts: extractAccounts(from: session),
             chainIds: extractChainIds(from: session),
             createdAt: Date(),
-            expiryDate: session.expiryDate
+            expiryDate: session.expiryDate ?? Date().addingTimeInterval(86400 * 7) // Default to 7 days
         )
         
         // Add to active sessions
@@ -105,7 +105,7 @@ final class WalletConnectSessionManager: ObservableObject {
         for session in sdkSessions {
             if let index = activeSessions.firstIndex(where: { $0.topic == session.topic }) {
                 // Update existing session info
-                activeSessions[index].expiryDate = session.expiryDate
+                activeSessions[index].expiryDate = session.expiryDate ?? Date().addingTimeInterval(86400 * 7)
                 activeSessions[index].accounts = extractAccounts(from: session)
                 activeSessions[index].chainIds = extractChainIds(from: session)
             } else {
@@ -126,17 +126,20 @@ final class WalletConnectSessionManager: ObservableObject {
     
     private func loadStoredSessions() {
         do {
-            if let dataString = try keychainManager.load(for: kStoredSessionsKey),
-               let data = dataString.data(using: .utf8) {
-                let decoder = JSONDecoder()
-                activeSessions = try decoder.decode([WalletConnectSessionInfo].self, from: data)
-                hasActiveSessions = !activeSessions.isEmpty
-                
-                // Clean up expired sessions on load
-                cleanupExpiredSessions()
-                
-                print("✅ WalletConnectSessionManager: Loaded \(activeSessions.count) stored sessions")
-            }
+            let data = try keychainManager.load(for: kStoredSessionsKey)
+            let decoder = JSONDecoder()
+            activeSessions = try decoder.decode([WalletConnectSessionInfo].self, from: data)
+            hasActiveSessions = !activeSessions.isEmpty
+            
+            // Clean up expired sessions on load
+            cleanupExpiredSessions()
+            
+            print("✅ WalletConnectSessionManager: Loaded \(activeSessions.count) stored sessions")
+        } catch KeychainError.itemNotFound {
+            // No stored sessions, this is fine
+            print("✅ WalletConnectSessionManager: No stored sessions found")
+            activeSessions = []
+            hasActiveSessions = false
         } catch {
             print("❌ WalletConnectSessionManager: Failed to load stored sessions: \(error)")
             activeSessions = []
@@ -148,7 +151,7 @@ final class WalletConnectSessionManager: ObservableObject {
         do {
             let encoder = JSONEncoder()
             let data = try encoder.encode(activeSessions)
-            try keychainManager.save(String(data: data, encoding: .utf8) ?? "", for: kStoredSessionsKey)
+            try keychainManager.save(data, for: kStoredSessionsKey)
             print("✅ WalletConnectSessionManager: Saved \(activeSessions.count) sessions to keychain")
         } catch {
             print("❌ WalletConnectSessionManager: Failed to save sessions: \(error)")
@@ -161,7 +164,8 @@ final class WalletConnectSessionManager: ObservableObject {
         for namespace in session.namespaces.values {
             for account in namespace.accounts {
                 // Parse CAIP-10 format: "eip155:1:0x1234..."
-                let components = account.absoluteString.split(separator: ":")
+                let accountString = account.absoluteString
+                let components = accountString.split(separator: ":")
                 if components.count >= 3 {
                     let blockchain = String(components[0])
                     let chainId = String(components[1])
@@ -183,8 +187,17 @@ final class WalletConnectSessionManager: ObservableObject {
         var chainIds: Set<String> = []
         
         for namespace in session.namespaces.values {
+            // Add chains from the namespace if available
+            if let chains = namespace.chains {
+                for chain in chains {
+                    chainIds.insert(chain.absoluteString)
+                }
+            }
+            
+            // Also extract from accounts
             for account in namespace.accounts {
-                let components = account.absoluteString.split(separator: ":")
+                let accountString = account.absoluteString
+                let components = accountString.split(separator: ":")
                 if components.count >= 2 {
                     chainIds.insert("\(components[0]):\(components[1])")
                 }

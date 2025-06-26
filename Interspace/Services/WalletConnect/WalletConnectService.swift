@@ -418,25 +418,26 @@ final class WalletConnectService: ObservableObject {
     }
     
     private func handleSessionResponse(_ response: Response) {
-        print("📱 WalletConnectService: Received response for \(response.id)")
+        print("📱 WalletConnectService: Received response")
         
+        // Extract the result based on the response structure
         switch response.result {
-        case .response(let value):
-            // Handle successful response
-            if let signature = try? value.get(String.self) {
+        case .response(let anyCodable):
+            // Try to extract the signature string from the response
+            if let signature = try? anyCodable.get(String.self) {
                 print("✅ WalletConnectService: Got signature: \(signature)")
                 signingCompletion?(.success(signature))
                 signingCompletion = nil
             } else {
-                print("❌ WalletConnectService: Failed to parse signature from response")
+                print("❌ WalletConnectService: Could not extract signature from response")
                 signingCompletion?(.failure(WalletConnectError.invalidResponse))
                 signingCompletion = nil
             }
             
-        case .error(let error):
+        case .error(let jsonRPCError):
             // Handle error response
-            print("❌ WalletConnectService: Request failed with error: \(error)")
-            signingCompletion?(.failure(WalletConnectError.signingFailed(error.message)))
+            print("❌ WalletConnectService: Request failed with error: \(jsonRPCError.message)")
+            signingCompletion?(.failure(WalletConnectError.signingFailed(jsonRPCError.message)))
             signingCompletion = nil
         }
     }
