@@ -2,17 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UILaunchScreen</key>
-	<dict>
-		<key>UIImageName</key>
-		<string></string>
-	</dict>
 	<key>API_BASE_URL</key>
 	<string>$(API_BASE_URL)</string>
-	<key>GIDClientID</key>
-	<string>$(GOOGLE_CLIENT_ID)</string>
-	<key>GIDServerClientID</key>
-	<string>$(GOOGLE_SERVER_CLIENT_ID)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -36,10 +27,12 @@
 			</array>
 		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_CLIENT_ID)</string>
+	<key>GIDServerClientID</key>
+	<string>$(GOOGLE_SERVER_CLIENT_ID)</string>
 	<key>INFURA_API_KEY</key>
 	<string>$(INFURA_API_KEY)</string>
-	<key>WALLETCONNECT_PROJECT_ID</key>
-	<string>$(WALLETCONNECT_PROJECT_ID)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>metamask</string>
@@ -48,5 +41,12 @@
 		<string>cbwallet</string>
 		<string>wc</string>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIImageName</key>
+		<string></string>
+	</dict>
+	<key>WALLETCONNECT_PROJECT_ID</key>
+	<string>$(WALLETCONNECT_PROJECT_ID)</string>
 </dict>
 </plist>

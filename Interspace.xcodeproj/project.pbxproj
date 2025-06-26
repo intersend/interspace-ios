@@ -169,6 +169,7 @@
 				CoreDataMigration.swift,
 				DesignSystem.swift,
 				DesignTokens.swift,
+				WalletDesignSystem.swift,
 			);
 			target = 13B07F861A680F5B00A75B9A /* Interspace */;
 		};
@@ -258,6 +259,7 @@
 				WalletAuthenticationView.swift,
 				WalletConnectionView.swift,
 				WalletView.swift,
+				WalletViewRedesigned.swift,
 				WebBrowserView.swift,
 			);
 			target = 13B07F861A680F5B00A75B9A /* Interspace */;
@@ -2277,6 +2279,7 @@
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = "metamask cbwallet rainbow trust argent safe zerion wc";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Allow Interspace to use the camera to scan WalletConnect QR codes";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Allow Interspace to use Face ID";
+				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Interspace to use Siri";
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -2319,6 +2322,7 @@
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = "metamask cbwallet rainbow trust argent safe zerion wc";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Allow Interspace to use the camera to scan WalletConnect QR codes";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Allow Interspace to use Face ID";
+				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Interspace to use Siri";
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
