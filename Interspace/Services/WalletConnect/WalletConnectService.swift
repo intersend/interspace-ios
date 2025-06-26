@@ -124,10 +124,8 @@ final class WalletConnectService: ObservableObject {
         }
         
         do {
-            // Parse the URI
-            guard let pairingURI = WalletConnectURI(string: uri) else {
-                throw WalletConnectError.invalidURI
-            }
+            // Parse the URI using the throwing initializer
+            let pairingURI = try WalletConnectURI(string: uri)
             
             // Pair with the wallet
             try await Pair.instance.pair(uri: pairingURI)
@@ -153,7 +151,9 @@ final class WalletConnectService: ObservableObject {
         currentAddress = address
         
         // Create personal_sign request
-        let blockchain = try Blockchain("eip155:1") // Ethereum mainnet
+        guard let blockchain = Blockchain("eip155:1") else { // Ethereum mainnet
+            throw WalletConnectError.invalidResponse
+        }
         let request = Request(
             topic: session.topic,
             method: "personal_sign",
@@ -497,9 +497,15 @@ extension WalletConnectService {
 // Create a wrapper to adapt Starscream's WebSocket to WalletConnectRelay's WebSocketConnecting
 class WebSocketAdapter: WebSocketConnecting {
     private let socket: WebSocket
+    private var _isConnected: Bool = false
     
     var isConnected: Bool {
-        socket.isConnected
+        _isConnected
+    }
+    
+    var request: URLRequest {
+        get { socket.request }
+        set { socket.request = newValue }
     }
     
     var onConnect: (() -> Void)?
@@ -514,12 +520,15 @@ class WebSocketAdapter: WebSocketConnecting {
         socket.onEvent = { [weak self] event in
             switch event {
             case .connected:
+                self?._isConnected = true
                 self?.onConnect?()
-            case .disconnected(let reason, _):
+            case .disconnected(_, _):
+                self?._isConnected = false
                 self?.onDisconnect?(nil)
             case .text(let string):
                 self?.onText?(string)
             case .error(let error):
+                self?._isConnected = false
                 self?.onDisconnect?(error)
             default:
                 break
@@ -535,8 +544,8 @@ class WebSocketAdapter: WebSocketConnecting {
         socket.disconnect()
     }
     
-    func write(string: String) {
-        socket.write(string: string)
+    func write(string: String, completion: (() -> Void)? = nil) {
+        socket.write(string: string, completion: completion)
     }
 }
 
