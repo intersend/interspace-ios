@@ -50,8 +50,11 @@ final class WalletConnectService: ObservableObject {
             )
         )
         
-        // Configure Sign client with metadata and project ID
-        Sign.configure(metadata: metadata, projectId: projectId)
+        // Configure Pair first
+        Pair.configure(metadata: metadata)
+        
+        // Configure Sign client
+        Sign.configure(metadata: metadata)
         
         print("✅ WalletConnectService: Configured with project ID: \(projectId)")
     }
@@ -68,7 +71,7 @@ final class WalletConnectService: ObservableObject {
         // Subscribe to session requests
         Sign.instance.sessionRequestPublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] request in
+            .sink { [weak self] (request, _) in
                 self?.handleSessionRequest(request)
             }
             .store(in: &cancellables)
@@ -89,6 +92,14 @@ final class WalletConnectService: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Subscribe to session responses
+        Sign.instance.sessionResponsePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] response in
+                self?.handleSessionResponse(response)
+            }
+            .store(in: &cancellables)
+        
         // Load existing sessions
         loadSessions()
     }
@@ -103,7 +114,7 @@ final class WalletConnectService: ObservableObject {
         
         do {
             // Parse the URI
-            guard let pairingURI = WalletConnectURI(string: uri) else {
+            guard let pairingURI = try? WalletConnectURI(string: uri) else {
                 throw WalletConnectError.invalidURI
             }
             
@@ -131,11 +142,12 @@ final class WalletConnectService: ObservableObject {
         currentAddress = address
         
         // Create personal_sign request
+        let blockchain = Blockchain("eip155:1")! // Ethereum mainnet
         let request = Request(
             topic: session.topic,
             method: "personal_sign",
             params: AnyCodable([message, address]),
-            chainId: Blockchain("eip155:1")! // Ethereum mainnet
+            chainId: blockchain
         )
         
         return try await withCheckedThrowingContinuation { continuation in
@@ -143,6 +155,7 @@ final class WalletConnectService: ObservableObject {
                 continuation.resume(with: result)
             }
             
+            // Send the request to the wallet
             Task {
                 do {
                     try await Sign.instance.request(params: request)
@@ -257,22 +270,22 @@ final class WalletConnectService: ObservableObject {
         
         // For each required namespace in the proposal
         for (key, requiredNamespace) in proposal.requiredNamespaces {
-            // For now, we'll support Ethereum mainnet
-            let accounts = Set(requiredNamespace.chains?.compactMap { chain in
-                if let address = getCurrentWalletAddress() {
-                    return Account(blockchain: chain, address: address)!
-                }
-                return nil
-            } ?? [])
+            // For dApp use case, we need to provide empty accounts
+            // The wallet will provide its accounts after approval
+            let accounts = Set<Account>()
             
             // Include all required methods and events
             let methods = requiredNamespace.methods
             let events = requiredNamespace.events
             
+            // Optional namespaces
+            let chains = requiredNamespace.chains
+            
             sessionNamespaces[key] = SessionNamespace(
                 accounts: accounts,
                 methods: methods,
-                events: events
+                events: events,
+                chains: chains
             )
         }
         
@@ -280,9 +293,23 @@ final class WalletConnectService: ObservableObject {
     }
     
     private func getCurrentWalletAddress() -> String? {
+        // Return the current address if we have one from an active session
+        if let address = currentAddress {
+            return address
+        }
+        
+        // Otherwise check if we have an address from existing sessions
+        if let firstSession = sessions.first,
+           let firstAccount = firstSession.namespaces.values.flatMap({ $0.accounts }).first {
+            let components = firstAccount.absoluteString.split(separator: ":")
+            if components.count >= 3 {
+                return String(components[2])
+            }
+        }
+        
         // This will be set when connecting from a specific wallet
-        // For now, return a placeholder that will be replaced when actually connecting
-        return "0x0000000000000000000000000000000000000000"
+        // For now, return nil as we don't have a valid address yet
+        return nil
     }
     
     private func handleSessionSettled(_ session: Session) {
@@ -319,16 +346,10 @@ final class WalletConnectService: ObservableObject {
                     
                 default:
                     // Reject unsupported methods
-                    let response = Response(
-                        id: request.id,
-                        topic: request.topic,
-                        chainId: request.chainId?.absoluteString ?? "",
-                        result: .error(.init(code: -32601, message: "Method not supported"))
-                    )
                     try await Sign.instance.respond(
                         topic: request.topic,
                         requestId: request.id,
-                        response: .error(.init(code: -32601, message: "Method not supported"))
+                        response: .error(JSONRPCError(code: -32601, message: "Method not supported"))
                     )
                 }
             } catch {
@@ -359,7 +380,7 @@ final class WalletConnectService: ObservableObject {
             try await Sign.instance.respond(
                 topic: request.topic,
                 requestId: request.id,
-                response: .error(.init(code: -32000, message: "Unexpected signing request"))
+                response: .error(JSONRPCError(code: -32000, message: "Unexpected signing request"))
             )
         } catch {
             print("❌ WalletConnectService: Failed to respond to request: \(error)")
@@ -377,7 +398,7 @@ final class WalletConnectService: ObservableObject {
             try await Sign.instance.respond(
                 topic: request.topic,
                 requestId: request.id,
-                response: .error(.init(code: -32601, message: "Transactions not supported"))
+                response: .error(JSONRPCError(code: -32601, message: "Transactions not supported"))
             )
         } catch {
             print("❌ WalletConnectService: Failed to respond to request: \(error)")
@@ -393,6 +414,30 @@ final class WalletConnectService: ObservableObject {
             isConnected = false
             sessionTopic = nil
             currentAddress = nil
+        }
+    }
+    
+    private func handleSessionResponse(_ response: Response) {
+        print("📱 WalletConnectService: Received response for \(response.id)")
+        
+        switch response.result {
+        case .response(let value):
+            // Handle successful response
+            if let signature = try? value.get(String.self) {
+                print("✅ WalletConnectService: Got signature: \(signature)")
+                signingCompletion?(.success(signature))
+                signingCompletion = nil
+            } else {
+                print("❌ WalletConnectService: Failed to parse signature from response")
+                signingCompletion?(.failure(WalletConnectError.invalidResponse))
+                signingCompletion = nil
+            }
+            
+        case .error(let error):
+            // Handle error response
+            print("❌ WalletConnectService: Request failed with error: \(error)")
+            signingCompletion?(.failure(WalletConnectError.signingFailed(error.message)))
+            signingCompletion = nil
         }
     }
 }
