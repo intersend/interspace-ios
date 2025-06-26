@@ -125,7 +125,9 @@ final class WalletConnectService: ObservableObject {
         
         do {
             // Parse the URI using the throwing initializer
-            let pairingURI = try WalletConnectURI(string: uri)
+            guard let pairingURI = try WalletConnectURI(string: uri) else {
+                throw WalletConnectError.invalidURI
+            }
             
             // Pair with the wallet
             try await Pair.instance.pair(uri: pairingURI)
@@ -154,7 +156,7 @@ final class WalletConnectService: ObservableObject {
         guard let blockchain = Blockchain("eip155:1") else { // Ethereum mainnet
             throw WalletConnectError.invalidResponse
         }
-        let request = Request(
+        let request = try Request(
             topic: session.topic,
             method: "personal_sign",
             params: AnyCodable([message, address]),
