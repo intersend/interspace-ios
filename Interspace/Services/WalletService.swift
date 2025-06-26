@@ -463,7 +463,7 @@ final class WalletService: ObservableObject {
         // This prevents issues with stale connections from previous sessions
         if isAuthenticationFlow && !sdk.account.isEmpty {
             print("💰 WalletService: Authentication flow detected with existing account, clearing first")
-            await sdk.disconnect()
+            sdk.disconnect()
             sdk.clearSession()
             try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
             print("💰 WalletService: Cleared stale connection, ready for fresh auth")
@@ -544,7 +544,7 @@ final class WalletService: ObservableObject {
         if sdk.account != initialAccount {
             print("💰 WalletService: Account changed during signing! Initial: \(initialAccount), Current: \(sdk.account)")
             // Disconnect and throw error
-            await sdk.disconnect()
+            sdk.disconnect()
             // Clear our state as well
             await MainActor.run {
                 self.connectionStatus = .disconnected
@@ -558,14 +558,8 @@ final class WalletService: ObservableObject {
         case .success(let signature):
             print("💰 WalletService: Signature received")
             
-            // Extract signature string
-            let signatureString: String
-            if let sig = signature as? String {
-                signatureString = sig
-            } else {
-                print("💰 WalletService: Invalid signature format")
-                throw WalletError.signatureFailed("Invalid signature format")
-            }
+            // Extract signature string (signature is already String type)
+            let signatureString = signature
             
             guard !signatureString.isEmpty else {
                 print("💰 WalletService: Empty signature from MetaMask")
@@ -591,7 +585,7 @@ final class WalletService: ObservableObject {
             let errorMessage = error.localizedDescription.lowercased()
             if errorMessage.contains("user denied") || errorMessage.contains("user rejected") || errorMessage.contains("cancelled") {
                 // User cancelled - disconnect to ensure clean state
-                await sdk.disconnect()
+                sdk.disconnect()
                 // Clear connection flags immediately on cancellation
                 isConnectionInProgress = false
                 isAuthenticationFlow = false
@@ -599,7 +593,7 @@ final class WalletService: ObservableObject {
             }
             
             // If signature fails, disconnect to ensure clean state for retry
-            await sdk.disconnect()
+            sdk.disconnect()
             await MainActor.run {
                 self.connectionStatus = .disconnected
                 self.connectedWallet = nil
@@ -756,12 +750,12 @@ final class WalletService: ObservableObject {
         // Wait for session to be established
         // This is a bit hacky but works for now
         var attempts = 0
-        while walletConnectService.sessions.isEmpty && attempts < 30 {
+        while await walletConnectService.sessions.isEmpty && attempts < 30 {
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             attempts += 1
         }
         
-        guard let session = walletConnectService.sessions.first else {
+        guard let session = await walletConnectService.sessions.first else {
             throw WalletError.connectionFailed("Failed to establish WalletConnect session")
         }
         
@@ -778,7 +772,7 @@ final class WalletService: ObservableObject {
         let address = String(components[2])
         
         // Store session info
-        walletConnectSessionManager.storeSession(session, walletName: session.peer.name)
+        await walletConnectSessionManager.storeSession(session, walletName: session.peer.name)
         
         // Get SIWE nonce and create message
         let nonce = try await getSIWENonce()
@@ -861,7 +855,7 @@ final class WalletService: ObservableObject {
             print("💰 WalletService: Account before disconnect: \(sdk.account.isEmpty ? "none" : sdk.account)")
             
             // First try disconnect
-            await sdk.disconnect()
+            sdk.disconnect()
             
             // If account still exists, use clearSession as shown in MetaMask reference
             if !sdk.account.isEmpty {
@@ -882,7 +876,7 @@ final class WalletService: ObservableObject {
         if isWalletKitConfigured {
             Task {
                 await walletConnectService.disconnect()
-                walletConnectSessionManager.refreshSessions()
+                await walletConnectSessionManager.refreshSessions()
             }
         }
         
@@ -989,7 +983,7 @@ final class WalletService: ObservableObject {
         // Also clear any MetaMask state
         if let sdk = metamaskSDK {
             Task {
-                await sdk.disconnect()
+                sdk.disconnect()
                 sdk.clearSession()
             }
         }

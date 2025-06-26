@@ -1,6 +1,8 @@
 import Foundation
 import Combine
 import WalletConnectSign
+import WalletConnectNetworking
+import WalletConnectPairing
 
 @MainActor
 final class WalletConnectService: ObservableObject {
@@ -50,11 +52,18 @@ final class WalletConnectService: ObservableObject {
             )
         )
         
-        // Configure Pair first
+        // Configure networking
+        Networking.configure(
+            groupIdentifier: "group.com.interspace",
+            projectId: projectId,
+            socketFactory: DefaultSocketFactory()
+        )
+        
+        // Configure Pair
         Pair.configure(metadata: metadata)
         
-        // Configure Sign client
-        Sign.configure(metadata: metadata)
+        // Configure Sign client with default crypto
+        Sign.configure(crypto: DefaultCryptoProvider())
         
         print("✅ WalletConnectService: Configured with project ID: \(projectId)")
     }
@@ -113,10 +122,8 @@ final class WalletConnectService: ObservableObject {
         }
         
         do {
-            // Parse the URI
-            guard let pairingURI = try? WalletConnectURI(string: uri) else {
-                throw WalletConnectError.invalidURI
-            }
+            // Parse the URI - use the throwing initializer
+            let pairingURI = try WalletConnectURI(string: uri)
             
             // Pair with the wallet
             try await Pair.instance.pair(uri: pairingURI)
@@ -142,7 +149,7 @@ final class WalletConnectService: ObservableObject {
         currentAddress = address
         
         // Create personal_sign request
-        let blockchain = Blockchain("eip155:1")! // Ethereum mainnet
+        let blockchain = try Blockchain(namespace: "eip155", reference: "1") // Ethereum mainnet
         let request = Request(
             topic: session.topic,
             method: "personal_sign",
@@ -252,7 +259,7 @@ final class WalletConnectService: ObservableObject {
             let sessionNamespaces = try buildSessionNamespaces(from: proposal)
             
             // Approve the session
-            try await Sign.instance.approve(
+            _ = try await Sign.instance.approve(
                 proposalId: proposal.id,
                 namespaces: sessionNamespaces
             )
@@ -282,10 +289,10 @@ final class WalletConnectService: ObservableObject {
             let chains = requiredNamespace.chains
             
             sessionNamespaces[key] = SessionNamespace(
+                chains: chains,
                 accounts: accounts,
                 methods: methods,
-                events: events,
-                chains: chains
+                events: events
             )
         }
         
@@ -369,7 +376,7 @@ final class WalletConnectService: ObservableObject {
             return
         }
         
-        let message = params[0]
+        let _ = params[0] // message
         let address = params[1]
         
         print("📝 WalletConnectService: Personal sign request for \(address)")
