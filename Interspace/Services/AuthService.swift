@@ -576,9 +576,6 @@ final class PasskeyService {
         // Combine both requests - iOS will handle which flow to show
         let authController = ASAuthorizationController(authorizationRequests: [assertionRequest, registrationRequest])
         
-        // Set to prefer immediately available credentials (shows sign-in if passkey exists)
-        authController.preferImmediatelyAvailableCredentials = true
-        
         let passkeyResult = try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 let delegate = PasskeyAuthorizationDelegate { result in
@@ -626,23 +623,32 @@ final class PasskeyService {
         )
         
         // Use V2 authenticate endpoint with passkey strategy
+        let credentialId = passkeyResult.credentialID
+        let clientDataJSON = passkeyResult.clientDataJSON ?? ""
+        let attestationObject = passkeyResult.attestationObject ?? ""
+        let authenticatorData = passkeyResult.authenticatorData ?? ""
+        let signature = passkeyResult.signature
+        let userHandle = passkeyResult.userHandle ?? ""
+        let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? ""
+        let deviceName = UIDevice.current.name
+        
         var requestBody: [String: Any] = [
             "strategy": "passkey",
             "passkeyResponse": [
-                "id": passkeyResult.credentialID.base64URLEncodedString(),
-                "rawId": passkeyResult.credentialID.base64URLEncodedString(),
+                "id": credentialId,
+                "rawId": credentialId,
                 "type": "public-key",
                 "response": [
-                    "clientDataJSON": passkeyResult.clientDataJSON.base64URLEncodedString(),
-                    "attestationObject": passkeyResult.attestationObject?.base64URLEncodedString() ?? "",
-                    "authenticatorData": passkeyResult.authenticatorData?.base64URLEncodedString() ?? "",
-                    "signature": passkeyResult.signature?.base64URLEncodedString() ?? "",
-                    "userHandle": passkeyResult.userHandle?.base64URLEncodedString() ?? ""
+                    "clientDataJSON": clientDataJSON,
+                    "attestationObject": attestationObject,
+                    "authenticatorData": authenticatorData,
+                    "signature": signature,
+                    "userHandle": userHandle
                 ]
             ],
             "challenge": challenge,
-            "deviceId": UIDevice.current.identifierForVendor?.uuidString ?? "",
-            "deviceName": UIDevice.current.name
+            "deviceId": deviceId,
+            "deviceName": deviceName
         ]
         
         if let username = username {
