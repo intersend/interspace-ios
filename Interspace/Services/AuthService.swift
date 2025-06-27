@@ -639,8 +639,27 @@ final class PasskeyService {
     }
     
     static func getDefaultRPID() -> String {
-        // Use the actual domain for passkey authentication
-        return "interspace.app"
+        // Get the RP ID based on the current API URL
+        let apiURL = EnvironmentConfiguration.shared.currentEnvironment.apiBaseURL
+        
+        // Extract the domain from the API URL
+        if let url = URL(string: apiURL),
+           let host = url.host {
+            // Remove 'api.' prefix if present for the RP ID
+            if host.hasPrefix("api.") {
+                return String(host.dropFirst(4))
+            } else if host.hasPrefix("staging-api.") {
+                // For staging, use the staging subdomain
+                return host
+            } else if host.contains("ngrok") {
+                // For ngrok URLs, use the full ngrok domain
+                return host
+            }
+            return host
+        }
+        
+        // Fallback to interspace.fi
+        return "interspace.fi"
     }
 }
 
