@@ -8,14 +8,9 @@ struct WalletConnectionTray: View {
     
     @State private var selectedWallet: WalletType?
     @State private var showWalletConnection = false
+    @State private var availableWallets: [(type: WalletType, available: Bool)] = []
     
-    private let wallets: [(type: WalletType, available: Bool)] = [
-        (.metamask, true),
-        (.coinbase, true),
-        (.walletConnect, true),
-        (.safe, false),
-        (.ledger, false)
-    ]
+    private let walletService = WalletService.shared
     
     var body: some View {
         NavigationStack {
@@ -50,20 +45,20 @@ struct WalletConnectionTray: View {
                                 .padding(.horizontal, 20)
                             
                             VStack(spacing: 0) {
-                                ForEach(wallets.filter { $0.available }, id: \.type) { wallet in
+                                ForEach(availableWallets.filter { $0.available }, id: \.type) { wallet in
                                     TrayWalletOptionRow(
                                         walletType: wallet.type,
                                         title: wallet.type.displayName,
                                         subtitle: subtitle(for: wallet.type),
-                                        isFirst: wallet.type == wallets.filter { $0.available }.first?.type,
-                                        isLast: wallet.type == wallets.filter { $0.available }.last?.type,
+                                        isFirst: wallet.type == availableWallets.filter { $0.available }.first?.type,
+                                        isLast: wallet.type == availableWallets.filter { $0.available }.last?.type,
                                         onTap: {
                                             selectedWallet = wallet.type
                                             showWalletConnection = true
                                         }
                                     )
                                     
-                                    if wallet.type != wallets.filter { $0.available }.last?.type {
+                                    if wallet.type != availableWallets.filter { $0.available }.last?.type {
                                         Divider()
                                             .padding(.leading, 72)
                                     }
@@ -77,7 +72,7 @@ struct WalletConnectionTray: View {
                         }
                         
                         // Coming Soon Section
-                        if wallets.contains(where: { !$0.available }) {
+                        if availableWallets.contains(where: { !$0.available }) {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Coming Soon")
                                     .font(.headline)
@@ -85,13 +80,13 @@ struct WalletConnectionTray: View {
                                     .padding(.horizontal, 20)
                                 
                                 VStack(spacing: 0) {
-                                    ForEach(wallets.filter { !$0.available }, id: \.type) { wallet in
+                                    ForEach(availableWallets.filter { !$0.available }, id: \.type) { wallet in
                                         ComingSoonWalletRow(
                                             walletType: wallet.type,
                                             title: wallet.type.displayName,
                                             subtitle: subtitle(for: wallet.type),
-                                            isFirst: wallet.type == wallets.filter { !$0.available }.first?.type,
-                                            isLast: wallet.type == wallets.filter { !$0.available }.last?.type
+                                            isFirst: wallet.type == availableWallets.filter { !$0.available }.first?.type,
+                                            isLast: wallet.type == availableWallets.filter { !$0.available }.last?.type
                                         )
                                         
                                         if wallet.type != wallets.filter { !$0.available }.last?.type {

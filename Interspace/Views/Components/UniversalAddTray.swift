@@ -27,7 +27,10 @@ struct UniversalAddTray: View {
     @State private var showWalletAuthorization = false
     @State private var showAddApp = false
     @State private var showProfileCreation = false
+    @State private var availableWalletConnectWallets: [WalletType] = []
     // Removed showWalletConnectionTray - using direct authorization
+    
+    private let walletService = WalletService.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -127,7 +130,7 @@ struct UniversalAddTray: View {
                                 title: "Coinbase Wallet",
                                 iconColor: .blue,
                                 isFirst: false,
-                                isLast: false
+                                isLast: availableWalletConnectWallets.isEmpty
                             ) {
                                 HapticManager.impact(.light)
                                 selectedWalletType = .coinbase
@@ -137,23 +140,31 @@ struct UniversalAddTray: View {
                                 }
                             }
                             
-                            Divider()
-                                .padding(.leading, 72)
+                            if !availableWalletConnectWallets.isEmpty {
+                                Divider()
+                                    .padding(.leading, 72)
+                            }
                             
-                            // WalletConnect
-                            AddOptionRow(
-                                icon: "link.circle.fill",
-                                iconType: .system,
-                                title: "WalletConnect",
-                                iconColor: .purple,
-                                isFirst: false,
-                                isLast: true
-                            ) {
-                                HapticManager.impact(.light)
-                                selectedWalletType = .walletConnect
-                                // Show authorization directly without intermediate tray
-                                DispatchQueue.main.async {
-                                    showWalletAuthorization = true
+                            // Add individual WalletConnect-compatible wallets
+                            ForEach(Array(availableWalletConnectWallets.enumerated()), id: \.element) { index, walletType in
+                                if index > 0 {
+                                    Divider()
+                                        .padding(.leading, 72)
+                                }
+                                
+                                AddOptionRow(
+                                    icon: walletType.systemIconName,
+                                    iconType: .system,
+                                    title: walletType.displayName,
+                                    iconColor: walletType.primaryColor,
+                                    isFirst: false,
+                                    isLast: index == availableWalletConnectWallets.count - 1
+                                ) {
+                                    HapticManager.impact(.light)
+                                    selectedWalletType = walletType
+                                    DispatchQueue.main.async {
+                                        showWalletAuthorization = true
+                                    }
                                 }
                             }
                         }
@@ -363,6 +374,7 @@ struct UniversalAddTray: View {
                     await profileViewModel.loadProfile()
                 }
             }
+            checkAvailableWallets()
         }
         .onChange(of: authManager.isAuthenticated) { newValue in
             // Close the tray when authentication succeeds
@@ -429,6 +441,35 @@ struct UniversalAddTray: View {
         
         // Show success feedback
         HapticManager.notification(.success)
+    }
+    
+    private func checkAvailableWallets() {
+        // Check which WalletConnect-compatible apps are installed
+        let potentialWallets: [WalletType] = [.rainbow, .trust, .argent, .gnosisSafe]
+        var available: [WalletType] = []
+        
+        for walletType in potentialWallets {
+            let scheme: String
+            switch walletType {
+            case .rainbow:
+                scheme = "rainbow"
+            case .trust:
+                scheme = "trust"
+            case .argent:
+                scheme = "argent"
+            case .gnosisSafe:
+                scheme = "gnosissafe"
+            default:
+                continue
+            }
+            
+            if let url = URL(string: "\(scheme)://"),
+               UIApplication.shared.canOpenURL(url) {
+                available.append(walletType)
+            }
+        }
+        
+        availableWalletConnectWallets = available
     }
 }
 
