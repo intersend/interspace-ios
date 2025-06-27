@@ -1,6 +1,13 @@
 import Foundation
 import SwiftUI
 
+// MARK: - WalletAppInfo
+struct WalletAppInfo {
+    let name: String
+    let scheme: String
+    let icon: String
+}
+
 enum WalletType: String, Codable, CaseIterable, Identifiable {
     case metamask = "metamask"
     case coinbase = "coinbase"

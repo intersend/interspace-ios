@@ -20,7 +20,7 @@ final class WalletService: ObservableObject {
     
     // WalletConnect SDK
     private var isWalletKitConfigured = false
-    private let walletConnectService = WalletConnectService.shared
+    internal let walletConnectService = WalletConnectService.shared
     private let walletConnectSessionManager = WalletConnectSessionManager.shared
     
     // Connection state management
@@ -840,20 +840,8 @@ final class WalletService: ObservableObject {
             throw WalletError.sdkNotInitialized
         }
         
-        // For production: Generate our own QR code for wallets to scan
-        // For testing: Show scanner to connect to demo dApps
-        
-        // Check if we should generate QR or scan
-        let shouldGenerateQR = false // Set to true for production
-        
-        if shouldGenerateQR {
-            // Generate our own connection URI
-            let uri = try await walletConnectService.createConnectionRequest()
-            throw WalletError.showQRCode(uri)
-        } else {
-            // This will trigger the UI to show the scanner (for testing)
-            throw WalletError.qrCodeScanRequired
-        }
+        // Use the new deep linking approach
+        return try await handleWalletConnected()
     }
     
     // Method to handle scanned WalletConnect URI
@@ -1112,6 +1100,119 @@ final class WalletService: ObservableObject {
                 sdk.clearSession()
             }
         }
+    }
+    
+    // MARK: - Deep Linking
+    
+    /// Open wallet app with deep link
+    func openWalletWithDeepLink(walletType: WalletType, uri: String) {
+        print("📱 WalletService: Opening wallet app with deep link")
+        
+        // Define wallet app schemes
+        let walletSchemes: [WalletType: String] = [
+            .metamask: "metamask://",
+            .walletConnect: "" // WalletConnect uses multiple wallet apps
+        ]
+        
+        // For WalletConnect, determine which wallet app to open
+        if walletType == .walletConnect {
+            // Try to open available wallet apps
+            let walletApps = getAvailableWalletApps()
+            
+            // Try each wallet app until one opens
+            for app in walletApps {
+                let deepLink = "\(app.scheme)://wc?uri=\(uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri)"
+                if let url = URL(string: deepLink), UIApplication.shared.canOpenURL(url) {
+                    UIApplication.shared.open(url, options: [:]) { success in
+                        print("📱 WalletService: Opened \(app.name): \(success)")
+                    }
+                    return
+                }
+            }
+            
+            // If no wallet apps available, show error
+            print("❌ WalletService: No compatible wallet apps found")
+        } else if let scheme = walletSchemes[walletType] {
+            // For MetaMask or other direct wallet connections
+            let deepLink = "\(scheme)connect"
+            if let url = URL(string: deepLink), UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url, options: [:]) { success in
+                    print("📱 WalletService: Opened \(walletType.displayName): \(success)")
+                }
+            }
+        }
+    }
+    
+    /// Get available wallet apps installed on device
+    func getAvailableWalletApps() -> [WalletAppInfo] {
+        let walletApps = [
+            WalletAppInfo(name: "Rainbow", scheme: "rainbow", icon: "rainbow"),
+            WalletAppInfo(name: "Trust Wallet", scheme: "trust", icon: "trust"),
+            WalletAppInfo(name: "Argent", scheme: "argent", icon: "argent"),
+            WalletAppInfo(name: "Gnosis Safe", scheme: "gnosissafe", icon: "safe"),
+            WalletAppInfo(name: "MetaMask", scheme: "metamask", icon: "metamask")
+        ]
+        
+        // Filter to only installed apps
+        return walletApps.filter { app in
+            if let url = URL(string: "\(app.scheme)://") {
+                return UIApplication.shared.canOpenURL(url)
+            }
+            return false
+        }
+    }
+    
+    /// Handle wallet connection for WalletConnect with deep linking
+    func handleWalletConnected() async throws -> WalletConnectionResult {
+        print("📱 WalletService: Handling WalletConnect connection")
+        
+        // Generate WalletConnect URI
+        let uri = try await walletConnectService.connectToWallet()
+        
+        // Open wallet app with deep link
+        openWalletWithDeepLink(walletType: .walletConnect, uri: uri)
+        
+        // Wait for session to be established
+        var attempts = 0
+        while await walletConnectService.sessions.isEmpty && attempts < 60 { // 30 seconds timeout
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            attempts += 1
+        }
+        
+        guard let session = await walletConnectService.sessions.first else {
+            throw WalletError.connectionFailed("Failed to establish WalletConnect session")
+        }
+        
+        // Get wallet address
+        guard let address = await walletConnectService.getConnectedAddress() else {
+            throw WalletError.noAccountsFound
+        }
+        
+        print("📱 WalletService: Connected to wallet: \(address)")
+        
+        // Create SIWE message
+        let nonce = try await getSIWENonce()
+        let message = createSIWEMessage(address: address, nonce: nonce, chainId: 1)
+        
+        // Sign SIWE message
+        let signature = try await walletConnectService.signSIWEMessage(message, address: address, session: session)
+        
+        // Clean up session after authentication
+        await walletConnectService.cleanupAuthSession()
+        
+        // Update UI state
+        await MainActor.run {
+            self.connectionStatus = .connected
+            self.connectedWallet = .walletConnect
+            self.walletAddress = address
+        }
+        
+        return WalletConnectionResult(
+            address: address,
+            signature: signature,
+            message: message,
+            walletType: .walletConnect
+        )
     }
 }
 

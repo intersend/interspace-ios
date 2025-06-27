@@ -128,68 +128,40 @@ final class WalletConnectService: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Connect to a wallet using WalletConnect URI for SIWE authentication
-    func connectForAuth(uri: String) async throws {
-        // For connecting FROM a wallet app TO our dApp
-        // This is when a wallet scans our QR code
-        guard uri.hasPrefix("wc:") else {
-            throw WalletConnectError.invalidURI
-        }
+    /// Connect to a wallet by generating our own URI
+    func connectToWallet() async throws -> String {
+        print("📱 WalletConnectService: Creating connection request as dApp")
         
-        do {
-            // Parse the URI
-            guard let pairingURI = try? WalletConnectURI(string: uri) else {
-                throw WalletConnectError.invalidURI
-            }
-            
-            // Pair with the wallet
-            try await Pair.instance.pair(uri: pairingURI)
-            
-            print("✅ WalletConnectService: Paired with URI for authentication")
-            
-            // The wallet will send us a session proposal
-            // We'll handle it in handleSessionProposal
-            
-        } catch {
-            print("❌ WalletConnectService: Failed to pair: \(error)")
-            throw WalletConnectError.pairingFailed(error.localizedDescription)
-        }
-    }
-    
-    /// Create a connection request as a dApp
-    func createConnectionRequest() async throws -> String {
         // Create a pairing URI that wallets can use to connect to us
         let uri = try await Pair.instance.create()
-        print("📱 WalletConnectService: Created pairing URI for wallets to connect")
-        print("📱 URI: \(uri.absoluteString)")
+        print("📱 URI created: \(uri.absoluteString)")
         
-        // After creating the pairing, we need to connect with our requirements
+        // Define the namespaces we require from the wallet
+        let requiredNamespaces: [String: ProposalNamespace] = [
+            "eip155": ProposalNamespace(
+                chains: [Blockchain("eip155:1")!], // Ethereum mainnet
+                methods: ["personal_sign", "eth_sign"], // For SIWE
+                events: []
+            )
+        ]
+        
+        // Create connection proposal
         Task {
             do {
-                // Define the namespaces we require from the wallet
-                let requiredNamespaces: [String: ProposalNamespace] = [
-                    "eip155": ProposalNamespace(
-                        chains: [Blockchain("eip155:1")!], // Ethereum mainnet
-                        methods: ["personal_sign", "eth_sign"], // For SIWE
-                        events: []
-                    )
-                ]
-                
-                // Connect to the wallet
                 _ = try await Sign.instance.connect(
                     requiredNamespaces: requiredNamespaces,
                     optionalNamespaces: [:],
                     sessionProperties: nil
                 )
-                
-                print("📱 WalletConnectService: Connection request sent via pairing")
+                print("📱 WalletConnectService: Connection proposal sent")
             } catch {
-                print("❌ WalletConnectService: Failed to send connection request: \(error)")
+                print("❌ WalletConnectService: Failed to send connection proposal: \(error)")
             }
         }
         
         return uri.absoluteString
     }
+    
     
     /// Sign a SIWE message for authentication
     func signSIWEMessage(_ message: String, address: String, session: Session) async throws -> String {
@@ -290,25 +262,15 @@ final class WalletConnectService: ObservableObject {
     private func handleSessionProposal(_ proposal: Session.Proposal) {
         print("📱 WalletConnectService: Received session proposal from \(proposal.proposer.name)")
         print("📱 Proposal ID: \(proposal.id)")
-        print("📱 Required namespaces: \(proposal.requiredNamespaces)")
-        print("📱 Optional namespaces: \(proposal.optionalNamespaces ?? [:])")
         
-        // Store the proposal
+        // We're a dApp, we shouldn't receive proposals - we make them
+        // This might happen if we're testing with demo sites
+        print("⚠️ WalletConnectService: Unexpected session proposal - we're a dApp, not a wallet")
+        print("⚠️ This usually means you're scanning a QR from another dApp")
+        print("⚠️ For production use, Interspace should generate QR codes for wallets to scan")
+        
+        // Store but don't auto-approve
         pendingProposal = proposal
-        
-        // Check if this is from our own dApp connection request
-        if proposal.proposer.name == "Interspace" {
-            // This shouldn't happen - we're the ones making proposals
-            print("⚠️ WalletConnectService: Received our own proposal, ignoring")
-            return
-        }
-        
-        // For testing: When we scan a QR code from a demo dApp, we act as a wallet
-        // In production, we should only act as a dApp for SIWE auth
-        print("⚠️ WalletConnectService: Acting as wallet for testing purposes")
-        Task {
-            await approveSessionAsWallet(proposal)
-        }
     }
     
     private func approveSessionAsWallet(_ proposal: Session.Proposal) async {
