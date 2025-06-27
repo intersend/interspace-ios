@@ -420,6 +420,7 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
                 
                 if walletType == .walletConnect {
                     // For WalletConnect, show wallet options
+                    print("🔍 DEBUG: WalletConnect selected, showing options sheet")
                     await MainActor.run {
                         showWalletConnectOptions = true
                         connectionState = .idle // Reset state while showing options
