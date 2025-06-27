@@ -150,7 +150,7 @@ struct WalletConnectTray: View {
         case .coinbase:
             viewModel.selectWallet(wallet)
             dismiss()
-        case .rainbow, .trust, .argent, .gnosisSafe:
+        case .rainbow, .trust, .argent, .gnosisSafe, .family, .phantom, .oneInch, .zerion, .imToken, .tokenPocket, .spot, .omni:
             // WalletConnect-compatible wallets
             viewModel.selectWallet(wallet)
             dismiss()
@@ -297,6 +297,22 @@ struct WalletRow: View {
             return "Argent"
         case .gnosisSafe:
             return "Gnosis Safe"
+        case .family:
+            return "Family"
+        case .phantom:
+            return "Phantom"
+        case .oneInch:
+            return "1inch Wallet"
+        case .zerion:
+            return "Zerion"
+        case .imToken:
+            return "imToken"
+        case .tokenPocket:
+            return "TokenPocket"
+        case .spot:
+            return "Spot"
+        case .omni:
+            return "Omni"
         case .google:
             return "Google"
         case .apple:

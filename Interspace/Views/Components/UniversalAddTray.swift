@@ -445,7 +445,7 @@ struct UniversalAddTray: View {
     
     private func checkAvailableWallets() {
         // Check which WalletConnect-compatible apps are installed
-        let potentialWallets: [WalletType] = [.rainbow, .trust, .argent, .gnosisSafe]
+        let potentialWallets: [WalletType] = [.rainbow, .trust, .argent, .gnosisSafe, .family, .phantom, .oneInch, .zerion, .imToken, .tokenPocket, .spot, .omni]
         var available: [WalletType] = []
         
         for walletType in potentialWallets {
@@ -459,6 +459,22 @@ struct UniversalAddTray: View {
                 scheme = "argent"
             case .gnosisSafe:
                 scheme = "gnosissafe"
+            case .family:
+                scheme = "family"
+            case .phantom:
+                scheme = "phantom"
+            case .oneInch:
+                scheme = "oneinch"
+            case .zerion:
+                scheme = "zerion"
+            case .imToken:
+                scheme = "imtoken"
+            case .tokenPocket:
+                scheme = "tokenpocket"
+            case .spot:
+                scheme = "spot"
+            case .omni:
+                scheme = "omni"
             default:
                 continue
             }

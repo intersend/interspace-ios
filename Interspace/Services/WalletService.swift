@@ -390,7 +390,7 @@ final class WalletService: ObservableObject {
                 }
             case .coinbase:
                 result = try await connectCoinbaseWallet()
-            case .walletConnect, .rainbow, .trust, .argent, .gnosisSafe:
+            case .walletConnect, .rainbow, .trust, .argent, .gnosisSafe, .family, .phantom, .oneInch, .zerion, .imToken, .tokenPocket, .spot, .omni:
                 // All WalletConnect-compatible wallets use the same connection method
                 result = try await connectWalletConnectType(walletType)
             case .google, .apple:
@@ -1028,6 +1028,22 @@ final class WalletService: ObservableObject {
             return canOpenWallet(scheme: "argent://")
         case .gnosisSafe:
             return canOpenWallet(scheme: "gnosissafe://")
+        case .family:
+            return canOpenWallet(scheme: "family://")
+        case .phantom:
+            return canOpenWallet(scheme: "phantom://")
+        case .oneInch:
+            return canOpenWallet(scheme: "oneinch://")
+        case .zerion:
+            return canOpenWallet(scheme: "zerion://")
+        case .imToken:
+            return canOpenWallet(scheme: "imtoken://")
+        case .tokenPocket:
+            return canOpenWallet(scheme: "tokenpocket://")
+        case .spot:
+            return canOpenWallet(scheme: "spot://")
+        case .omni:
+            return canOpenWallet(scheme: "omni://")
         case .google, .apple:
             return true // Social authentication is always available
         case .mpc:
@@ -1139,6 +1155,7 @@ final class WalletService: ObservableObject {
     // MARK: - Deep Linking
     
     /// Open wallet app with deep link
+    @MainActor
     func openWalletWithDeepLink(walletType: WalletType, uri: String) {
         print("📱 WalletService: Opening wallet app with deep link for \(walletType.displayName)")
         
@@ -1155,6 +1172,22 @@ final class WalletService: ObservableObject {
             scheme = "argent"
         case .gnosisSafe:
             scheme = "gnosissafe"
+        case .family:
+            scheme = "family"
+        case .phantom:
+            scheme = "phantom"
+        case .oneInch:
+            scheme = "oneinch"
+        case .zerion:
+            scheme = "zerion"
+        case .imToken:
+            scheme = "imtoken"
+        case .tokenPocket:
+            scheme = "tokenpocket"
+        case .spot:
+            scheme = "spot"
+        case .omni:
+            scheme = "omni"
         case .walletConnect:
             // For generic WalletConnect, try to open the first available wallet
             let walletApps = getAvailableWalletApps()
@@ -1188,7 +1221,15 @@ final class WalletService: ObservableObject {
             WalletAppInfo(name: "Trust Wallet", scheme: "trust", icon: "trust"),
             WalletAppInfo(name: "Argent", scheme: "argent", icon: "argent"),
             WalletAppInfo(name: "Gnosis Safe", scheme: "gnosissafe", icon: "safe"),
-            WalletAppInfo(name: "MetaMask", scheme: "metamask", icon: "metamask")
+            WalletAppInfo(name: "MetaMask", scheme: "metamask", icon: "metamask"),
+            WalletAppInfo(name: "Family", scheme: "family", icon: "family"),
+            WalletAppInfo(name: "Phantom", scheme: "phantom", icon: "phantom"),
+            WalletAppInfo(name: "1inch Wallet", scheme: "oneinch", icon: "oneinch"),
+            WalletAppInfo(name: "Zerion", scheme: "zerion", icon: "zerion"),
+            WalletAppInfo(name: "imToken", scheme: "imtoken", icon: "imtoken"),
+            WalletAppInfo(name: "TokenPocket", scheme: "tokenpocket", icon: "tokenpocket"),
+            WalletAppInfo(name: "Spot", scheme: "spot", icon: "spot"),
+            WalletAppInfo(name: "Omni", scheme: "omni", icon: "omni")
         ]
         
         // Filter to only installed apps
@@ -1204,14 +1245,20 @@ final class WalletService: ObservableObject {
     func handleWalletConnected(walletType: WalletType = .walletConnect) async throws -> WalletConnectionResult {
         print("📱 WalletService: Handling WalletConnect connection for \(walletType.displayName)")
         
+        // Clean up any existing sessions before creating a new one
+        await walletConnectService.disconnect()
+        
+        // Small delay to ensure cleanup is complete
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
         // Store the actual wallet type for later use
         self.connectedWallet = walletType
         
         // Generate WalletConnect URI
         let uri = try await walletConnectService.connectToWallet()
         
-        // Open wallet app with deep link
-        openWalletWithDeepLink(walletType: walletType, uri: uri)
+        // Open wallet app with deep link (must be on main thread)
+        await openWalletWithDeepLink(walletType: walletType, uri: uri)
         
         // Wait for session to be established
         var attempts = 0

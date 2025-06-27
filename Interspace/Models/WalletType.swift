@@ -16,6 +16,14 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
     case trust = "trust"
     case argent = "argent"
     case gnosisSafe = "gnosissafe"
+    case family = "family"
+    case phantom = "phantom"
+    case oneInch = "oneinch"
+    case zerion = "zerion"
+    case imToken = "imtoken"
+    case tokenPocket = "tokenpocket"
+    case spot = "spot"
+    case omni = "omni"
     case safe = "safe"
     case ledger = "ledger"
     case trezor = "trezor"
@@ -42,6 +50,22 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "Argent"
         case .gnosisSafe:
             return "Gnosis Safe"
+        case .family:
+            return "Family"
+        case .phantom:
+            return "Phantom"
+        case .oneInch:
+            return "1inch Wallet"
+        case .zerion:
+            return "Zerion"
+        case .imToken:
+            return "imToken"
+        case .tokenPocket:
+            return "TokenPocket"
+        case .spot:
+            return "Spot"
+        case .omni:
+            return "Omni"
         case .safe:
             return "Safe"
         case .ledger:
@@ -75,6 +99,22 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "a.circle.fill"
         case .gnosisSafe:
             return "shield.checkered"
+        case .family:
+            return "person.2.fill"
+        case .phantom:
+            return "moon.fill"
+        case .oneInch:
+            return "1.circle.fill"
+        case .zerion:
+            return "z.circle.fill"
+        case .imToken:
+            return "square.and.arrow.up.fill"
+        case .tokenPocket:
+            return "folder.fill"
+        case .spot:
+            return "location.fill"
+        case .omni:
+            return "infinity"
         case .safe:
             return "shield.fill"
         case .ledger:
@@ -108,6 +148,22 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "argent"
         case .gnosisSafe:
             return "gnosissafe"
+        case .family:
+            return "family"
+        case .phantom:
+            return "phantom"
+        case .oneInch:
+            return "oneinch"
+        case .zerion:
+            return "zerion"
+        case .imToken:
+            return "imtoken"
+        case .tokenPocket:
+            return "tokenpocket"
+        case .spot:
+            return "spot"
+        case .omni:
+            return "omni"
         case .safe:
             return "safe"
         case .ledger:
@@ -141,6 +197,22 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return Color(red: 1.0, green: 0.5, blue: 0.2)
         case .gnosisSafe:
             return Color.green
+        case .family:
+            return Color(red: 0.5, green: 0.8, blue: 0.4)
+        case .phantom:
+            return Color(red: 0.4, green: 0.3, blue: 0.9)
+        case .oneInch:
+            return Color(red: 0.9, green: 0.2, blue: 0.3)
+        case .zerion:
+            return Color(red: 0.2, green: 0.7, blue: 0.9)
+        case .imToken:
+            return Color(red: 0.1, green: 0.5, blue: 0.9)
+        case .tokenPocket:
+            return Color(red: 0.3, green: 0.7, blue: 0.5)
+        case .spot:
+            return Color(red: 0.9, green: 0.6, blue: 0.2)
+        case .omni:
+            return Color(red: 0.6, green: 0.2, blue: 0.8)
         case .safe:
             return Color.green
         case .ledger:
