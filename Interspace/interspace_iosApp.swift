@@ -1,4 +1,10 @@
 import SwiftUI
+import Foundation
+
+struct DemoModeConfiguration {
+    static let isDemoMode: Bool = true
+    static let showDemoIndicator: Bool = true
+}
 
 @main
 struct interspace_iosApp: App {
@@ -6,13 +12,9 @@ struct interspace_iosApp: App {
     
     // Initialize shared services on app launch
     init() {
-        // Perform critical initialization synchronously
-        Task { @MainActor in
-            if DemoModeConfiguration.isDemoMode {
-                await ServiceInitializer.shared.initializeForDemoMode()
-            } else {
-                await ServiceInitializer.shared.initializeCriticalServices()
-            }
+        // Perform critical initialization
+        if DemoModeConfiguration.isDemoMode {
+            print("🎭 Demo Mode: Initializing services for demo")
         }
     }
     
@@ -24,6 +26,22 @@ struct interspace_iosApp: App {
                 .environmentObject(serviceInitializer.session)
                 .environmentObject(serviceInitializer)
                 .preferredColorScheme(.dark)
+                .overlay(alignment: .top) {
+                    if DemoModeConfiguration.isDemoMode && DemoModeConfiguration.showDemoIndicator {
+                        HStack {
+                            Image(systemName: "play.circle.fill")
+                            Text("DEMO MODE")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.orange)
+                        .cornerRadius(20)
+                        .padding(.top, 50)
+                    }
+                }
                 .onAppear {
                     // Configure global app appearance
                     if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
@@ -32,8 +50,18 @@ struct interspace_iosApp: App {
                         }
                     }
                     
-                    // Initialize deferred services after UI is ready
-                    ServiceInitializer.shared.initializeDeferredServices()
+                    // Initialize services based on mode
+                    Task { @MainActor in
+                        if DemoModeConfiguration.isDemoMode {
+                            // For demo mode, initialize with minimal services
+                            await ServiceInitializer.shared.initializeCriticalServices()
+                        } else {
+                            await ServiceInitializer.shared.initializeCriticalServices()
+                        }
+                        
+                        // Initialize deferred services after UI is ready
+                        ServiceInitializer.shared.initializeDeferredServices()
+                    }
                 }
                 .onOpenURL { url in
                     print("📱 SwiftUI App: Received URL: \(url.absoluteString)")
@@ -53,3 +81,4 @@ struct interspace_iosApp: App {
         }
     }
 }
+
