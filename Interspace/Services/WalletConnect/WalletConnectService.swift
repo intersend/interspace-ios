@@ -128,6 +128,34 @@ final class WalletConnectService: ObservableObject {
     
     // MARK: - Public Methods
     
+    /// Connect to a wallet using WalletConnect URI for SIWE authentication
+    func connectForAuth(uri: String) async throws {
+        // For connecting FROM a wallet app TO our dApp
+        // This is when a wallet scans our QR code
+        guard uri.hasPrefix("wc:") else {
+            throw WalletConnectError.invalidURI
+        }
+        
+        do {
+            // Parse the URI
+            guard let pairingURI = try? WalletConnectURI(string: uri) else {
+                throw WalletConnectError.invalidURI
+            }
+            
+            // Pair with the wallet
+            try await Pair.instance.pair(uri: pairingURI)
+            
+            print("✅ WalletConnectService: Paired with URI for authentication")
+            
+            // The wallet will send us a session proposal
+            // We'll handle it in handleSessionProposal
+            
+        } catch {
+            print("❌ WalletConnectService: Failed to pair: \(error)")
+            throw WalletConnectError.pairingFailed(error.localizedDescription)
+        }
+    }
+    
     /// Connect to a wallet by generating our own URI
     func connectToWallet() async throws -> String {
         print("📱 WalletConnectService: Creating connection request as dApp")

@@ -228,6 +228,7 @@
 				Components/UniversalAddTray.swift,
 				Components/VerificationCodeField.swift,
 				Components/WalletConnectionTray.swift,
+				Components/WalletConnectOptionsView.swift,
 				Components/WalletConnectTray.swift,
 				Components/WebNavigationBar.swift,
 				Components/WebProgressBar.swift,

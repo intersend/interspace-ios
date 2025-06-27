@@ -752,53 +752,45 @@ final class WalletService: ObservableObject {
         print("💰 WalletService: Making request to Coinbase Wallet...")
         
         // Make the request using continuation for async/await
-        let result: [Result<JSONRPC, ProviderError>]
-        do {
-            result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[Result<JSONRPC, ProviderError>], Error>) in
-                CoinbaseWalletSDK.shared.makeRequest(request) { result in
-                    switch result {
-                    case .success(let response):
-                        continuation.resume(returning: response)
-                    case .failure(let error):
-                        continuation.resume(throwing: error)
-                    }
+        let response = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<BaseMessage<[ActionResult]>, Error>) in
+            CoinbaseWalletSDK.shared.makeRequest(request) { result in
+                switch result {
+                case .success(let response):
+                    continuation.resume(returning: response)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
                 }
             }
-        } catch {
-            // Handle Coinbase-specific errors
-            print("💰 WalletService: Coinbase SDK error: \(error)")
-            
-            // Check for user cancellation
-            if let providerError = error as? ProviderError {
-                switch providerError {
-                case .userRejectedRequest:
-                    throw WalletError.userCancelled
-                case .unauthorized:
-                    throw WalletError.connectionFailed("Unauthorized access to Coinbase Wallet")
-                case .unsupportedMethod:
-                    throw WalletError.connectionFailed("Unsupported method requested")
-                default:
-                    throw WalletError.connectionFailed("Coinbase Wallet error: \(providerError.localizedDescription)")
-                }
-            }
-            
-            throw WalletError.connectionFailed(error.localizedDescription)
         }
         
         print("💰 WalletService: Received response from Coinbase Wallet")
         
         // Check we have both responses
-        guard result.count >= 2 else {
-            print("💰 WalletService: Invalid response count: \(result.count)")
+        guard response.content.count >= 2 else {
+            print("💰 WalletService: Invalid response count: \(response.content.count)")
             throw WalletError.connectionFailed("Invalid response from Coinbase Wallet")
         }
         
         // Extract account from first response
-        let accountResult = result[0]
-        guard case .success(let accountJSON) = accountResult,
-              case .eth_requestAccounts(let addresses) = accountJSON,
-              !addresses.isEmpty else {
-            print("💰 WalletService: Failed to get account from response")
+        let accountResult = response.content[0]
+        guard case .success(let accountJSON) = accountResult else {
+            if case .failure(let error) = accountResult {
+                print("💰 WalletService: Account request failed: \(error.message)")
+                if error.code == 4001 { // User rejected
+                    throw WalletError.userCancelled
+                }
+            }
+            throw WalletError.noAccountsFound
+        }
+        
+        // Decode the JSON response to get addresses
+        struct AccountResponse: Codable {
+            let result: [String]
+        }
+        
+        let accountResponse = try? accountJSON.decode(as: AccountResponse.self)
+        guard let addresses = accountResponse?.result, !addresses.isEmpty else {
+            print("💰 WalletService: Failed to decode addresses from response")
             throw WalletError.noAccountsFound
         }
         
@@ -813,11 +805,26 @@ final class WalletService: ObservableObject {
         )
         
         // Extract signature from second response
-        let signResult = result[1]
-        guard case .success(let signJSON) = signResult,
-              case .personal_sign(let signature) = signJSON else {
-            print("💰 WalletService: Failed to get signature from response")
+        let signResult = response.content[1]
+        guard case .success(let signJSON) = signResult else {
+            if case .failure(let error) = signResult {
+                print("💰 WalletService: Sign request failed: \(error.message)")
+                if error.code == 4001 { // User rejected
+                    throw WalletError.userCancelled
+                }
+            }
             throw WalletError.signatureFailed("Failed to get signature")
+        }
+        
+        // Decode the signature response
+        struct SignResponse: Codable {
+            let result: String
+        }
+        
+        let signResponse = try? signJSON.decode(as: SignResponse.self)
+        guard let signature = signResponse?.result else {
+            print("💰 WalletService: Failed to decode signature from response")
+            throw WalletError.signatureFailed("Failed to decode signature")
         }
         
         print("💰 WalletService: Got signature: \(signature.prefix(20))...")
