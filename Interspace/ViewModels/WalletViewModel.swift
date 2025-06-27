@@ -52,11 +52,17 @@ final class WalletViewModel: ObservableObject {
                     targetProfileId = profileId
                 } else {
                     // Use DataSyncManager for profiles with caching
-                    let profilesResponse: ProfilesResponse = try await dataSyncManager.fetch(
-                        type: ProfilesResponse.self,
-                        endpoint: "profiles",
-                        policy: .cacheFirst
-                    )
+                    let profilesResponse: ProfilesResponse = DemoModeConfiguration.isDemoMode
+                        ? try await dataSyncManager.fetchDemoMode(
+                            type: ProfilesResponse.self,
+                            endpoint: "profiles",
+                            policy: .cacheFirst
+                        )
+                        : try await dataSyncManager.fetch(
+                            type: ProfilesResponse.self,
+                            endpoint: "profiles",
+                            policy: .cacheFirst
+                        )
                     guard let activeProfile = profilesResponse.data.first(where: { $0.isActive }) else {
                         throw WalletViewError.noBalance
                     }
@@ -64,11 +70,17 @@ final class WalletViewModel: ObservableObject {
                 }
                 
                 // Use DataSyncManager for balance with network-first policy (5 min cache)
-                unifiedBalance = try await dataSyncManager.fetch(
-                    type: UnifiedBalance.self,
-                    endpoint: "profiles/\(targetProfileId)/balance",
-                    policy: .networkFirst
-                )
+                unifiedBalance = DemoModeConfiguration.isDemoMode
+                    ? try await dataSyncManager.fetchDemoMode(
+                        type: UnifiedBalance.self,
+                        endpoint: "profiles/\(targetProfileId)/balance",
+                        policy: .networkFirst
+                    )
+                    : try await dataSyncManager.fetch(
+                        type: UnifiedBalance.self,
+                        endpoint: "profiles/\(targetProfileId)/balance",
+                        policy: .networkFirst
+                    )
                 
             } catch {
                 handleError(error)
@@ -91,22 +103,35 @@ final class WalletViewModel: ObservableObject {
         } else {
             do {
                 // Get active profile from cache first
-                let profilesResponse: ProfilesResponse = try await dataSyncManager.fetch(
-                    type: ProfilesResponse.self,
-                    endpoint: "profiles",
-                    policy: .cacheFirst
-                )
+                let profilesResponse: ProfilesResponse = DemoModeConfiguration.isDemoMode
+                    ? try await dataSyncManager.fetchDemoMode(
+                        type: ProfilesResponse.self,
+                        endpoint: "profiles",
+                        policy: .cacheFirst
+                    )
+                    : try await dataSyncManager.fetch(
+                        type: ProfilesResponse.self,
+                        endpoint: "profiles",
+                        policy: .cacheFirst
+                    )
                 guard let activeProfile = profilesResponse.data.first(where: { $0.isActive }) else {
                     throw WalletViewError.noBalance
                 }
                 
                 // Force refresh balance from network
-                unifiedBalance = try await dataSyncManager.fetch(
-                    type: UnifiedBalance.self,
-                    endpoint: "profiles/\(activeProfile.id)/balance",
-                    policy: .networkOnly,
-                    forceRefresh: true
-                )
+                unifiedBalance = DemoModeConfiguration.isDemoMode
+                    ? try await dataSyncManager.fetchDemoMode(
+                        type: UnifiedBalance.self,
+                        endpoint: "profiles/\(activeProfile.id)/balance",
+                        policy: .networkOnly,
+                        forceRefresh: true
+                    )
+                    : try await dataSyncManager.fetch(
+                        type: UnifiedBalance.self,
+                        endpoint: "profiles/\(activeProfile.id)/balance",
+                        policy: .networkOnly,
+                        forceRefresh: true
+                    )
                 
                 // Add haptic feedback for successful refresh
                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -131,16 +156,24 @@ final class WalletViewModel: ObservableObject {
         } else {
             do {
                 // Get active profile
-                let profiles = try await profileAPI.getProfiles()
+                let profiles = DemoModeConfiguration.isDemoMode
+                    ? try await profileAPI.getProfilesDemoMode()
+                    : try await profileAPI.getProfiles()
                 guard let activeProfile = profiles.first(where: { $0.isActive }) else {
                     throw WalletViewError.noBalance
                 }
                 
-                let history = try await walletAPI.getTransactionHistory(
-                    profileId: activeProfile.id,
-                    page: page,
-                    limit: limit
-                )
+                let history = DemoModeConfiguration.isDemoMode
+                    ? try await walletAPI.getTransactionHistoryDemoMode(
+                        profileId: activeProfile.id,
+                        page: page,
+                        limit: limit
+                    )
+                    : try await walletAPI.getTransactionHistory(
+                        profileId: activeProfile.id,
+                        page: page,
+                        limit: limit
+                    )
                 
                 if page == 1 {
                     transactionHistory = history

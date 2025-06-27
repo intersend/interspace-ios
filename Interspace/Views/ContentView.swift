@@ -9,44 +9,55 @@ struct ContentView: View {
         ZStack {
             // Main content
             Group {
-                switch sessionCoordinator.sessionState {
-                case .loading:
-                    LoadingView()
-                        .transition(.asymmetric(
-                            insertion: .opacity,
-                            removal: .opacity.combined(with: .scale(scale: 0.95))
-                        ))
-                    
-                case .unauthenticated:
-                    AuthView()
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 1.05)),
-                            removal: .opacity
-                        ))
-                    
-                case .needsProfile:
-                    OnboardingView()
-                        .transition(.opacity)
-                    
-                case .authenticated:
+                if DemoModeConfiguration.isDemoMode {
+                    // In demo mode, skip authentication and go directly to main view
                     ZStack {
                         Color.clear // Invisible background to force full size
                         MainTabView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity) // Force full size
                             .background(Color.cyan.opacity(0.2)) // DEBUG: Cyan for MainTabView
                     }
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing)),
-                        removal: .opacity.combined(with: .scale(scale: 0.95))
-                    ))
-                    
-                case .error:
-                    ErrorView()
-                        .transition(.opacity)
+                } else {
+                    // Normal authentication flow
+                    switch sessionCoordinator.sessionState {
+                    case .loading:
+                        LoadingView()
+                            .transition(.asymmetric(
+                                insertion: .opacity,
+                                removal: .opacity.combined(with: .scale(scale: 0.95))
+                            ))
                         
-                case .locked:
-                    LockedView()
-                        .transition(.opacity)
+                    case .unauthenticated:
+                        AuthView()
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 1.05)),
+                                removal: .opacity
+                            ))
+                        
+                    case .needsProfile:
+                        OnboardingView()
+                            .transition(.opacity)
+                        
+                    case .authenticated:
+                        ZStack {
+                            Color.clear // Invisible background to force full size
+                            MainTabView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity) // Force full size
+                                .background(Color.cyan.opacity(0.2)) // DEBUG: Cyan for MainTabView
+                        }
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .trailing)),
+                            removal: .opacity.combined(with: .scale(scale: 0.95))
+                        ))
+                        
+                    case .error:
+                        ErrorView()
+                            .transition(.opacity)
+                            
+                    case .locked:
+                        LockedView()
+                            .transition(.opacity)
+                    }
                 }
             }
             
@@ -368,7 +379,8 @@ struct MainTabView: View {
     }
     
     var body: some View {
-        TabView(selection: $selectedTab) {
+        ZStack {
+            TabView(selection: $selectedTab) {
             // Apps Tab
             NavigationStack {
                 AppsView()
@@ -439,6 +451,10 @@ struct MainTabView: View {
             UINavigationBar.appearance().compactAppearance = navAppearance
             UINavigationBar.appearance().tintColor = UIColor.white
             UINavigationBar.appearance().prefersLargeTitles = true
+        }
+            
+            // Demo mode indicator overlay
+            DemoModeIndicator()
         }
     }
 }

@@ -8,7 +8,11 @@ struct interspace_iosApp: App {
     init() {
         // Perform critical initialization synchronously
         Task { @MainActor in
-            await ServiceInitializer.shared.initializeCriticalServices()
+            if DemoModeConfiguration.isDemoMode {
+                await ServiceInitializer.shared.initializeForDemoMode()
+            } else {
+                await ServiceInitializer.shared.initializeCriticalServices()
+            }
         }
     }
     

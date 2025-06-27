@@ -54,7 +54,9 @@ final class AppsViewModel: ObservableObject {
                     targetProfileId = profileId
                 } else {
                     // Get profiles directly from ProfileAPI to handle response wrapper
-                    let profiles = try await profileAPI.getProfiles()
+                    let profiles = DemoModeConfiguration.isDemoMode 
+                        ? try await profileAPI.getProfilesDemoMode()
+                        : try await profileAPI.getProfiles()
                     guard let activeProfile = profiles.first(where: { $0.isActive }) else {
                         throw AppsError.noActiveProfile
                     }
@@ -64,8 +66,12 @@ final class AppsViewModel: ObservableObject {
                 print("📱 AppsViewModel: Loading apps for profile: \(targetProfileId)")
                 
                 // Use ProfileAPI methods that handle the wrapped responses correctly
-                async let appsTask = profileAPI.getApps(profileId: targetProfileId)
-                async let foldersTask = profileAPI.getFolders(profileId: targetProfileId)
+                async let appsTask = DemoModeConfiguration.isDemoMode
+                    ? profileAPI.getAppsDemoMode(profileId: targetProfileId)
+                    : profileAPI.getApps(profileId: targetProfileId)
+                async let foldersTask = DemoModeConfiguration.isDemoMode
+                    ? profileAPI.getFoldersDemoMode(profileId: targetProfileId)
+                    : profileAPI.getFolders(profileId: targetProfileId)
                 
                 let (appsResult, foldersResult) = try await (appsTask, foldersTask)
                 
@@ -200,7 +206,9 @@ final class AppsViewModel: ObservableObject {
         if let profileId = profileId {
             targetProfileId = profileId
         } else {
-            let profiles = try await profileAPI.getProfiles()
+            let profiles = DemoModeConfiguration.isDemoMode
+                ? try await profileAPI.getProfilesDemoMode()
+                : try await profileAPI.getProfiles()
             guard let activeProfile = profiles.first(where: { $0.isActive }) else {
                 throw AppsError.noActiveProfile
             }
@@ -217,7 +225,9 @@ final class AppsViewModel: ObservableObject {
         )
         
         // Create app
-        let newApp = try await profileAPI.createApp(profileId: targetProfileId, request: request)
+        let newApp = DemoModeConfiguration.isDemoMode
+            ? try await profileAPI.createAppDemoMode(profileId: targetProfileId, request: request)
+            : try await profileAPI.createApp(profileId: targetProfileId, request: request)
         
         // Update local state
         await MainActor.run {
@@ -258,7 +268,11 @@ final class AppsViewModel: ObservableObject {
             error = nil
             
             do {
-                try await profileAPI.deleteApp(appId: app.id)
+                if DemoModeConfiguration.isDemoMode {
+                    try await profileAPI.deleteAppDemoMode(appId: app.id)
+                } else {
+                    try await profileAPI.deleteApp(appId: app.id)
+                }
                 
                 // Remove from local array
                 apps.removeAll { $0.id == app.id }
@@ -276,7 +290,9 @@ final class AppsViewModel: ObservableObject {
             let request = ReorderAppsRequest(appIds: appIds, folderId: folderId)
             
             // Get active profile
-            let profiles = try await profileAPI.getProfiles()
+            let profiles = DemoModeConfiguration.isDemoMode
+                ? try await profileAPI.getProfilesDemoMode()
+                : try await profileAPI.getProfiles()
             guard let activeProfile = profiles.first(where: { $0.isActive }) else {
                 throw AppsError.noActiveProfile
             }
