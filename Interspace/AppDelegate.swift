@@ -1,7 +1,6 @@
 import SwiftUI
 import metamask_ios_sdk
-// Temporarily disabled - Coinbase SDK causing crashes
-// import CoinbaseWalletSDK
+import CoinbaseWalletSDK
 import GoogleSignIn
 import WalletConnectSign
 
@@ -33,11 +32,11 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
     print("📱 AppDelegate: Deferring WalletService initialization")
     _ = WalletService.shared // Just create the instance, don't initialize SDKs
     
-    // Coinbase Wallet SDK configuration disabled temporarily
-    // UIApplication.swizzleOpenURL()
-    // CoinbaseWalletSDK.configure(
-    //     callback: URL(string: "interspace://callback")!  // Updated callback path
-    // )
+    // Configure Coinbase Wallet SDK
+    print("📱 AppDelegate: Configuring Coinbase Wallet SDK")
+    CoinbaseWalletSDK.configure(
+        callback: URL(string: "interspace://coinbase")!
+    )
     
     // Configure Google Sign-In
     print("📱 AppDelegate: Configuring Google Sign-In")
@@ -114,20 +113,23 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
             }
             return true
         }
+        
+        // Check if this is a Coinbase callback
+        if url.host == "coinbase" {
+            print("📱 AppDelegate: This is a Coinbase Wallet callback URL")
+            do {
+                let handled = try CoinbaseWalletSDK.shared.handleResponse(url)
+                if handled {
+                    print("📱 AppDelegate: Successfully handled Coinbase Wallet URL")
+                    return true
+                } else {
+                    print("📱 AppDelegate: Coinbase SDK did not handle URL")
+                }
+            } catch {
+                print("📱 AppDelegate: Error handling Coinbase URL: \(error)")
+            }
+        }
     }
-    
-    // Coinbase Wallet URL handling disabled temporarily
-    // do {
-    //     let handled = try CoinbaseWalletSDK.shared.handleResponse(url)
-    //     if handled {
-    //         print("📱 AppDelegate: Successfully handled Coinbase Wallet URL")
-    //         return true
-    //     } else {
-    //         print("📱 AppDelegate: Coinbase SDK did not handle URL")
-    //     }
-    // } catch {
-    //     print("📱 AppDelegate: Error handling Coinbase URL: \(error)")
-    // }
     
     // Check for Google Sign-In URLs
     // TODO: Uncomment after adding GoogleSignIn via SPM
@@ -159,18 +161,18 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
         if let url = userActivity.webpageURL {
             print("📱 AppDelegate: Universal link URL: \(url.absoluteString)")
             
-            // Coinbase Wallet universal link handling disabled temporarily
-            // do {
-            //     let handled = try CoinbaseWalletSDK.shared.handleResponse(url)
-            //     if handled {
-            //         print("📱 AppDelegate: Successfully handled Coinbase universal link")
-            //         return true
-            //     } else {
-            //         print("📱 AppDelegate: Coinbase SDK did not handle universal link")
-            //     }
-            // } catch {
-            //     print("📱 AppDelegate: Error handling Coinbase universal link: \(error)")
-            // }
+            // Handle Coinbase Wallet universal links
+            do {
+                let handled = try CoinbaseWalletSDK.shared.handleResponse(url)
+                if handled {
+                    print("📱 AppDelegate: Successfully handled Coinbase universal link")
+                    return true
+                } else {
+                    print("📱 AppDelegate: Coinbase SDK did not handle universal link")
+                }
+            } catch {
+                print("📱 AppDelegate: Error handling Coinbase universal link: \(error)")
+            }
             
 //             if url.absoluteString.contains("wc") {
 //                 print("📱 AppDelegate: Handling WalletConnect universal link")

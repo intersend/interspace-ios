@@ -1,8 +1,7 @@
 import Foundation
 import Combine
 import metamask_ios_sdk
-// Temporarily disabled - Coinbase SDK causing crashes
-// import CoinbaseWalletSDK
+import CoinbaseWalletSDK
 import UIKit
 
 final class WalletService: ObservableObject {
@@ -66,11 +65,10 @@ final class WalletService: ObservableObject {
             
             // Initialize SDKs asynchronously
             async let metamaskSetup: Void = setupMetaMaskSDKAsync()
-            // Coinbase setup temporarily disabled
-            // async let coinbaseSetup: Void = setupCoinbaseSDKAsync()
+            async let coinbaseSetup: Void = setupCoinbaseSDKAsync()
             
-            // Wait for MetaMask to complete
-            _ = await (metamaskSetup)
+            // Wait for both SDKs to complete
+            _ = await (metamaskSetup, coinbaseSetup)
             
             // Setup WalletConnect
             setupWalletConnect()
@@ -88,9 +86,9 @@ final class WalletService: ObservableObject {
         await setupMetaMaskSDK()
     }
     
-    /// Setup Coinbase SDK asynchronously - temporarily disabled
+    /// Setup Coinbase SDK asynchronously
     private func setupCoinbaseSDKAsync() async {
-        // setupCoinbaseSDK()
+        setupCoinbaseSDK()
     }
     
     private func setupNotificationObservers() {
@@ -279,13 +277,8 @@ final class WalletService: ObservableObject {
     // MARK: - Coinbase Wallet SetupINFURA_API_KEY
     
     private func setupCoinbaseSDK() {
-        // Coinbase SDK configuration temporarily disabled
-        // CoinbaseWalletSDK.configure(
-        //     host: URL(string: "https://interspace.fi")!,
-        //     callback: URL(string: "interspace://coinbase")!
-        // )
-        
-        print("💰 WalletService: Coinbase SDK configuration skipped (temporarily disabled)")
+        // Coinbase SDK is configured in AppDelegate
+        print("💰 WalletService: Coinbase SDK ready (configured in AppDelegate)")
     }
     
     // MARK: - WalletConnect Setup
@@ -722,10 +715,113 @@ final class WalletService: ObservableObject {
     // MARK: - Coinbase Wallet Connection
     
     private func connectCoinbaseWallet() async throws -> WalletConnectionResult {
-        print("💰 WalletService: Coinbase Wallet connection temporarily disabled")
+        print("💰 WalletService: Starting Coinbase Wallet connection")
         
-        // Return an error indicating Coinbase is coming soon
-        throw WalletError.connectionFailed("Coinbase Wallet integration is coming soon. Please use MetaMask or another supported wallet for now.")
+        // Check if Coinbase Wallet is installed
+        if !canOpenCoinbaseWallet() {
+            print("💰 WalletService: Coinbase Wallet app not installed")
+            throw WalletError.connectionFailed("Coinbase Wallet app is not installed. Please install Coinbase Wallet from the App Store.")
+        }
+        
+        // Get SIWE nonce from backend
+        let nonce = try await getSIWENonce()
+        print("💰 WalletService: Got SIWE nonce: \(nonce)")
+        
+        // Create SIWE message (address will be updated after we get it)
+        let message = createSIWEMessage(
+            address: "pending", // Will be replaced with actual address
+            nonce: nonce,
+            chainId: 1 // Ethereum mainnet
+        )
+        
+        // Create a personal sign request that includes both account request and signing
+        let request = Request(actions: [
+            Action(jsonRpc: .eth_requestAccounts),
+            Action(jsonRpc: .personal_sign(address: "", message: message))
+        ])
+        
+        print("💰 WalletService: Making request to Coinbase Wallet...")
+        
+        // Make the request using continuation for async/await
+        let result: [Result<JSONRPC, ProviderError>]
+        do {
+            result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[Result<JSONRPC, ProviderError>], Error>) in
+                CoinbaseWalletSDK.shared.makeRequest(request) { result in
+                    switch result {
+                    case .success(let response):
+                        continuation.resume(returning: response)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        } catch {
+            // Handle Coinbase-specific errors
+            print("💰 WalletService: Coinbase SDK error: \(error)")
+            
+            // Check for user cancellation
+            if let providerError = error as? ProviderError {
+                switch providerError {
+                case .userRejectedRequest:
+                    throw WalletError.userCancelled
+                case .unauthorized:
+                    throw WalletError.connectionFailed("Unauthorized access to Coinbase Wallet")
+                case .unsupportedMethod:
+                    throw WalletError.connectionFailed("Unsupported method requested")
+                default:
+                    throw WalletError.connectionFailed("Coinbase Wallet error: \(providerError.localizedDescription)")
+                }
+            }
+            
+            throw WalletError.connectionFailed(error.localizedDescription)
+        }
+        
+        print("💰 WalletService: Received response from Coinbase Wallet")
+        
+        // Check we have both responses
+        guard result.count >= 2 else {
+            print("💰 WalletService: Invalid response count: \(result.count)")
+            throw WalletError.connectionFailed("Invalid response from Coinbase Wallet")
+        }
+        
+        // Extract account from first response
+        let accountResult = result[0]
+        guard case .success(let accountJSON) = accountResult,
+              case .eth_requestAccounts(let addresses) = accountJSON,
+              !addresses.isEmpty else {
+            print("💰 WalletService: Failed to get account from response")
+            throw WalletError.noAccountsFound
+        }
+        
+        let address = addresses[0]
+        print("💰 WalletService: Got address: \(address)")
+        
+        // Update SIWE message with actual address
+        let finalMessage = createSIWEMessage(
+            address: address,
+            nonce: nonce,
+            chainId: 1
+        )
+        
+        // Extract signature from second response
+        let signResult = result[1]
+        guard case .success(let signJSON) = signResult,
+              case .personal_sign(let signature) = signJSON else {
+            print("💰 WalletService: Failed to get signature from response")
+            throw WalletError.signatureFailed("Failed to get signature")
+        }
+        
+        print("💰 WalletService: Got signature: \(signature.prefix(20))...")
+        
+        let connectionResult = WalletConnectionResult(
+            address: address,
+            signature: signature,
+            message: finalMessage,
+            walletType: .coinbase
+        )
+        
+        print("💰 WalletService: Coinbase Wallet connection successful")
+        return connectionResult
     }
     
     // MARK: - WalletConnect Connection
@@ -921,8 +1017,11 @@ final class WalletService: ObservableObject {
     }
     
     private func canOpenCoinbaseWallet() -> Bool {
-        // Coinbase integration temporarily disabled
-        print("💰 WalletService: Coinbase Wallet availability check - disabled (coming soon)")
+        if let url = URL(string: "cbwallet://"), UIApplication.shared.canOpenURL(url) {
+            print("💰 WalletService: Coinbase Wallet is installed")
+            return true
+        }
+        print("💰 WalletService: Coinbase Wallet is not installed")
         return false
     }
     
