@@ -67,6 +67,7 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
     @State private var showRetryButton = false
     @State private var timeoutTimer: Timer?
     @State private var showQRScanner = false
+    @State private var showWalletConnectOptions = false
     
     @StateObject private var walletService = WalletService.shared
     @StateObject private var authManager = AuthenticationManagerV2.shared
@@ -366,6 +367,21 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
                 }
             }
         }
+        .sheet(isPresented: $showWalletConnectOptions) {
+            WalletConnectOptionsView(isPresented: $showWalletConnectOptions) { walletScheme in
+                Task {
+                    // If walletScheme is nil, show QR scanner
+                    if walletScheme == nil {
+                        await MainActor.run {
+                            showQRScanner = true
+                        }
+                    } else {
+                        // Handle deep link connection
+                        await handleWalletConnectDeepLink()
+                    }
+                }
+            }
+        }
     }
     
     private func connectWallet() {
@@ -403,14 +419,14 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
                 let result: WalletConnectionResult
                 
                 if walletType == .walletConnect {
-                    // For WalletConnect, we need to show QR scanner
+                    // For WalletConnect, show wallet options
                     await MainActor.run {
-                        showQRScanner = true
-                        connectionState = .idle // Reset state while showing scanner
+                        showWalletConnectOptions = true
+                        connectionState = .idle // Reset state while showing options
                         isConnecting = false
                         hasStartedConnection = false
                     }
-                    return // Exit early, connection will continue from QR scanner
+                    return // Exit early, connection will continue from wallet selection
                 } else {
                     result = try await walletService.connectWallet(walletType)
                 }
@@ -597,6 +613,83 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
             await MainActor.run {
                 connectionError = "Failed to complete setup: \(error.localizedDescription)"
                 connectionState = .error(error.localizedDescription)
+            }
+        }
+    }
+    
+    private func handleWalletConnectDeepLink() async {
+        showWalletConnectOptions = false
+        
+        // Reset connection state
+        await MainActor.run {
+            hasStartedConnection = true
+            isConnecting = true
+            connectionError = nil
+            connectionState = .connecting
+            connectionStartTime = Date()
+            showRetryButton = false
+        }
+        
+        // Start timeout monitoring
+        startTimeoutMonitoring()
+        
+        do {
+            // Small delay to show the "Connecting" state
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            await MainActor.run {
+                connectionState = .waitingForUser
+            }
+            
+            // Connect using deep linking approach
+            let result = try await walletService.handleWalletConnected()
+            
+            await MainActor.run {
+                connectedAddress = result.address
+                walletSignature = result.signature
+                walletMessage = result.message
+                HapticManager.notification(.success)
+            }
+            
+            // Proceed with linking/auth
+            await MainActor.run {
+                connectionState = .linking
+            }
+            
+            if isForAuthentication {
+                try await performAuthentication()
+            } else {
+                try await performLinking()
+            }
+            
+            // Success!
+            await MainActor.run {
+                connectionState = .success
+                isConnecting = false
+            }
+            
+        } catch let error as WalletError {
+            await MainActor.run {
+                connectionError = error.localizedDescription
+                connectionState = .error(error.localizedDescription)
+                isConnecting = false
+                hasStartedConnection = false // Reset for retry
+                
+                if error.localizedDescription.contains("User rejected") {
+                    HapticManager.notification(.error)
+                } else if error.localizedDescription.contains("time") || 
+                          error.localizedDescription.contains("pending") {
+                    // Show timeout UI
+                    connectionState = .timeout
+                }
+            }
+        } catch {
+            await MainActor.run {
+                connectionError = error.localizedDescription
+                connectionState = .error(error.localizedDescription)
+                isConnecting = false
+                hasStartedConnection = false // Reset for retry
+                HapticManager.notification(.error)
             }
         }
     }

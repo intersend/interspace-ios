@@ -40,6 +40,10 @@
 		<string>https</string>
 		<string>cbwallet</string>
 		<string>wc</string>
+		<string>rainbow</string>
+		<string>trust</string>
+		<string>argent</string>
+		<string>gnosissafe</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>
