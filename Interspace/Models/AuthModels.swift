@@ -158,6 +158,25 @@ struct WalletCheckData: Codable {
     let isOrphan: Bool
 }
 
+// MARK: - V2 Authentication Response
+struct AuthenticationResponseV2: Codable {
+    let success: Bool
+    let tokens: AuthTokensV2?
+    let account: AccountV2?
+    let profiles: [ProfileSummaryV2]?
+    let activeProfile: ProfileSummaryV2?
+    let isNewUser: Bool?
+    let privacyMode: String?
+    let sessionToken: String?
+    let message: String?
+}
+
+struct AuthTokensV2: Codable {
+    let accessToken: String
+    let refreshToken: String
+    let expiresIn: Int?
+}
+
 // MARK: - Error Models
 enum AuthenticationError: LocalizedError, Identifiable {
     case invalidCredentials
