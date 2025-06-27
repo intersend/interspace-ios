@@ -183,6 +183,110 @@ final class ProfileAPI {
     // MARK: - Linked Account Management Endpoints
     
     /// GET /profiles/:profileId/accounts
+    // MARK: - Demo Mode Methods
+    
+    func getProfilesDemoMode() async throws -> [SmartProfile] {
+        let mockProfiles = [
+            SmartProfile(
+                id: "demo-profile-1",
+                name: "Personal",
+                isActive: true,
+                sessionWalletAddress: "0x1234567890123456789012345678901234567890",
+                linkedAccountsCount: 1,
+                appsCount: 3,
+                foldersCount: 2,
+                isDevelopmentWallet: true,
+                clientShare: nil,
+                createdAt: Date().ISO8601Format(),
+                updatedAt: Date().ISO8601Format()
+            ),
+            SmartProfile(
+                id: "demo-profile-2",
+                name: "Work",
+                isActive: false,
+                sessionWalletAddress: "0x0987654321098765432109876543210987654321",
+                linkedAccountsCount: 0,
+                appsCount: 2,
+                foldersCount: 1,
+                isDevelopmentWallet: true,
+                clientShare: nil,
+                createdAt: Date().ISO8601Format(),
+                updatedAt: Date().ISO8601Format()
+            )
+        ]
+        return mockProfiles
+    }
+    
+    func getAppsDemoMode(profileId: String) async throws -> [BookmarkedApp] {
+        return [
+            BookmarkedApp(
+                id: "demo-app-1",
+                name: "Twitter",
+                url: "https://twitter.com",
+                iconUrl: "https://abs.twimg.com/icons/apple-touch-icon-192x192.png",
+                position: 0,
+                folderId: nil
+            ),
+            BookmarkedApp(
+                id: "demo-app-2",
+                name: "GitHub",
+                url: "https://github.com",
+                iconUrl: "https://github.githubassets.com/favicons/favicon.png",
+                position: 1,
+                folderId: nil
+            ),
+            BookmarkedApp(
+                id: "demo-app-3",
+                name: "ChatGPT",
+                url: "https://chat.openai.com",
+                iconUrl: "https://cdn.oaistatic.com/assets/apple-touch-icon-mz9nytnj.png",
+                position: 2,
+                folderId: nil
+            )
+        ]
+    }
+    
+    func getFoldersDemoMode(profileId: String) async throws -> [AppFolder] {
+        return [
+            AppFolder(
+                id: "demo-folder-1",
+                name: "Social",
+                color: "#007AFF",
+                position: 0,
+                isPublic: false,
+                appsCount: 0,
+                createdAt: Date().ISO8601Format(),
+                updatedAt: Date().ISO8601Format()
+            ),
+            AppFolder(
+                id: "demo-folder-2",
+                name: "Development",
+                color: "#34C759",
+                position: 1,
+                isPublic: false,
+                appsCount: 0,
+                createdAt: Date().ISO8601Format(),
+                updatedAt: Date().ISO8601Format()
+            )
+        ]
+    }
+    
+    func createAppDemoMode(profileId: String, request: CreateAppRequest) async throws -> BookmarkedApp {
+        return BookmarkedApp(
+            id: UUID().uuidString,
+            name: request.name,
+            url: request.url,
+            iconUrl: request.iconUrl,
+            position: 0,
+            folderId: nil
+        )
+    }
+    
+    func deleteAppDemoMode(appId: String) async throws {
+        // Mock deletion - just return success
+        print("Demo: Deleted app with ID: \(appId)")
+    }
+    
     func getLinkedAccounts(profileId: String) async throws -> [LinkedAccount] {
         let response: LinkedAccountsResponse = try await apiService.performRequest(
             endpoint: "/profiles/\(profileId)/accounts",

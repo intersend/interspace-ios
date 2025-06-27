@@ -4,10 +4,11 @@ extension DataSyncManager {
     
     /// Override fetch method for demo mode
     func fetchDemoMode<T: Decodable>(
-        type: T.Type,
         endpoint: String,
-        policy: CachePolicy = .networkFirst,
-        forceRefresh: Bool = false
+        type: T.Type,
+        cacheKey: String,
+        forceRefresh: Bool = false,
+        policy: CachePolicy = .cacheFirst
     ) async throws -> T {
         if DemoModeConfiguration.isDemoMode {
             print("🎭 DataSyncManager: Intercepting fetch for \(endpoint)")

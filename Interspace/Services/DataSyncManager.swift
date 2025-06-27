@@ -118,6 +118,42 @@ final class DataSyncManager: ObservableObject {
     
     // MARK: - Public Methods
     
+    /// Fetch demo data for demo mode
+    func fetchDemoMode<T: Codable>(
+        endpoint: String,
+        type: T.Type,
+        cacheKey: String,
+        forceRefresh: Bool = false,
+        policy: CachePolicy = .cacheFirst
+    ) async throws -> T {
+        // Return mock data based on the endpoint
+        if endpoint.contains("user") {
+            let user = User(
+                id: "demo-user-1",
+                email: "demo@interspace.app",
+                walletAddress: nil,
+                isGuest: false,
+                authStrategies: ["email"],
+                profilesCount: 2,
+                linkedAccountsCount: 1,
+                activeDevicesCount: 1,
+                socialAccounts: [],
+                createdAt: Date().ISO8601Format(),
+                updatedAt: Date().ISO8601Format()
+            )
+            let userData = UserResponse(
+                success: true,
+                data: user
+            )
+            if let result = userData as? T {
+                return result
+            }
+        }
+        
+        // Default empty response
+        throw NSError(domain: "DemoMode", code: 404, userInfo: [NSLocalizedDescriptionKey: "Demo data not available for this endpoint"])
+    }
+    
     /// Fetch data with specified cache policy
     func fetch<T: Codable>(
         type: T.Type,

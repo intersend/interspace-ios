@@ -135,6 +135,67 @@ final class WalletAPI {
         )
     }
     
+    // MARK: - Demo Mode Methods
+    
+    func getTransactionHistoryDemoMode(profileId: String, page: Int = 1, limit: Int = 20) async throws -> TransactionHistory {
+        let mockTransactions = [
+            TransactionHistory.TransactionItem(
+                operationSetId: "demo-tx-1",
+                type: "transfer",
+                status: "completed",
+                from: TransactionHistory.TransactionItem.TransactionEndpoint(
+                    token: "ETH",
+                    chainId: 1,
+                    amount: "0.5",
+                    address: "0x1234...5678"
+                ),
+                to: TransactionHistory.TransactionItem.TransactionEndpoint(
+                    token: "ETH",
+                    chainId: 1,
+                    amount: "0.5",
+                    address: "0x8765...4321"
+                ),
+                gasToken: "ETH",
+                createdAt: Date().addingTimeInterval(-86400).ISO8601Format(),
+                completedAt: Date().addingTimeInterval(-86400).ISO8601Format(),
+                transactions: []
+            ),
+            TransactionHistory.TransactionItem(
+                operationSetId: "demo-tx-2",
+                type: "transfer",
+                status: "completed",
+                from: TransactionHistory.TransactionItem.TransactionEndpoint(
+                    token: "USDC",
+                    chainId: 1,
+                    amount: "100",
+                    address: "0x1234...5678"
+                ),
+                to: TransactionHistory.TransactionItem.TransactionEndpoint(
+                    token: "USDC",
+                    chainId: 1,
+                    amount: "100",
+                    address: "0xaaaa...bbbb"
+                ),
+                gasToken: "ETH",
+                createdAt: Date().addingTimeInterval(-172800).ISO8601Format(),
+                completedAt: Date().addingTimeInterval(-172800).ISO8601Format(),
+                transactions: []
+            )
+        ]
+        
+        return TransactionHistory(
+            transactions: mockTransactions,
+            pagination: TransactionHistory.PaginationInfo(
+                page: page,
+                limit: limit,
+                total: mockTransactions.count,
+                totalPages: 1,
+                hasNext: false,
+                hasPrev: false
+            )
+        )
+    }
+    
     // MARK: - Token Allowance Endpoints
     
     /// POST /accounts/:accountId/allowances

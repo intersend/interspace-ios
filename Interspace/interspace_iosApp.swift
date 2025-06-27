@@ -1,9 +1,13 @@
 import SwiftUI
 import Foundation
 
-struct DemoModeConfiguration {
-    static let isDemoMode: Bool = true
-    static let showDemoIndicator: Bool = true
+/// Global demo mode configuration
+public enum DemoMode {
+    public static let isEnabled: Bool = true
+    public static let showIndicator: Bool = true
+    public static let useMockData: Bool = true
+    public static let skipAuthentication: Bool = true
+    public static let demoUserEmail: String = "demo@interspace.app"
 }
 
 @main
@@ -13,7 +17,7 @@ struct interspace_iosApp: App {
     // Initialize shared services on app launch
     init() {
         // Perform critical initialization
-        if DemoModeConfiguration.isDemoMode {
+        if DemoMode.isEnabled {
             print("🎭 Demo Mode: Initializing services for demo")
         }
     }
@@ -27,7 +31,7 @@ struct interspace_iosApp: App {
                 .environmentObject(serviceInitializer)
                 .preferredColorScheme(.dark)
                 .overlay(alignment: .top) {
-                    if DemoModeConfiguration.isDemoMode && DemoModeConfiguration.showDemoIndicator {
+                    if DemoMode.isEnabled && DemoMode.showIndicator {
                         HStack {
                             Image(systemName: "play.circle.fill")
                             Text("DEMO MODE")
@@ -52,7 +56,7 @@ struct interspace_iosApp: App {
                     
                     // Initialize services based on mode
                     Task { @MainActor in
-                        if DemoModeConfiguration.isDemoMode {
+                        if DemoMode.isEnabled {
                             // For demo mode, initialize with minimal services
                             await ServiceInitializer.shared.initializeCriticalServices()
                         } else {

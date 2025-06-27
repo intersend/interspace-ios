@@ -204,6 +204,7 @@
 				Components/AddToProfileTray.swift,
 				Components/AuthLoadingOverlay.swift,
 				Components/BottomSheet.swift,
+				Components/DemoModeIndicator.swift,
 				Components/DevelopmentModeIndicator.swift,
 				Components/DevelopmentModeToggle.swift,
 				Components/DevelopmentToggle.swift,
