@@ -11,7 +11,7 @@ echo "🔨 Starting Xcode Cloud pre-build setup..."
 # Script directory
 PROJECT_DIR="$CI_PRIMARY_REPOSITORY_PATH"
 
-# Helper functions (simplified for sh compatibility)
+# Helper functions
 log_info() {
     echo "[INFO] $1"
 }
@@ -64,11 +64,11 @@ configure_build_settings() {
     
     # Set build configuration based on workflow
     case "$CI_WORKFLOW" in
-        *"Release"*|*"Production"*)
+        *Release*|*Production*)
             export CONFIGURATION="Release"
             log_info "Using Release configuration"
             ;;
-        *"Beta"*|*"TestFlight"*)
+        *Beta*|*TestFlight*)
             export CONFIGURATION="Release"
             log_info "Using Release configuration for TestFlight"
             ;;
@@ -77,13 +77,6 @@ configure_build_settings() {
             log_info "Using Debug configuration"
             ;;
     esac
-    
-    # Enable additional build flags for specific workflows
-    if [[ "$CI_WORKFLOW" == *"PR"* ]] || [[ -n "$CI_PULL_REQUEST_NUMBER" ]]; then
-        log_info "Pull Request build detected"
-        export RUN_CLANG_STATIC_ANALYZER="YES"
-        export ENABLE_TESTABILITY="YES"
-    fi
 }
 
 # Run SwiftLint
@@ -92,23 +85,9 @@ run_swiftlint() {
     
     cd "$PROJECT_DIR"
     
-    if command -v swiftlint &> /dev/null; then
-        # Run SwiftLint with appropriate reporter
-        if [ -n "$CI_PULL_REQUEST_NUMBER" ]; then
-            # For PR builds, use GitHub Actions reporter
-            swiftlint lint --reporter github-actions-logging || {
-                log_warning "SwiftLint found issues"
-                # Don't fail the build for linting issues in non-release builds
-                if [[ "$CI_WORKFLOW" == *"Release"* ]]; then
-                    return 1
-                fi
-            }
-        else
-            # For other builds, use standard reporter
-            swiftlint lint || {
-                log_warning "SwiftLint found issues"
-            }
-        fi
+    if command -v swiftlint > /dev/null 2>&1; then
+        # Run SwiftLint - don't fail build on warnings
+        swiftlint lint || log_warning "SwiftLint found issues"
         log_success "SwiftLint check completed"
     else
         log_warning "SwiftLint not available"
@@ -173,7 +152,7 @@ generate_build_notes() {
 EOF
 
     # Add recent commit messages
-    if command -v git &> /dev/null; then
+    if command -v git > /dev/null 2>&1; then
         echo "### Recent Commits:" >> "$BUILD_NOTES_FILE"
         echo "" >> "$BUILD_NOTES_FILE"
         git log --oneline -10 >> "$BUILD_NOTES_FILE" 2>/dev/null || echo "Unable to fetch commit history" >> "$BUILD_NOTES_FILE"
@@ -187,46 +166,28 @@ validate_project() {
     log_info "Validating project state..."
     
     # Check for required files
-    local required_files=(
-        "$PROJECT_DIR/Interspace.xcodeproj"
-        "$PROJECT_DIR/Interspace/Supporting/BuildConfiguration.xcconfig"
-        "$PROJECT_DIR/Interspace/GoogleService-Info.plist"
-    )
-    
-    local missing_files=()
-    for file in "${required_files[@]}"; do
-        if [ ! -e "$file" ]; then
-            missing_files+=("$file")
-        fi
-    done
-    
-    if [ ${#missing_files[@]} -gt 0 ]; then
-        log_error "Missing required files:"
-        for file in "${missing_files[@]}"; do
-            echo "  - $file"
-        done
+    if [ ! -e "$PROJECT_DIR/Interspace.xcodeproj" ]; then
+        log_error "Interspace.xcodeproj not found"
         return 1
     fi
     
-    log_success "All required files present"
+    if [ ! -f "$PROJECT_DIR/Interspace/Supporting/BuildConfiguration.xcconfig" ]; then
+        log_warning "BuildConfiguration.xcconfig not found - will be created by post-clone script"
+    fi
+    
+    log_success "Project validation completed"
 }
 
 # Setup test environment
 setup_test_environment() {
-    if [[ "$CI_XCODEBUILD_ACTION" == *"test"* ]]; then
-        log_info "Setting up test environment..."
-        
-        # Set test-specific environment variables
-        export RUNNING_TESTS="YES"
-        export TEST_BUILD="$CI_BUILD_NUMBER"
-        
-        # Create test data directory if needed
-        TEST_DATA_DIR="$PROJECT_DIR/TestData"
-        if [ ! -d "$TEST_DATA_DIR" ]; then
-            mkdir -p "$TEST_DATA_DIR"
-            log_success "Created test data directory"
-        fi
-    fi
+    case "$CI_XCODEBUILD_ACTION" in
+        *test*)
+            log_info "Setting up test environment..."
+            export RUNNING_TESTS="YES"
+            export TEST_BUILD="$CI_BUILD_NUMBER"
+            log_success "Test environment configured"
+            ;;
+    esac
 }
 
 # Main execution

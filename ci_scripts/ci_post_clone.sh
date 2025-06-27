@@ -59,7 +59,7 @@ setup_build_configuration() {
     
     if [ -n "$API_BASE_URL_RELEASE" ]; then
         # For TestFlight/Beta builds, use staging API
-        if [[ "$CI_WORKFLOW" == *"TestFlight"* ]] || [[ "$CI_WORKFLOW" == *"Beta"* ]] || [[ "$CI_BRANCH" == "beta" ]]; then
+        if case "$CI_WORKFLOW" in *TestFlight*|*Beta*) true;; *) false;; esac || [ "$CI_BRANCH" = "beta" ]; then
             STAGING_API_URL="https://staging-api.interspace.fi/api/v2"
             sed -i '' "s|YOUR_PRODUCTION_API_URL_HERE|$STAGING_API_URL|g" "$CONFIG_FILE"
             log_success "Set staging API URL for TestFlight: $STAGING_API_URL"
