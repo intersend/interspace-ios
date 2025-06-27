@@ -150,6 +150,10 @@ struct WalletConnectTray: View {
         case .coinbase:
             viewModel.selectWallet(wallet)
             dismiss()
+        case .rainbow, .trust, .argent, .gnosisSafe:
+            // WalletConnect-compatible wallets
+            viewModel.selectWallet(wallet)
+            dismiss()
         case .google, .apple:
             // Social authentication not handled here
             break
@@ -285,6 +289,14 @@ struct WalletRow: View {
             return "Coinbase Wallet"
         case .walletConnect:
             return "WalletConnect"
+        case .rainbow:
+            return "Rainbow"
+        case .trust:
+            return "Trust Wallet"
+        case .argent:
+            return "Argent"
+        case .gnosisSafe:
+            return "Gnosis Safe"
         case .google:
             return "Google"
         case .apple:

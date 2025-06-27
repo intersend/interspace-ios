@@ -89,7 +89,7 @@ struct WalletConnectionTray: View {
                                             isLast: wallet.type == availableWallets.filter { !$0.available }.last?.type
                                         )
                                         
-                                        if wallet.type != wallets.filter { !$0.available }.last?.type {
+                                        if wallet.type != availableWallets.filter { !$0.available }.last?.type {
                                             Divider()
                                                 .padding(.leading, 72)
                                         }

@@ -1020,6 +1020,14 @@ final class WalletService: ObservableObject {
             return canOpenCoinbaseWallet()
         case .walletConnect:
             return true // Always available as it uses QR codes
+        case .rainbow:
+            return canOpenWallet(scheme: "rainbow://")
+        case .trust:
+            return canOpenWallet(scheme: "trust://")
+        case .argent:
+            return canOpenWallet(scheme: "argent://")
+        case .gnosisSafe:
+            return canOpenWallet(scheme: "gnosissafe://")
         case .google, .apple:
             return true // Social authentication is always available
         case .mpc:
@@ -1050,6 +1058,15 @@ final class WalletService: ObservableObject {
             return true
         }
         print("💰 WalletService: Coinbase Wallet is not installed")
+        return false
+    }
+    
+    private func canOpenWallet(scheme: String) -> Bool {
+        if let url = URL(string: scheme), UIApplication.shared.canOpenURL(url) {
+            print("💰 WalletService: Wallet with scheme \(scheme) is installed")
+            return true
+        }
+        print("💰 WalletService: Wallet with scheme \(scheme) is not installed")
         return false
     }
     
