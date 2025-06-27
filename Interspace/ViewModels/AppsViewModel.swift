@@ -165,7 +165,7 @@ final class AppsViewModel: ObservableObject {
         do {
             // Get active profile
             let profiles = try await profileAPI.getProfiles()
-            guard let activeProfile = profilesArray.first(where: { $0.isActive }) else {
+            guard let activeProfile = profiles.first(where: { $0.isActive }) else {
                 throw AppsError.noActiveProfile
             }
             
@@ -375,7 +375,7 @@ final class AppsViewModel: ObservableObject {
         do {
             // Get active profile
             let profiles = try await profileAPI.getProfiles()
-            guard let activeProfile = profilesArray.first(where: { $0.isActive }) else {
+            guard let activeProfile = profiles.first(where: { $0.isActive }) else {
                 throw AppsError.noActiveProfile
             }
             
@@ -464,7 +464,7 @@ final class AppsViewModel: ObservableObject {
             
             // Get active profile
             let profiles = try await profileAPI.getProfiles()
-            guard let activeProfile = profilesArray.first(where: { $0.isActive }) else {
+            guard let activeProfile = profiles.first(where: { $0.isActive }) else {
                 throw AppsError.noActiveProfile
             }
             

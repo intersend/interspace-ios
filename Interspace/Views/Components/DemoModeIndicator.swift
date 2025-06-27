@@ -4,7 +4,7 @@ struct DemoModeIndicator: View {
     @State private var isExpanded = false
     
     var body: some View {
-        if DemoModeConfiguration.isDemoMode && DemoModeConfiguration.showDemoIndicator {
+        if DemoMode.isEnabled && DemoMode.showIndicator {
             VStack {
                 HStack {
                     Spacer()
