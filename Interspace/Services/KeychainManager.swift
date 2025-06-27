@@ -15,6 +15,9 @@ final class KeychainManager {
         case tokenExpiry = "token_expiry"
         case userInfo = "user_info"
         case appleUserID = "apple_user_id"
+        case appleUserInfo = "apple_user_info"
+        case appleUserEmail = "apple_user_email"
+        case appleUserFullName = "apple_user_full_name"
     }
     
     // MARK: - Save
@@ -204,6 +207,47 @@ final class KeychainManager {
         try? save(keyData, for: key)
     }
     
+    // MARK: - Apple User Info Management
+    
+    func saveAppleUserInfo(_ userInfo: AppleUserInfo) throws {
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(userInfo)
+        try save(data, for: .appleUserInfo)
+        
+        // Also save email and name separately for quick access
+        if let email = userInfo.email {
+            try save(email, for: .appleUserEmail)
+        }
+        
+        if let firstName = userInfo.firstName, let lastName = userInfo.lastName {
+            let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+            if !fullName.isEmpty {
+                try save(fullName, for: .appleUserFullName)
+            }
+        }
+    }
+    
+    func getAppleUserInfo() -> AppleUserInfo? {
+        guard let data = try? load(for: .appleUserInfo) else { return nil }
+        let decoder = JSONDecoder()
+        return try? decoder.decode(AppleUserInfo.self, from: data)
+    }
+    
+    func getAppleUserEmail() -> String? {
+        try? loadString(for: .appleUserEmail)
+    }
+    
+    func getAppleUserFullName() -> String? {
+        try? loadString(for: .appleUserFullName)
+    }
+    
+    func clearAppleUserInfo() {
+        try? delete(for: .appleUserInfo)
+        try? delete(for: .appleUserEmail)
+        try? delete(for: .appleUserFullName)
+        try? delete(for: .appleUserID)
+    }
+    
     // MARK: - Clear All Data
     
     func clearAll() {
@@ -213,6 +257,9 @@ final class KeychainManager {
         // Clear user info and apple user ID
         try? delete(for: .userInfo)
         try? delete(for: .appleUserID)
+        
+        // Clear Apple user info
+        clearAppleUserInfo()
         
         // Clear all items from keychain for this service
         // This is a more thorough approach
