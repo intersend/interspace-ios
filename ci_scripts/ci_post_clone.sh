@@ -98,9 +98,9 @@ setup_google_service() {
         return 0
     fi
     
-    # If we have the content as environment variable
+    # If we have the content as environment variable (base64 encoded)
     if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
-        echo "$GOOGLE_SERVICE_INFO_PLIST" > "$GOOGLE_PLIST"
+        echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 -d > "$GOOGLE_PLIST"
         log_success "Created GoogleService-Info.plist from environment variable"
         return 0
     fi
@@ -108,9 +108,75 @@ setup_google_service() {
     # Copy from template if available
     if [ -f "$TEMPLATE_PLIST" ]; then
         cp "$TEMPLATE_PLIST" "$GOOGLE_PLIST"
+        # Replace placeholders with actual values
+        if [ -n "$GOOGLE_CLIENT_ID" ]; then
+            sed -i '' "s|YOUR_GOOGLE_CLIENT_ID_HERE|$GOOGLE_CLIENT_ID|g" "$GOOGLE_PLIST"
+            # Generate reversed client ID from client ID
+            REVERSED_ID="com.googleusercontent.apps.$(echo $GOOGLE_CLIENT_ID | sed 's/-.*//')"
+            sed -i '' "s|YOUR_GOOGLE_REVERSED_CLIENT_ID_HERE|$REVERSED_ID|g" "$GOOGLE_PLIST"
+        fi
         log_success "Created GoogleService-Info.plist from template"
     else
-        log_warning "GoogleService-Info.plist template not found"
+        log_warning "GoogleService-Info.plist template not found - creating from Google Client ID"
+        # Create GoogleService-Info.plist using the Google Client ID from environment
+        if [ -n "$GOOGLE_CLIENT_ID" ]; then
+            cat > "$GOOGLE_PLIST" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CLIENT_ID</key>
+    <string>$GOOGLE_CLIENT_ID</string>
+    <key>REVERSED_CLIENT_ID</key>
+    <string>$(echo $GOOGLE_CLIENT_ID | sed 's/\.apps\.googleusercontent\.com$//' | awk -F- '{for(i=NF;i>0;i--) printf "%s%s", $i, (i>1?".":"")}').apps.googleusercontent.com</string>
+    <key>API_KEY</key>
+    <string>placeholder-api-key</string>
+    <key>GCM_SENDER_ID</key>
+    <string>784862970473</string>
+    <key>PLIST_VERSION</key>
+    <string>1</string>
+    <key>BUNDLE_ID</key>
+    <string>com.interspace.ios</string>
+    <key>PROJECT_ID</key>
+    <string>interspace-auth</string>
+    <key>STORAGE_BUCKET</key>
+    <string>interspace-auth.appspot.com</string>
+    <key>IS_ADS_ENABLED</key>
+    <false/>
+    <key>IS_ANALYTICS_ENABLED</key>
+    <false/>
+    <key>IS_APPINVITE_ENABLED</key>
+    <true/>
+    <key>IS_GCM_ENABLED</key>
+    <true/>
+    <key>IS_SIGNIN_ENABLED</key>
+    <true/>
+    <key>GOOGLE_APP_ID</key>
+    <string>1:784862970473:ios:placeholder</string>
+</dict>
+</plist>
+EOF
+            log_success "Created GoogleService-Info.plist from GOOGLE_CLIENT_ID"
+        else
+            # Fallback to minimal placeholder
+            cat > "$GOOGLE_PLIST" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CLIENT_ID</key>
+    <string>784862970473-ihme8p5f3psknnorplhero2108rk12sf.apps.googleusercontent.com</string>
+    <key>REVERSED_CLIENT_ID</key>
+    <string>com.googleusercontent.apps.784862970473-ihme8p5f3psknnorplhero2108rk12sf</string>
+    <key>PLIST_VERSION</key>
+    <string>1</string>
+    <key>BUNDLE_ID</key>
+    <string>com.interspace.ios</string>
+</dict>
+</plist>
+EOF
+            log_warning "Created minimal GoogleService-Info.plist - Google Sign-In may not work fully"
+        fi
     fi
 }
 
