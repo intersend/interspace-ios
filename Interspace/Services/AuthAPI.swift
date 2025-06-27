@@ -316,16 +316,7 @@ struct VerifyEmailCodeRequest: Codable {
 }
 
 // RefreshTokenRequest and LogoutRequest are defined in AuthService.swift
-
-struct SIWEAuthenticationRequest: Codable {
-    let message: String
-    let signature: String
-    let address: String
-    let authStrategy: String
-    let deviceId: String?
-    let deviceName: String
-    let deviceType: String
-}
+// SIWEAuthenticationRequest is defined in SIWEModels.swift
 
 // MARK: - Response Models (Not in AuthModels.swift)
 

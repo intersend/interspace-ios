@@ -1,5 +1,5 @@
 {
-  "originHash" : "fde987a7d6b47600efa844c55772e011affc927f79cee1a095639a2c6a02eebf",
+  "originHash" : "ae4200492c77d8e12ffdbdfa938d79f0e47493b420b0a013345f6eb2102941cc",
   "pins" : [
     {
       "identity" : "app-check",
@@ -89,15 +89,6 @@
       "state" : {
         "revision" : "18a4ecaf530aecbf3d1d1bbf0db4928214ada081",
         "version" : "1.6.5"
-      }
-    },
-    {
-      "identity" : "silentshard-artifacts",
-      "kind" : "remoteSourceControl",
-      "location" : "https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts",
-      "state" : {
-        "branch" : "main",
-        "revision" : "a841f0307bac2fb81c51d98943ec39fbbd1066d0"
       }
     },
     {

@@ -9,21 +9,27 @@ final class WalletConnectSessionManager: ObservableObject {
     // Session storage keys
     private let kStoredSessionsKey = "com.interspace.walletconnect.sessions"
     private let kActiveSessionKey = "com.interspace.walletconnect.activeSession"
+    private let kSessionProfileMapKey = "com.interspace.walletconnect.sessionProfileMap"
     
     // Published properties
     @Published var activeSessions: [WalletConnectSessionInfo] = []
     @Published var hasActiveSessions: Bool = false
     
+    // Profile-to-session mapping
+    private var sessionProfileMap: [String: String] = [:] // [sessionTopic: profileId]
+    
     private let keychainManager = KeychainManager.shared
     
     private init() {
         loadStoredSessions()
+        loadSessionProfileMap()
+        setupNotificationObservers()
     }
     
     // MARK: - Public Methods
     
     /// Store a new session
-    func storeSession(_ session: Session, walletName: String? = nil) {
+    func storeSession(_ session: Session, walletName: String? = nil, profileId: String? = nil) {
         let sessionInfo = WalletConnectSessionInfo(
             topic: session.topic,
             peerName: session.peer.name,
@@ -34,12 +40,19 @@ final class WalletConnectSessionManager: ObservableObject {
             accounts: extractAccounts(from: session),
             chainIds: extractChainIds(from: session),
             createdAt: Date(),
-            expiryDate: session.expiryDate ?? Date().addingTimeInterval(86400 * 7) // Default to 7 days
+            expiryDate: session.expiryDate ?? Date().addingTimeInterval(86400 * 7), // Default to 7 days
+            profileId: profileId ?? ProfileViewModel.shared.activeProfile?.id
         )
         
         // Add to active sessions
         if !activeSessions.contains(where: { $0.topic == sessionInfo.topic }) {
             activeSessions.append(sessionInfo)
+        }
+        
+        // Update profile mapping if we have a profile
+        if let profileId = sessionInfo.profileId {
+            sessionProfileMap[session.topic] = profileId
+            saveSessionProfileMap()
         }
         
         // Persist to keychain
@@ -54,31 +67,45 @@ final class WalletConnectSessionManager: ObservableObject {
     /// Remove a session
     func removeSession(topic: String) {
         activeSessions.removeAll { $0.topic == topic }
+        sessionProfileMap.removeValue(forKey: topic)
+        
         saveSessionsToKeychain()
+        saveSessionProfileMap()
         hasActiveSessions = !activeSessions.isEmpty
         
         print("✅ WalletConnectSessionManager: Removed session with topic: \(topic)")
     }
     
     /// Get session info for a specific address
-    func getSessionInfo(for address: String) -> WalletConnectSessionInfo? {
+    func getSessionInfo(for address: String, profileId: String? = nil) -> WalletConnectSessionInfo? {
         let normalizedAddress = address.lowercased()
+        let targetProfileId = profileId ?? ProfileViewModel.shared.activeProfile?.id
         
         return activeSessions.first { sessionInfo in
-            sessionInfo.accounts.contains { account in
+            // Check if session matches the profile (if provided)
+            let matchesProfile = targetProfileId == nil || sessionInfo.profileId == targetProfileId
+            
+            // Check if session contains the address
+            let containsAddress = sessionInfo.accounts.contains { account in
                 account.address.lowercased() == normalizedAddress
             }
+            
+            return matchesProfile && containsAddress
         }
     }
     
     /// Get all addresses from active sessions
-    func getAllConnectedAddresses() -> [String] {
-        activeSessions.flatMap { $0.accounts.map { $0.address } }
+    func getAllConnectedAddresses(for profileId: String? = nil) -> [String] {
+        let targetProfileId = profileId ?? ProfileViewModel.shared.activeProfile?.id
+        
+        return activeSessions
+            .filter { targetProfileId == nil || $0.profileId == targetProfileId }
+            .flatMap { $0.accounts.map { $0.address } }
     }
     
     /// Check if an address is connected via WalletConnect
-    func isAddressConnected(_ address: String) -> Bool {
-        getSessionInfo(for: address) != nil
+    func isAddressConnected(_ address: String, profileId: String? = nil) -> Bool {
+        getSessionInfo(for: address, profileId: profileId) != nil
     }
     
     /// Clean up expired sessions
@@ -105,9 +132,11 @@ final class WalletConnectSessionManager: ObservableObject {
         for session in sdkSessions {
             if let index = activeSessions.firstIndex(where: { $0.topic == session.topic }) {
                 // Update existing session info
-                activeSessions[index].expiryDate = session.expiryDate ?? Date().addingTimeInterval(86400 * 7)
-                activeSessions[index].accounts = extractAccounts(from: session)
-                activeSessions[index].chainIds = extractChainIds(from: session)
+                activeSessions[index] = activeSessions[index].withUpdates(
+                    expiryDate: session.expiryDate ?? Date().addingTimeInterval(86400 * 7),
+                    accounts: extractAccounts(from: session),
+                    chainIds: extractChainIds(from: session)
+                )
             } else {
                 // Add new session
                 storeSession(session)
@@ -206,6 +235,74 @@ final class WalletConnectSessionManager: ObservableObject {
         
         return Array(chainIds)
     }
+    
+    // MARK: - Profile Management
+    
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleProfileChanged),
+            name: .profileDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func handleProfileChanged() {
+        Task { @MainActor in
+            print("📱 WalletConnectSessionManager: Profile changed, updating session visibility")
+            
+            // Update hasActiveSessions based on current profile
+            if let activeProfile = ProfileViewModel.shared.activeProfile {
+                let profileSessions = activeSessions.filter { $0.profileId == activeProfile.id }
+                hasActiveSessions = !profileSessions.isEmpty
+                print("📱 WalletConnectSessionManager: Found \(profileSessions.count) sessions for current profile")
+            } else {
+                // No active profile means no visible sessions
+                hasActiveSessions = false
+                print("📱 WalletConnectSessionManager: No active profile, hiding all sessions")
+            }
+        }
+    }
+    
+    private func loadSessionProfileMap() {
+        do {
+            let data = try keychainManager.load(for: kSessionProfileMapKey)
+            sessionProfileMap = try JSONDecoder().decode([String: String].self, from: data)
+            print("✅ WalletConnectSessionManager: Loaded session-profile mappings")
+        } catch {
+            // No mapping found or error, start fresh
+            sessionProfileMap = [:]
+        }
+    }
+    
+    private func saveSessionProfileMap() {
+        do {
+            let data = try JSONEncoder().encode(sessionProfileMap)
+            try keychainManager.save(data, for: kSessionProfileMapKey)
+        } catch {
+            print("❌ WalletConnectSessionManager: Failed to save session-profile map: \(error)")
+        }
+    }
+    
+    /// Get sessions for the current active profile
+    func getActiveProfileSessions() -> [WalletConnectSessionInfo] {
+        guard let activeProfile = ProfileViewModel.shared.activeProfile else {
+            return []
+        }
+        
+        return activeSessions.filter { $0.profileId == activeProfile.id }
+    }
+    
+    /// Migrate existing sessions to current profile (one-time migration)
+    func migrateSessionsToProfile(_ profileId: String) {
+        for i in 0..<activeSessions.count where activeSessions[i].profileId == nil {
+            activeSessions[i] = activeSessions[i].withProfileId(profileId)
+            sessionProfileMap[activeSessions[i].topic] = profileId
+        }
+        
+        saveSessionsToKeychain()
+        saveSessionProfileMap()
+    }
 }
 
 // MARK: - Models
@@ -222,6 +319,7 @@ struct WalletConnectSessionInfo: Codable, Identifiable {
     var chainIds: [String]
     let createdAt: Date
     var expiryDate: Date
+    var profileId: String?
     
     var primaryAddress: String? {
         accounts.first?.address
@@ -236,6 +334,27 @@ struct WalletConnectSessionInfo: Codable, Identifiable {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: expiryDate)
+    }
+    
+    // Helper methods for immutable updates
+    func withUpdates(expiryDate: Date? = nil, accounts: [WalletConnectAccount]? = nil, chainIds: [String]? = nil) -> WalletConnectSessionInfo {
+        var updated = self
+        if let expiryDate = expiryDate {
+            updated.expiryDate = expiryDate
+        }
+        if let accounts = accounts {
+            updated.accounts = accounts
+        }
+        if let chainIds = chainIds {
+            updated.chainIds = chainIds
+        }
+        return updated
+    }
+    
+    func withProfileId(_ profileId: String) -> WalletConnectSessionInfo {
+        var updated = self
+        updated.profileId = profileId
+        return updated
     }
 }
 

@@ -283,12 +283,13 @@ struct EnhancedTokenSection: View {
                 .sectionHeaderStyle()
             
             LazyVStack(spacing: 0) {
-                ForEach(tokens, id: \.standardizedTokenId) { token in
+                ForEach(Array(tokens.enumerated()), id: \.element.standardizedTokenId) { index, token in
                     EnhancedTokenCell(
                         token: token,
                         isExpanded: expandedTokenId == token.standardizedTokenId,
-                        onTap: { onTokenTap(token) },
-                        onSend: { onSendToken(token) }
+                        isFirst: index == 0,
+                        isLast: index == tokens.count - 1,
+                        onTap: { onTokenTap(token) }
                     )
                 }
             }
@@ -299,6 +300,8 @@ struct EnhancedTokenSection: View {
 }
 
 // MARK: - Enhanced Token Cell
+// EnhancedTokenCell is defined in Wallet/TokenListView.swift
+/* Removed duplicate EnhancedTokenCell
 struct EnhancedTokenCell: View {
     let token: UnifiedBalance.TokenBalance
     let isExpanded: Bool
@@ -456,6 +459,7 @@ struct EnhancedTokenCell: View {
         return formatter.string(from: NSNumber(value: adjustedValue)) ?? "0"
     }
 }
+*/
 
 // MARK: - NFT Gallery Section
 struct NFTGallerySection: View {

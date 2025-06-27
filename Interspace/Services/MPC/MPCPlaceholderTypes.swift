@@ -1,8 +1,11 @@
 import Foundation
+// TODO: Import Silence Labs SDK when module conflicts are resolved
+// import silentshard
+// import silentshardduo
 
 // MARK: - Placeholder Types for Silence Labs SDK
 // These are temporary types to allow the project to build
-// Replace with actual Silence Labs SDK imports when available
+// Replace with actual Silence Labs SDK imports when module conflicts are resolved
 
 // Placeholder for DuoSession
 class DuoSession {

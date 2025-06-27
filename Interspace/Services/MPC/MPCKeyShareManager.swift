@@ -1,9 +1,10 @@
 import Foundation
-// TODO: Import Silence Labs SDK when added to project
+// TODO: Import Silence Labs SDK when module conflicts are resolved
 // import silentshard
+// import silentshardduo
 
 // Using placeholder types for now
-// Remove this import when Silence Labs SDK is properly integrated
+// Remove this comment when Silence Labs SDK module conflicts are resolved
 
 // MARK: - MPCKeyShareManager
 

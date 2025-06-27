@@ -1,6 +1,7 @@
 import XCTest
 @testable import Interspace
-import silentshardduo
+// TODO: Import when module conflicts are resolved
+// import silentshardduo
 
 class MPCWalletServiceTests: XCTestCase {
     

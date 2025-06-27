@@ -1,0 +1,13 @@
+[core]
+	bare = true
+	repositoryformatversion = 0
+	filemode = true
+	ignorecase = true
+	precomposeunicode = true
+[remote "origin"]
+	url = https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts
+	fetch = +refs/*:refs/*
+	mirror = true
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main
