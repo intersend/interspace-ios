@@ -537,16 +537,72 @@ final class PasskeyService {
     
     @available(iOS 16.0, *)
     func authenticateOrRegisterWithPasskey(username: String? = nil) async throws -> AuthTokens {
-        // First, try authentication to check if user has existing passkeys
-        do {
+        // Check if user has existing passkeys before showing any UI
+        let hasPasskeys = await checkForExistingPasskeys(username: username)
+        
+        if hasPasskeys {
+            print("🔑 Existing passkeys found, showing authentication flow")
             return try await authenticateWithPasskeyOnly(username: username)
-        } catch let error as ASAuthorizationError where error.code == .canceled {
-            // User canceled - don't fallback to registration
-            throw PasskeyError.authenticationFailed
-        } catch {
-            // No credentials found or other error - try registration
-            print("🔑 No existing passkeys found, switching to registration flow")
+        } else {
+            print("🔑 No passkeys found, starting registration flow directly")
             return try await registerPasskeyV2(username: username)
+        }
+    }
+    
+    @available(iOS 16.0, *)
+    private func checkForExistingPasskeys(username: String? = nil) async -> Bool {
+        do {
+            // Get authentication options to check for allowed credentials
+            let (challenge, optionsData) = try await getPasskeyChallenge(for: username, isRegistration: false)
+            
+            guard let options = try? JSONDecoder().decode(PasskeyOptions.self, from: optionsData) else {
+                return false
+            }
+            
+            // If server returns allowed credentials, user has passkeys
+            if let allowedCredentials = options.allowCredentials, !allowedCredentials.isEmpty {
+                return true
+            }
+            
+            // For enhanced checking, try silent credential discovery if available
+            if #available(iOS 17.0, *) {
+                return await performSilentPasskeyCheck(challenge: challenge, options: options)
+            }
+            
+            // No credentials from server - user has no passkeys
+            return false
+            
+        } catch {
+            // Error checking - assume no passkeys
+            print("🔑 Error checking for passkeys: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    @available(iOS 17.0, *)
+    private func performSilentPasskeyCheck(challenge: String, options: PasskeyOptions) async -> Bool {
+        guard let challengeData = Data(base64URLEncoded: challenge) else {
+            return false
+        }
+        
+        let rpId = options.rp?.id ?? PasskeyService.getDefaultRPID()
+        let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
+        let assertionRequest = platformProvider.createCredentialAssertionRequest(challenge: challengeData)
+        
+        let authController = ASAuthorizationController(authorizationRequests: [assertionRequest])
+        
+        return await withCheckedContinuation { continuation in
+            Task { @MainActor in
+                let delegate = PasskeySilentCheckDelegate { hasCredentials in
+                    continuation.resume(returning: hasCredentials)
+                }
+                
+                authController.delegate = delegate
+                authController.presentationContextProvider = delegate
+                
+                // Use preferImmediatelyAvailableCredentials for silent check
+                authController.performRequests(options: .preferImmediatelyAvailableCredentials)
+            }
         }
     }
     
@@ -578,20 +634,34 @@ final class PasskeyService {
         
         let authController = ASAuthorizationController(authorizationRequests: [assertionRequest])
         
-        let passkeyResult = try await withCheckedThrowingContinuation { continuation in
-            Task { @MainActor in
-                let delegate = PasskeyAuthorizationDelegate { result in
-                    continuation.resume(with: result)
+        do {
+            let passkeyResult = try await withCheckedThrowingContinuation { continuation in
+                Task { @MainActor in
+                    let delegate = PasskeyAuthorizationDelegate { result in
+                        continuation.resume(with: result)
+                    }
+                    
+                    authController.delegate = delegate
+                    authController.presentationContextProvider = delegate
+                    authController.performRequests()
                 }
-                
-                authController.delegate = delegate
-                authController.presentationContextProvider = delegate
-                authController.performRequests()
+            }
+            
+            // Verify authentication with backend
+            return try await verifyPasskeyAuthentication(passkeyResult, challenge: challenge)
+        } catch let error as ASAuthorizationError {
+            // Convert ASAuthorizationError to PasskeyError for better handling
+            switch error.code {
+            case .canceled:
+                throw PasskeyError.authenticationCanceled
+            case .failed, .invalidResponse, .notHandled:
+                throw PasskeyError.noCredentialsAvailable
+            case .unknown:
+                throw PasskeyError.authenticationFailed
+            @unknown default:
+                throw PasskeyError.authenticationFailed
             }
         }
-        
-        // Verify authentication with backend
-        return try await verifyPasskeyAuthentication(passkeyResult, challenge: challenge)
     }
     
     @available(iOS 16.0, *)
@@ -857,19 +927,89 @@ private class PasskeyAuthorizationDelegate: NSObject, ASAuthorizationControllerD
     }
 }
 
+@available(iOS 17.0, *)
+private class PasskeySilentCheckDelegate: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    
+    private let completion: (Bool) -> Void
+    private var strongSelf: PasskeySilentCheckDelegate?
+    
+    init(completion: @escaping (Bool) -> Void) {
+        self.completion = completion
+        super.init()
+        self.strongSelf = self
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        defer { strongSelf = nil }
+        // If we got an authorization, user has passkeys
+        completion(true)
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        defer { strongSelf = nil }
+        
+        // Check error to determine if user has no passkeys or other error
+        if let authError = error as? ASAuthorizationError {
+            switch authError.code {
+            case .canceled:
+                // User canceled - but this shouldn't happen with preferImmediatelyAvailableCredentials
+                completion(false)
+            case .failed, .invalidResponse, .notHandled, .unknown:
+                // No credentials available
+                completion(false)
+            case .notInteractive:
+                // Cannot show UI - no credentials immediately available
+                completion(false)
+            @unknown default:
+                completion(false)
+            }
+        } else {
+            completion(false)
+        }
+    }
+    
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            return scene.windows.first { $0.isKeyWindow } ?? UIWindow()
+        }
+        return UIWindow()
+    }
+}
+
 enum PasskeyError: LocalizedError {
     case unsupportedCredential
     case registrationFailed
     case authenticationFailed
+    case authenticationCanceled
+    case noCredentialsAvailable
+    case notConfigured
+    case platformNotSupported
     
     var errorDescription: String? {
         switch self {
         case .unsupportedCredential:
             return "Unsupported credential type"
         case .registrationFailed:
-            return "Passkey registration failed"
+            return "Passkey registration failed. Please try again."
         case .authenticationFailed:
-            return "Passkey authentication failed"
+            return "Passkey authentication failed. Please try again."
+        case .authenticationCanceled:
+            return "Passkey authentication was canceled"
+        case .noCredentialsAvailable:
+            return "No passkeys found for this account"
+        case .notConfigured:
+            return "Device not configured for passkeys. Please enable iCloud Keychain and set a device passcode."
+        case .platformNotSupported:
+            return "Passkeys require iOS 16 or later"
+        }
+    }
+    
+    var isUserCancellation: Bool {
+        switch self {
+        case .authenticationCanceled:
+            return true
+        default:
+            return false
         }
     }
 }
