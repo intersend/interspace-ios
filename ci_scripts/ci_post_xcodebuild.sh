@@ -11,28 +11,21 @@ echo "📦 Starting Xcode Cloud post-build tasks..."
 # Script directory
 PROJECT_DIR="$CI_PRIMARY_REPOSITORY_PATH"
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-# Helper functions
+# Helper functions (simplified for sh compatibility)
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo "[INFO] $1"
 }
 
 log_success() {
-    echo -e "${GREEN}[✓]${NC} $1"
+    echo "[✓] $1"
 }
 
 log_error() {
-    echo -e "${RED}[✗]${NC} $1"
+    echo "[✗] $1"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[!]${NC} $1"
+    echo "[!] $1"
 }
 
 # Process test results
