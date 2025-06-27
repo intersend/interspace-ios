@@ -8,8 +8,20 @@ set -e
 
 echo "🔨 Starting Xcode Cloud pre-build setup..."
 
+# Debug information
+echo "[DEBUG] Current directory: $(pwd)"
+echo "[DEBUG] CI_PRIMARY_REPOSITORY_PATH: $CI_PRIMARY_REPOSITORY_PATH"
+echo "[DEBUG] CI_WORKFLOW: $CI_WORKFLOW"
+echo "[DEBUG] CI_BRANCH: $CI_BRANCH"
+
 # Script directory
 PROJECT_DIR="$CI_PRIMARY_REPOSITORY_PATH"
+
+# Ensure we have a valid project directory
+if [ -z "$PROJECT_DIR" ]; then
+    echo "[ERROR] CI_PRIMARY_REPOSITORY_PATH is not set"
+    exit 1
+fi
 
 # Helper functions
 log_info() {
@@ -35,8 +47,18 @@ update_build_number() {
     if [ -n "$CI_BUILD_NUMBER" ]; then
         # Use Xcode Cloud build number
         cd "$PROJECT_DIR"
-        agvtool new-version -all "$CI_BUILD_NUMBER"
-        log_success "Build number set to: $CI_BUILD_NUMBER"
+        
+        # Check if agvtool is available
+        if command -v agvtool > /dev/null 2>&1; then
+            agvtool new-version -all "$CI_BUILD_NUMBER" || {
+                log_warning "Failed to update build number with agvtool"
+                # Don't fail the build for this
+                return 0
+            }
+            log_success "Build number set to: $CI_BUILD_NUMBER"
+        else
+            log_warning "agvtool not found - skipping build number update"
+        fi
     else
         log_warning "CI_BUILD_NUMBER not available"
     fi
@@ -167,12 +189,16 @@ validate_project() {
     
     # Check for required files
     if [ ! -e "$PROJECT_DIR/Interspace.xcodeproj" ]; then
-        log_error "Interspace.xcodeproj not found"
+        log_error "Interspace.xcodeproj not found at $PROJECT_DIR"
+        log_info "Current directory: $(pwd)"
+        log_info "PROJECT_DIR: $PROJECT_DIR"
+        log_info "CI_PRIMARY_REPOSITORY_PATH: $CI_PRIMARY_REPOSITORY_PATH"
         return 1
     fi
     
     if [ ! -f "$PROJECT_DIR/Interspace/Supporting/BuildConfiguration.xcconfig" ]; then
-        log_warning "BuildConfiguration.xcconfig not found - will be created by post-clone script"
+        log_warning "BuildConfiguration.xcconfig not found - should have been created by post-clone script"
+        # Don't fail for this, as it might be created later
     fi
     
     log_success "Project validation completed"
