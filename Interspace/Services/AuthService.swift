@@ -1125,12 +1125,59 @@ extension AppleSignInService: ASAuthorizationControllerDelegate {
         print("🍎 AppleSignInService: Full Name: \(appleIDCredential.fullName?.formatted() ?? "Not provided")")
         print("🍎 AppleSignInService: Real User Status: \(appleIDCredential.realUserStatus.rawValue)")
         
+        // Check if we have user info from Apple (first sign-in)
+        var email = appleIDCredential.email
+        var fullName = appleIDCredential.fullName
+        
+        // If Apple didn't provide email/name (subsequent sign-ins), check cache
+        if email == nil || fullName == nil {
+            print("🍎 AppleSignInService: Checking cache for missing user info")
+            
+            // Try to get cached Apple user info
+            if let cachedUserInfo = KeychainManager.shared.getAppleUserInfo() {
+                if cachedUserInfo.id == appleIDCredential.user {
+                    // Use cached values if current ones are nil
+                    if email == nil && cachedUserInfo.email != nil {
+                        email = cachedUserInfo.email
+                        print("🍎 AppleSignInService: Using cached email: \(email ?? "")")
+                    }
+                    
+                    if fullName == nil && (cachedUserInfo.firstName != nil || cachedUserInfo.lastName != nil) {
+                        var components = PersonNameComponents()
+                        components.givenName = cachedUserInfo.firstName
+                        components.familyName = cachedUserInfo.lastName
+                        fullName = components
+                        print("🍎 AppleSignInService: Using cached name: \(fullName?.formatted() ?? "")")
+                    }
+                }
+            }
+        }
+        
+        // Cache user info if we have it (first sign-in)
+        if appleIDCredential.email != nil || appleIDCredential.fullName != nil {
+            print("🍎 AppleSignInService: Caching Apple user info for future use")
+            
+            let userInfo = AppleUserInfo(
+                id: appleIDCredential.user,
+                email: appleIDCredential.email,
+                firstName: appleIDCredential.fullName?.givenName,
+                lastName: appleIDCredential.fullName?.familyName
+            )
+            
+            do {
+                try KeychainManager.shared.saveAppleUserInfo(userInfo)
+                print("🍎 AppleSignInService: Successfully cached Apple user info")
+            } catch {
+                print("🍎 AppleSignInService: Failed to cache Apple user info: \(error)")
+            }
+        }
+        
         let result = AppleSignInResult(
             userId: appleIDCredential.user,
             identityToken: identityToken,
             authorizationCode: authorizationCode,
-            email: appleIDCredential.email,
-            fullName: appleIDCredential.fullName,
+            email: email,
+            fullName: fullName,
             realUserStatus: appleIDCredential.realUserStatus
         )
         
