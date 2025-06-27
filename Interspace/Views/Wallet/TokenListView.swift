@@ -224,7 +224,7 @@ struct EnhancedTokenCell: View {
                     // Expand Indicator
                     Image(systemName: WalletSymbols.expand)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.tertiary)
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
                 .padding(.horizontal, WalletDesign.Spacing.regular)

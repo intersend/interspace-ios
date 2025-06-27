@@ -285,10 +285,19 @@ final class WalletService: ObservableObject {
     
     private func setupWalletConnect() {
         // Get project ID from Info.plist or environment
-        let projectId = Bundle.main.object(forInfoDictionaryKey: "WALLETCONNECT_PROJECT_ID") as? String ?? "YOUR_PROJECT_ID"
+        var projectId = Bundle.main.object(forInfoDictionaryKey: "WALLETCONNECT_PROJECT_ID") as? String ?? ""
+        
+        print("💰 WalletService: WalletConnect Project ID from Info.plist: '\(projectId)'")
+        
+        // Fallback to hardcoded value if not configured properly
+        if projectId.isEmpty || projectId == "$(WALLETCONNECT_PROJECT_ID)" {
+            print("⚠️ WalletService: Info.plist not configured, using hardcoded project ID")
+            // This is the project ID from BuildConfiguration.xcconfig
+            projectId = "936ce227c0152a29bdeef7d68794b0ac"
+        }
         
         guard !projectId.isEmpty && projectId != "YOUR_PROJECT_ID" else {
-            print("WalletConnect: Project ID not configured")
+            print("⚠️ WalletService: WalletConnect Project ID not properly configured")
             return
         }
         
@@ -296,7 +305,7 @@ final class WalletService: ObservableObject {
         // Just mark as configured if project ID exists
         isWalletKitConfigured = true
         
-        print("💰 WalletService: WalletConnect configured")
+        print("✅ WalletService: WalletConnect configured with project ID: \(projectId)")
     }
     
     // MARK: - Debug Methods
@@ -831,23 +840,42 @@ final class WalletService: ObservableObject {
             throw WalletError.sdkNotInitialized
         }
         
-        // This will trigger the UI to show the scanner
-        throw WalletError.qrCodeScanRequired
+        // For production: Generate our own QR code for wallets to scan
+        // For testing: Show scanner to connect to demo dApps
+        
+        // Check if we should generate QR or scan
+        let shouldGenerateQR = false // Set to true for production
+        
+        if shouldGenerateQR {
+            // Generate our own connection URI
+            let uri = try await walletConnectService.createConnectionRequest()
+            throw WalletError.showQRCode(uri)
+        } else {
+            // This will trigger the UI to show the scanner (for testing)
+            throw WalletError.qrCodeScanRequired
+        }
     }
     
     // Method to handle scanned WalletConnect URI
     func connectWithWalletConnectURI(_ uri: String) async throws -> WalletConnectionResult {
+        print("💰 WalletService: connectWithWalletConnectURI called for SIWE auth")
+        
+        // Initialize SDKs if needed
+        await initializeSDKsIfNeeded()
+        
+        print("💰 WalletService: isWalletKitConfigured = \(isWalletKitConfigured)")
+        
         guard isWalletKitConfigured else {
+            print("❌ WalletService: WalletConnect SDK not initialized - throwing error")
             throw WalletError.sdkNotInitialized
         }
         
-        print("💰 WalletService: Connecting with WalletConnect URI")
+        print("💰 WalletService: Connecting with WalletConnect URI for SIWE")
         
-        // Connect using WalletConnectService
-        try await walletConnectService.connect(uri: uri)
+        // Connect using WalletConnectService for authentication
+        try await walletConnectService.connectForAuth(uri: uri)
         
         // Wait for session to be established
-        // This is a bit hacky but works for now
         var attempts = 0
         while await walletConnectService.sessions.isEmpty && attempts < 30 {
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -858,28 +886,23 @@ final class WalletService: ObservableObject {
             throw WalletError.connectionFailed("Failed to establish WalletConnect session")
         }
         
-        // Extract address from session
-        guard let firstAccount = session.namespaces.values.flatMap({ $0.accounts }).first else {
+        // Get wallet address from the connected session
+        guard let address = await walletConnectService.getConnectedAddress() else {
             throw WalletError.noAccountsFound
         }
         
-        let components = firstAccount.absoluteString.split(separator: ":")
-        guard components.count >= 3 else {
-            throw WalletError.connectionFailed("Invalid account format")
-        }
-        
-        let address = String(components[2])
-        
-        // Store session info
-        await walletConnectSessionManager.storeSession(session, walletName: session.peer.name)
+        print("💰 WalletService: Connected wallet address: \(address)")
         
         // Get SIWE nonce and create message
         let nonce = try await getSIWENonce()
         let message = createSIWEMessage(address: address, nonce: nonce, chainId: 1)
         
-        // Sign message via WalletConnect
-        print("💰 WalletService: Requesting signature via WalletConnect")
-        let signature = try await walletConnectService.signMessage(message, address: address)
+        // Sign SIWE message via WalletConnect
+        print("💰 WalletService: Requesting SIWE signature via WalletConnect")
+        let signature = try await walletConnectService.signSIWEMessage(message, address: address, session: session)
+        
+        // Clean up the temporary WalletConnect session after getting signature
+        await walletConnectService.cleanupAuthSession()
         
         // Create connection result
         let result = WalletConnectionResult(
@@ -896,7 +919,7 @@ final class WalletService: ObservableObject {
             self.walletAddress = address
         }
         
-        print("💰 WalletService: WalletConnect connection successful")
+        print("💰 WalletService: WalletConnect SIWE authentication successful")
         return result
     }
     
@@ -975,7 +998,7 @@ final class WalletService: ObservableObject {
         if isWalletKitConfigured {
             Task {
                 await walletConnectService.disconnect()
-                await walletConnectSessionManager.refreshSessions()
+                // No need to refresh sessions for SIWE-only implementation
             }
         }
         
@@ -1116,6 +1139,7 @@ enum WalletError: LocalizedError, Identifiable {
     case unsupportedWallet(String)
     case networkError(String)
     case qrCodeScanRequired
+    case showQRCode(String)
     
     var id: String {
         switch self {
@@ -1135,6 +1159,8 @@ enum WalletError: LocalizedError, Identifiable {
             return "networkError_\(message)"
         case .qrCodeScanRequired:
             return "qrCodeScanRequired"
+        case .showQRCode(let uri):
+            return "showQRCode_\(uri)"
         }
     }
     
@@ -1156,18 +1182,11 @@ enum WalletError: LocalizedError, Identifiable {
             return "Network error: \(message)"
         case .qrCodeScanRequired:
             return "QR code scan required"
+        case .showQRCode:
+            return "Show QR code for wallet to scan"
         }
     }
 }
 
 // MARK: - Response Types
-
-private struct NonceResponse: Codable {
-    let success: Bool
-    let data: NonceData?
-    let error: String?
-}
-
-private struct NonceData: Codable {
-    let nonce: String
-}
+// NonceResponse and NonceData are defined in SIWEModels.swift

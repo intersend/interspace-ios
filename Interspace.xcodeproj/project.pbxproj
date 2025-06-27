@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		785508562E09898B00EDDF1C /* c2dkls in Frameworks */ = {isa = PBXBuildFile; productRef = 785508552E09898B00EDDF1C /* c2dkls */; };
-		7855085C2E09898B00EDDF1C /* silentshardduo in Frameworks */ = {isa = PBXBuildFile; productRef = 7855085B2E09898B00EDDF1C /* silentshardduo */; };
 		785509202E098AD400EDDF1C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7861E6D62E021F38005D228A /* AppDelegate.swift */; };
 		78550C542E098EC600EDDF1C /* interspace_iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACBAFBC0CADEC4B3E2D7592B /* interspace_iosApp.swift */; };
 		7861E3192E0114AD005D228A /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7861E2D22E0114AD005D228A /* GoogleService-Info.plist */; };
@@ -19,6 +17,9 @@
 		789C7C972E02424200FF5B32 /* CoinbaseWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C962E02424200FF5B32 /* CoinbaseWalletSDK */; };
 		78CFACFE2E0DEBD900999473 /* ReownWalletKit in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFACFD2E0DEBD900999473 /* ReownWalletKit */; };
 		78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFACFF2E0DEBD900999473 /* WalletConnect */; };
+		78CFC5602E0ED25600999473 /* ReownWalletKit in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFC55F2E0ED25600999473 /* ReownWalletKit */; };
+		78CFC5622E0ED25600999473 /* WalletConnect in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFC5612E0ED25600999473 /* WalletConnect */; };
+		78CFC5642E0ED25600999473 /* WalletConnectVerify in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFC5632E0ED25600999473 /* WalletConnectVerify */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -124,6 +125,7 @@
 				ErrorWrapper.swift,
 				InterspaceCache.xcdatamodeld,
 				MPCError.swift,
+				SIWEModels.swift,
 				SmartProfileModels.swift,
 				SocialAccount.swift,
 				WalletType.swift,
@@ -240,6 +242,7 @@
 				Modifiers/LiquidGlassTextFieldStyle.swift,
 				Modifiers/ScrollOffsetModifier.swift,
 				Modifiers/ShakeDetector.swift,
+				OnboardingView.swift,
 				Profile/MPCTransactionApprovalView.swift,
 				Profile/MPCWalletSetupView.swift,
 				Profile/ProfileAboutView.swift,
@@ -259,8 +262,11 @@
 				Settings/SettingsSection.swift,
 				Settings/WalletSecurityView.swift,
 				SocialAccountDetailView.swift,
-				TransactionHistoryView.swift,
 				Wallet/BalanceCardView.swift,
+				Wallet/BalanceDisplayView.swift,
+				Wallet/NFTGalleryView.swift,
+				Wallet/TokenListView.swift,
+				Wallet/TransactionHistoryView.swift,
 				WalletAuthenticationView.swift,
 				WalletConnectionView.swift,
 				WalletView.swift,
@@ -295,11 +301,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				78CFC5642E0ED25600999473 /* WalletConnectVerify in Frameworks */,
 				78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */,
-				7855085C2E09898B00EDDF1C /* silentshardduo in Frameworks */,
+				78CFC5602E0ED25600999473 /* ReownWalletKit in Frameworks */,
 				789C7C972E02424200FF5B32 /* CoinbaseWalletSDK in Frameworks */,
-				785508562E09898B00EDDF1C /* c2dkls in Frameworks */,
 				789C7C922E02421B00FF5B32 /* metamask-ios-sdk in Frameworks */,
+				78CFC5622E0ED25600999473 /* WalletConnect in Frameworks */,
 				78CFACFE2E0DEBD900999473 /* ReownWalletKit in Frameworks */,
 				789C7C952E02423600FF5B32 /* GoogleSignIn in Frameworks */,
 			);
@@ -2160,7 +2167,6 @@
 				7861E7282E02317E005D228A /* XCRemoteSwiftPackageReference "wallet-mobile-sdk" */,
 				7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */,
 				789C7C932E02423600FF5B32 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
-				785508542E09894400EDDF1C /* XCRemoteSwiftPackageReference "silentshard-artifacts" */,
 			);
 			preferredProjectObjectVersion = 46;
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
@@ -2274,6 +2280,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 579ZB4FX6N;
 				ENABLE_BITCODE = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
 					"FB_SONARKIT_ENABLED=1",
@@ -2321,7 +2328,13 @@
 				CODE_SIGN_ENTITLEMENTS = Interspace/Interspace.entitlements;
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 579ZB4FX6N;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)/include/duo_schnorr",
+					"$(BUILT_PRODUCTS_DIR)/include/ecies",
+				);
 				INFOPLIST_FILE = Interspace/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Interspace;
 				INFOPLIST_KEY_CFBundleURLTypes = "$(inherited)";
@@ -2588,14 +2601,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		785508542E09894400EDDF1C /* XCRemoteSwiftPackageReference "silentshard-artifacts" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
 		7861E7272E023147005D228A /* XCRemoteSwiftPackageReference "metamask-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/MetaMask/metamask-ios-sdk";
@@ -2631,16 +2636,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		785508552E09898B00EDDF1C /* c2dkls */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 785508542E09894400EDDF1C /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
-			productName = c2dkls;
-		};
-		7855085B2E09898B00EDDF1C /* silentshardduo */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 785508542E09894400EDDF1C /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
-			productName = silentshardduo;
-		};
 		789C7C912E02421B00FF5B32 /* metamask-ios-sdk */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7861E7272E023147005D228A /* XCRemoteSwiftPackageReference "metamask-ios-sdk" */;
@@ -2665,6 +2660,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
 			productName = WalletConnect;
+		};
+		78CFC55F2E0ED25600999473 /* ReownWalletKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownWalletKit;
+		};
+		78CFC5612E0ED25600999473 /* WalletConnect */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = WalletConnect;
+		};
+		78CFC5632E0ED25600999473 /* WalletConnectVerify */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = WalletConnectVerify;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

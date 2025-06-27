@@ -1,0 +1,401 @@
+{
+  "object" : {
+    "artifacts" : [
+      {
+        "kind" : "xcframework",
+        "packageRef" : {
+          "identity" : "metamask-ios-sdk",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/MetaMask/metamask-ios-sdk",
+          "name" : "metamask-ios-sdk"
+        },
+        "path" : "/Users/ardaerturk/Documents/GitHub/interspace-codebase/interspace-ios/SourcePackages/checkouts/metamask-ios-sdk/Sources/metamask-ios-sdk/Frameworks/Ecies.xcframework",
+        "source" : {
+          "type" : "local"
+        },
+        "targetName" : "Ecies"
+      },
+      {
+        "kind" : "xcframework",
+        "packageRef" : {
+          "identity" : "silentshard-artifacts",
+          "kind" : "remoteSourceControl",
+          "location" : "https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts",
+          "name" : "silentshard-artifacts"
+        },
+        "path" : "/Users/ardaerturk/Documents/GitHub/interspace-codebase/interspace-ios/SourcePackages/checkouts/silentshard-artifacts/frameworks/silentshardduo.xcframework",
+        "source" : {
+          "type" : "local"
+        },
+        "targetName" : "silentshardduo"
+      },
+      {
+        "kind" : "xcframework",
+        "packageRef" : {
+          "identity" : "silentshard-artifacts",
+          "kind" : "remoteSourceControl",
+          "location" : "https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts",
+          "name" : "silentshard-artifacts"
+        },
+        "path" : "/Users/ardaerturk/Documents/GitHub/interspace-codebase/interspace-ios/SourcePackages/checkouts/silentshard-artifacts/frameworks/silentshard.xcframework",
+        "source" : {
+          "type" : "local"
+        },
+        "targetName" : "silentshard"
+      },
+      {
+        "kind" : "xcframework",
+        "packageRef" : {
+          "identity" : "silentshard-artifacts",
+          "kind" : "remoteSourceControl",
+          "location" : "https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts",
+          "name" : "silentshard-artifacts"
+        },
+        "path" : "/Users/ardaerturk/Documents/GitHub/interspace-codebase/interspace-ios/SourcePackages/checkouts/silentshard-artifacts/frameworks/duo_schnorr.xcframework",
+        "source" : {
+          "type" : "local"
+        },
+        "targetName" : "duo_schnorr"
+      },
+      {
+        "kind" : "xcframework",
+        "packageRef" : {
+          "identity" : "silentshard-artifacts",
+          "kind" : "remoteSourceControl",
+          "location" : "https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts",
+          "name" : "silentshard-artifacts"
+        },
+        "path" : "/Users/ardaerturk/Documents/GitHub/interspace-codebase/interspace-ios/SourcePackages/checkouts/silentshard-artifacts/frameworks/silentshardtrio.xcframework",
+        "source" : {
+          "type" : "local"
+        },
+        "targetName" : "silentshardtrio"
+      },
+      {
+        "kind" : "xcframework",
+        "packageRef" : {
+          "identity" : "silentshard-artifacts",
+          "kind" : "remoteSourceControl",
+          "location" : "https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts",
+          "name" : "silentshard-artifacts"
+        },
+        "path" : "/Users/ardaerturk/Documents/GitHub/interspace-codebase/interspace-ios/SourcePackages/checkouts/silentshard-artifacts/frameworks/c2dkls.xcframework",
+        "source" : {
+          "type" : "local"
+        },
+        "targetName" : "c2dkls"
+      },
+      {
+        "kind" : "xcframework",
+        "packageRef" : {
+          "identity" : "yttrium",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/reown-com/yttrium",
+          "name" : "yttrium"
+        },
+        "path" : "/Users/ardaerturk/Documents/GitHub/interspace-codebase/interspace-ios/SourcePackages/artifacts/yttrium/YttriumXCFramework/target/ios/libuniffi_yttrium.xcframework",
+        "source" : {
+          "checksum" : "a8f493c867f0e25d120d9d204f34914ca51dcfc4d00d8ae9d255c99a1cd9e22b",
+          "type" : "remote",
+          "url" : "https://github.com/reown-com/yttrium/releases/download/0.9.7/libuniffi_yttrium.xcframework.zip"
+        },
+        "targetName" : "YttriumXCFramework"
+      }
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "app-check",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/google/app-check.git",
+          "name" : "app-check"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "61b85103a1aeed8218f17c794687781505fbbef5",
+            "version" : "11.2.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "app-check"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "appauth-ios",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/openid/AppAuth-iOS.git",
+          "name" : "AppAuth-iOS"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "2781038865a80e2c425a1da12cc1327bcd56501f",
+            "version" : "1.7.6"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "AppAuth-iOS"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "googlesignin-ios",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/google/GoogleSignIn-iOS",
+          "name" : "GoogleSignIn-iOS"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "65fb3f1aa6ffbfdc79c4e22178a55cd91561f5e9",
+            "version" : "8.0.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "GoogleSignIn-iOS"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "googleutilities",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/google/GoogleUtilities.git",
+          "name" : "GoogleUtilities"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "60da361632d0de02786f709bdc0c4df340f7613e",
+            "version" : "8.1.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "GoogleUtilities"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "gtm-session-fetcher",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/google/gtm-session-fetcher.git",
+          "name" : "gtm-session-fetcher"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "a2ab612cb980066ee56d90d60d8462992c07f24b",
+            "version" : "3.5.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "gtm-session-fetcher"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "gtmappauth",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/google/GTMAppAuth.git",
+          "name" : "GTMAppAuth"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "5d7d66f647400952b1758b230e019b07c0b4b22a",
+            "version" : "4.1.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "GTMAppAuth"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "metamask-ios-sdk",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/MetaMask/metamask-ios-sdk",
+          "name" : "metamask-ios-sdk"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "924d91bb3e98a5383c3082d6d5ba3ddac9e1c565",
+            "version" : "0.8.10"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "metamask-ios-sdk"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "promises",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/google/promises.git",
+          "name" : "promises"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "540318ecedd63d883069ae7f1ed811a2df00b6ac",
+            "version" : "2.4.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "promises"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "qrcode",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/WalletConnect/QRCode",
+          "name" : "QRCode"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "263f280d2c8144adfb0b6676109846cfc8dd552b",
+            "version" : "14.3.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "QRCode"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "reown-swift",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/reown-com/reown-swift",
+          "name" : "reown-swift"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "18a4ecaf530aecbf3d1d1bbf0db4928214ada081",
+            "version" : "1.6.5"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "reown-swift"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "silentshard-artifacts",
+          "kind" : "remoteSourceControl",
+          "location" : "https://dushyantsutharsilencelaboratories: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@github.com/dushyantsutharsilencelaboratories/silentshard-artifacts",
+          "name" : "silentshard-artifacts"
+        },
+        "state" : {
+          "checkoutState" : {
+            "branch" : "main",
+            "revision" : "a841f0307bac2fb81c51d98943ec39fbbd1066d0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "silentshard-artifacts"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "socket.io-client-swift",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/socketio/socket.io-client-swift",
+          "name" : "socket.io-client-swift"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "42da871d9369f290d6ec4930636c40672143905b",
+            "version" : "16.1.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "socket.io-client-swift"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "starscream",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/daltoniam/Starscream",
+          "name" : "Starscream"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "c6bfd1af48efcc9a9ad203665db12375ba6b145a",
+            "version" : "4.0.8"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "Starscream"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-qrcode-generator",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/dagronf/swift-qrcode-generator",
+          "name" : "swift-qrcode-generator"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "5ca09b6a2ad190f94aa3d6ddef45b187f8c0343b",
+            "version" : "1.0.3"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-qrcode-generator"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swiftimagereadwrite",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/dagronf/SwiftImageReadWrite",
+          "name" : "SwiftImageReadWrite"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "5596407d1cf61b953b8e658fa8636a471df3c509",
+            "version" : "1.1.6"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "SwiftImageReadWrite"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "wallet-mobile-sdk",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/MobileWalletProtocol/wallet-mobile-sdk.git",
+          "name" : "wallet-mobile-sdk"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "4293df51d3500b8e876ca4bf0d7548adf097569a",
+            "version" : "1.1.2"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "wallet-mobile-sdk"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "yttrium",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/reown-com/yttrium",
+          "name" : "yttrium"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "b96e0fb5aae557897a35586f30487044b426b1ca",
+            "version" : "0.9.7"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "yttrium"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}

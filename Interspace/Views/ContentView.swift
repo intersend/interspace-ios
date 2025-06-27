@@ -239,8 +239,9 @@ struct AuthExpiryOverlay: View {
     }
 }
 
-// MARK: - Onboarding View
+// OnboardingView is defined in OnboardingView.swift
 
+/* Removed duplicate OnboardingView - see OnboardingView.swift
 struct OnboardingView: View {
     @ObservedObject private var sessionCoordinator = SessionCoordinator.shared
     @State private var profileName = ""
@@ -327,6 +328,7 @@ struct OnboardingView: View {
         }
     }
 }
+*/
 
 struct MainTabView: View {
     @State private var selectedTab: Tab = .apps {

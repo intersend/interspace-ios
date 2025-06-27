@@ -28,10 +28,21 @@ final class WalletConnectService: ObservableObject {
     
     private init() {
         // Get project ID from Info.plist
-        self.projectId = Bundle.main.object(forInfoDictionaryKey: "WALLETCONNECT_PROJECT_ID") as? String ?? ""
+        var retrievedProjectId = Bundle.main.object(forInfoDictionaryKey: "WALLETCONNECT_PROJECT_ID") as? String ?? ""
+        
+        print("🔍 WalletConnectService: Retrieved project ID from Info.plist: '\(retrievedProjectId)'")
+        
+        // Fallback to hardcoded value if not configured properly
+        if retrievedProjectId.isEmpty || retrievedProjectId == "$(WALLETCONNECT_PROJECT_ID)" {
+            print("⚠️ WalletConnectService: Info.plist not configured, using hardcoded project ID")
+            // This is the project ID from BuildConfiguration.xcconfig
+            retrievedProjectId = "936ce227c0152a29bdeef7d68794b0ac"
+        }
+        
+        self.projectId = retrievedProjectId
         
         guard !projectId.isEmpty && projectId != "YOUR_PROJECT_ID" else {
-            print("⚠️ WalletConnectService: Project ID not configured in Info.plist")
+            print("⚠️ WalletConnectService: Project ID not configured")
             return
         }
         
@@ -55,8 +66,9 @@ final class WalletConnectService: ObservableObject {
         )
         
         // Configure networking
+        // Using app group for proper keychain access
         Networking.configure(
-            groupIdentifier: "group.com.interspace",
+            groupIdentifier: "group.com.interspace.walletconnect",
             projectId: projectId,
             socketFactory: DefaultSocketFactory()
         )
@@ -111,31 +123,32 @@ final class WalletConnectService: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Load existing sessions
-        loadSessions()
+        // For SIWE auth only, we don't need profile change notifications or persistent sessions
     }
     
     // MARK: - Public Methods
     
-    /// Connect to a wallet using WalletConnect URI
-    func connect(uri: String) async throws {
+    /// Connect to a wallet using WalletConnect URI for SIWE authentication
+    func connectForAuth(uri: String) async throws {
+        // For connecting FROM a wallet app TO our dApp
+        // This is when a wallet scans our QR code
         guard uri.hasPrefix("wc:") else {
             throw WalletConnectError.invalidURI
         }
         
         do {
-            // Parse the URI using the throwing initializer
-            guard let pairingURI = try WalletConnectURI(string: uri) else {
+            // Parse the URI
+            guard let pairingURI = try? WalletConnectURI(string: uri) else {
                 throw WalletConnectError.invalidURI
             }
             
             // Pair with the wallet
             try await Pair.instance.pair(uri: pairingURI)
             
-            print("✅ WalletConnectService: Paired with URI")
+            print("✅ WalletConnectService: Paired with URI for authentication")
             
-            // The session proposal will be received via the publisher
-            // and handled in handleSessionProposal
+            // The wallet will send us a session proposal
+            // We'll handle it in handleSessionProposal
             
         } catch {
             print("❌ WalletConnectService: Failed to pair: \(error)")
@@ -143,12 +156,43 @@ final class WalletConnectService: ObservableObject {
         }
     }
     
-    /// Sign a message using WalletConnect
-    func signMessage(_ message: String, address: String) async throws -> String {
-        guard let session = getActiveSession(for: address) else {
-            throw WalletConnectError.noActiveSession
+    /// Create a connection request as a dApp
+    func createConnectionRequest() async throws -> String {
+        // Create a pairing URI that wallets can use to connect to us
+        let uri = try await Pair.instance.create()
+        print("📱 WalletConnectService: Created pairing URI for wallets to connect")
+        print("📱 URI: \(uri.absoluteString)")
+        
+        // After creating the pairing, we need to connect with our requirements
+        Task {
+            do {
+                // Define the namespaces we require from the wallet
+                let requiredNamespaces: [String: ProposalNamespace] = [
+                    "eip155": ProposalNamespace(
+                        chains: [Blockchain("eip155:1")!], // Ethereum mainnet
+                        methods: ["personal_sign", "eth_sign"], // For SIWE
+                        events: []
+                    )
+                ]
+                
+                // Connect to the wallet
+                _ = try await Sign.instance.connect(
+                    requiredNamespaces: requiredNamespaces,
+                    optionalNamespaces: [:],
+                    sessionProperties: nil
+                )
+                
+                print("📱 WalletConnectService: Connection request sent via pairing")
+            } catch {
+                print("❌ WalletConnectService: Failed to send connection request: \(error)")
+            }
         }
         
+        return uri.absoluteString
+    }
+    
+    /// Sign a SIWE message for authentication
+    func signSIWEMessage(_ message: String, address: String, session: Session) async throws -> String {
         // Store current address for verification
         currentAddress = address
         
@@ -156,10 +200,15 @@ final class WalletConnectService: ObservableObject {
         guard let blockchain = Blockchain("eip155:1") else { // Ethereum mainnet
             throw WalletConnectError.invalidResponse
         }
+        
+        // For personal_sign, the message needs to be hex encoded
+        let messageData = message.data(using: .utf8) ?? Data()
+        let hexMessage = "0x" + messageData.map { String(format: "%02x", $0) }.joined()
+        
         let request = try Request(
             topic: session.topic,
             method: "personal_sign",
-            params: AnyCodable([message, address]),
+            params: AnyCodable([hexMessage, address]),
             chainId: blockchain
         )
         
@@ -172,7 +221,7 @@ final class WalletConnectService: ObservableObject {
             Task {
                 do {
                     try await Sign.instance.request(params: request)
-                    print("✅ WalletConnectService: Sent signing request")
+                    print("✅ WalletConnectService: Sent SIWE signing request")
                 } catch {
                     print("❌ WalletConnectService: Failed to send request: \(error)")
                     self.signingCompletion = nil
@@ -180,6 +229,31 @@ final class WalletConnectService: ObservableObject {
                 }
             }
         }
+    }
+    
+    /// Get the connected wallet address for SIWE auth
+    func getConnectedAddress() async -> String? {
+        // First check if we have a current address
+        if let address = currentAddress {
+            return address
+        }
+        
+        // Otherwise extract from the first session
+        if let firstSession = sessions.first,
+           let firstAccount = firstSession.namespaces.values.flatMap({ $0.accounts }).first {
+            let components = firstAccount.absoluteString.split(separator: ":")
+            if components.count >= 3 {
+                return String(components[2])
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Clean up after SIWE authentication
+    func cleanupAuthSession() async {
+        // Disconnect the temporary session used for auth
+        await disconnect()
     }
     
     /// Disconnect a session
@@ -208,61 +282,110 @@ final class WalletConnectService: ObservableObject {
         }
     }
     
-    /// Get active session for a wallet address
-    func getActiveSession(for address: String) -> Session? {
-        let normalizedAddress = address.lowercased()
-        
-        return sessions.first { session in
-            session.namespaces.values.flatMap { $0.accounts }
-                .contains { account in
-                    // Extract address from CAIP-10 format (e.g., "eip155:1:0x1234...")
-                    let components = account.absoluteString.split(separator: ":")
-                    if components.count >= 3 {
-                        let accountAddress = String(components[2]).lowercased()
-                        return accountAddress == normalizedAddress
-                    }
-                    return false
-                }
-        }
-    }
     
     // MARK: - Private Methods
     
-    private func loadSessions() {
-        sessions = Sign.instance.getSessions()
-        isConnected = !sessions.isEmpty
-        
-        if let firstSession = sessions.first {
-            sessionTopic = firstSession.topic
-            
-            // Extract first address
-            if let firstAccount = firstSession.namespaces.values.flatMap({ $0.accounts }).first {
-                let components = firstAccount.absoluteString.split(separator: ":")
-                if components.count >= 3 {
-                    currentAddress = String(components[2])
-                }
-            }
-        }
-        
-        print("✅ WalletConnectService: Loaded \(sessions.count) sessions")
-    }
+    // SIWE auth doesn't require persistent session loading
     
     private func handleSessionProposal(_ proposal: Session.Proposal) {
         print("📱 WalletConnectService: Received session proposal from \(proposal.proposer.name)")
+        print("📱 Proposal ID: \(proposal.id)")
+        print("📱 Required namespaces: \(proposal.requiredNamespaces)")
+        print("📱 Optional namespaces: \(proposal.optionalNamespaces ?? [:])")
         
         // Store the proposal
         pendingProposal = proposal
         
-        // Auto-approve for wallet use case
+        // Check if this is from our own dApp connection request
+        if proposal.proposer.name == "Interspace" {
+            // This shouldn't happen - we're the ones making proposals
+            print("⚠️ WalletConnectService: Received our own proposal, ignoring")
+            return
+        }
+        
+        // For testing: When we scan a QR code from a demo dApp, we act as a wallet
+        // In production, we should only act as a dApp for SIWE auth
+        print("⚠️ WalletConnectService: Acting as wallet for testing purposes")
         Task {
-            await approveSession(proposal)
+            await approveSessionAsWallet(proposal)
         }
     }
     
-    private func approveSession(_ proposal: Session.Proposal) async {
+    private func approveSessionAsWallet(_ proposal: Session.Proposal) async {
         do {
-            // Build session namespaces based on proposal
-            let sessionNamespaces = try buildSessionNamespaces(from: proposal)
+            // When acting as a wallet, we need to provide our account address
+            // For now, we'll use a dummy address for SIWE testing
+            let walletAddress = "0x1234567890123456789012345678901234567890"
+            
+            print("📱 WalletConnectService: Approving session as wallet with address: \(walletAddress)")
+            
+            var sessionNamespaces = [String: SessionNamespace]()
+            
+            // Process required namespaces
+            for (key, requiredNamespace) in proposal.requiredNamespaces {
+                print("📱 Processing required namespace: \(key)")
+                
+                let chains = requiredNamespace.chains ?? []
+                var accounts: [Account] = []
+                
+                // Create accounts for each chain
+                if chains.isEmpty && key == "eip155" {
+                    // Default to mainnet if no chains specified
+                    if let account = Account(blockchain: Blockchain("eip155:1")!, address: walletAddress) {
+                        accounts.append(account)
+                    }
+                } else {
+                    for chain in chains {
+                        if let account = Account(blockchain: chain, address: walletAddress) {
+                            accounts.append(account)
+                        }
+                    }
+                }
+                
+                sessionNamespaces[key] = SessionNamespace(
+                    accounts: accounts,
+                    methods: requiredNamespace.methods,
+                    events: requiredNamespace.events
+                )
+            }
+            
+            // Process optional namespaces if required is empty
+            if sessionNamespaces.isEmpty, let optionalNamespaces = proposal.optionalNamespaces {
+                for (key, optionalNamespace) in optionalNamespaces {
+                    print("📱 Processing optional namespace: \(key)")
+                    
+                    let chains = optionalNamespace.chains ?? []
+                    var accounts: [Account] = []
+                    
+                    // Create accounts for requested chains
+                    for chain in chains {
+                        if let account = Account(blockchain: chain, address: walletAddress) {
+                            accounts.append(account)
+                        }
+                    }
+                    
+                    // If no specific chains, use mainnet
+                    if accounts.isEmpty && key == "eip155" {
+                        if let account = Account(blockchain: Blockchain("eip155:1")!, address: walletAddress) {
+                            accounts.append(account)
+                        }
+                    }
+                    
+                    sessionNamespaces[key] = SessionNamespace(
+                        accounts: accounts,
+                        methods: optionalNamespace.methods,
+                        events: optionalNamespace.events
+                    )
+                }
+            }
+            
+            print("📱 WalletConnectService: Approving with \(sessionNamespaces.count) namespaces")
+            for (key, namespace) in sessionNamespaces {
+                print("  - \(key): \(namespace.accounts.count) accounts")
+                for account in namespace.accounts {
+                    print("    - \(account.absoluteString)")
+                }
+            }
             
             // Approve the session
             _ = try await Sign.instance.approve(
@@ -279,67 +402,98 @@ final class WalletConnectService: ObservableObject {
     }
     
     private func buildSessionNamespaces(from proposal: Session.Proposal) throws -> [String: SessionNamespace] {
+        // Get all supported chains from the proposal
+        let requiredChains = proposal.requiredNamespaces.flatMap { namespace in
+            namespace.value.chains ?? []
+        }
+        let optionalChains = proposal.optionalNamespaces?.flatMap { namespace in
+            namespace.value.chains ?? []
+        } ?? []
+        
+        // Combine and deduplicate chains
+        let allChains = requiredChains + optionalChains
+        let supportedChains = allChains.isEmpty ? [Blockchain("eip155:1")!] : Array(Set(allChains))
+        
+        // Get all methods and events
+        let supportedMethods = Set(
+            proposal.requiredNamespaces.flatMap { $0.value.methods } + 
+            (proposal.optionalNamespaces?.flatMap { $0.value.methods } ?? [])
+        )
+        let supportedEvents = Set(
+            proposal.requiredNamespaces.flatMap { $0.value.events } + 
+            (proposal.optionalNamespaces?.flatMap { $0.value.events } ?? [])
+        )
+        
+        // For dApp usage, we're connecting TO a wallet, so we don't have accounts yet
+        // The wallet will provide its accounts after approval
+        // We need to return an empty namespace that satisfies the requirements
+        
+        print("📱 WalletConnectService: Building namespaces for proposal")
+        print("  - Required namespaces: \(proposal.requiredNamespaces.keys.joined(separator: ", "))")
+        print("  - Optional namespaces: \(proposal.optionalNamespaces?.keys.joined(separator: ", ") ?? "none")")
+        print("  - Supported chains: \(supportedChains.map { $0.absoluteString }.joined(separator: ", "))")
+        print("  - Supported methods: \(Array(supportedMethods).joined(separator: ", "))")
+        print("  - Supported events: \(Array(supportedEvents).joined(separator: ", "))")
+        
+        // Since we're a dApp connecting to a wallet, we need to approve with minimal namespaces
+        // The wallet will provide the actual accounts
         var sessionNamespaces = [String: SessionNamespace]()
         
-        // For each required namespace in the proposal
+        // Build namespaces based on what the wallet requires
         for (key, requiredNamespace) in proposal.requiredNamespaces {
-            // For dApp use case, we need to provide empty accounts
-            // The wallet will provide its accounts after approval
-            let accounts: [Account] = []
-            
-            // Include all required methods and events
+            let chains = requiredNamespace.chains ?? []
             let methods = requiredNamespace.methods
             let events = requiredNamespace.events
             
-            // Optional namespaces
-            let chains = requiredNamespace.chains
-            
+            // For a dApp, we don't provide accounts - the wallet does
             sessionNamespaces[key] = SessionNamespace(
-                chains: chains,
-                accounts: accounts,
+                chains: chains.isEmpty ? nil : chains,
+                accounts: [],
                 methods: methods,
                 events: events
             )
         }
         
-        return sessionNamespaces
-    }
-    
-    private func getCurrentWalletAddress() -> String? {
-        // Return the current address if we have one from an active session
-        if let address = currentAddress {
-            return address
-        }
-        
-        // Otherwise check if we have an address from existing sessions
-        if let firstSession = sessions.first,
-           let firstAccount = firstSession.namespaces.values.flatMap({ $0.accounts }).first {
-            let components = firstAccount.absoluteString.split(separator: ":")
-            if components.count >= 3 {
-                return String(components[2])
+        // If no required namespaces, check optional
+        if sessionNamespaces.isEmpty, let optionalNamespaces = proposal.optionalNamespaces {
+            for (key, optionalNamespace) in optionalNamespaces {
+                let chains = optionalNamespace.chains ?? []
+                let methods = optionalNamespace.methods
+                let events = optionalNamespace.events
+                
+                sessionNamespaces[key] = SessionNamespace(
+                    chains: chains.isEmpty ? nil : chains,
+                    accounts: [],
+                    methods: methods,
+                    events: events
+                )
             }
         }
         
-        // This will be set when connecting from a specific wallet
-        // For now, return nil as we don't have a valid address yet
-        return nil
+        print("📱 WalletConnectService: Built \(sessionNamespaces.count) namespaces")
+        
+        return sessionNamespaces
     }
+    
     
     private func handleSessionSettled(_ session: Session) {
         print("✅ WalletConnectService: Session settled with \(session.peer.name)")
         
+        // For SIWE auth, we keep the session temporarily for signing
         sessions.append(session)
         isConnected = true
         sessionTopic = session.topic
         pendingProposal = nil
         
-        // Extract wallet address from session
+        // Extract wallet address from the session
         if let firstAccount = session.namespaces.values.flatMap({ $0.accounts }).first {
             let components = firstAccount.absoluteString.split(separator: ":")
             if components.count >= 3 {
                 currentAddress = String(components[2])
             }
         }
+        
+        print("✅ WalletConnectService: Session established for SIWE auth, wallet: \(currentAddress ?? "unknown")")
     }
     
     private func handleSessionRequest(_ request: Request) {
@@ -493,6 +647,7 @@ extension WalletConnectService {
         // The wallet will respond through the WalletConnect protocol
     }
 }
+
 
 // MARK: - Socket Factory
 
