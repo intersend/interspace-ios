@@ -537,25 +537,37 @@ final class PasskeyService {
     
     @available(iOS 16.0, *)
     func authenticateOrRegisterWithPasskey(username: String? = nil) async throws -> AuthTokens {
-        // Get both authentication and registration options
-        let authTask = Task { try await getPasskeyChallenge(for: username, isRegistration: false) }
+        // First, try authentication to check if user has existing passkeys
+        do {
+            return try await authenticateWithPasskeyOnly(username: username)
+        } catch let error as ASAuthorizationError where error.code == .canceled {
+            // User canceled - don't fallback to registration
+            throw PasskeyError.authenticationFailed
+        } catch {
+            // No credentials found or other error - try registration
+            print("🔑 No existing passkeys found, switching to registration flow")
+            return try await registerPasskeyV2(username: username)
+        }
+    }
+    
+    @available(iOS 16.0, *)
+    private func authenticateWithPasskeyOnly(username: String? = nil) async throws -> AuthTokens {
+        // Get authentication options from server
+        let (challenge, optionsData) = try await getPasskeyChallenge(for: username, isRegistration: false)
         
-        // Get authentication options first
-        let (authChallenge, authOptionsData) = try await authTask.value
-        
-        guard let authOptions = try? JSONDecoder().decode(PasskeyOptions.self, from: authOptionsData),
-              let authChallengeData = Data(base64URLEncoded: authChallenge) else {
+        guard let options = try? JSONDecoder().decode(PasskeyOptions.self, from: optionsData),
+              let challengeData = Data(base64URLEncoded: challenge) else {
             throw PasskeyError.authenticationFailed
         }
         
-        let rpId = authOptions.rp?.id ?? PasskeyService.getDefaultRPID()
+        let rpId = options.rp?.id ?? PasskeyService.getDefaultRPID()
         let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
         
-        // Create authentication request
-        let assertionRequest = platformProvider.createCredentialAssertionRequest(challenge: authChallengeData)
+        // Create authentication request only
+        let assertionRequest = platformProvider.createCredentialAssertionRequest(challenge: challengeData)
         
         // If we have allowed credentials from server, set them
-        if let allowedCredentials = authOptions.allowCredentials, !allowedCredentials.isEmpty {
+        if let allowedCredentials = options.allowCredentials, !allowedCredentials.isEmpty {
             assertionRequest.allowedCredentials = allowedCredentials.compactMap { cred -> ASAuthorizationPlatformPublicKeyCredentialDescriptor? in
                 guard let credIdData = Data(base64URLEncoded: cred.id) else { return nil }
                 return ASAuthorizationPlatformPublicKeyCredentialDescriptor(
@@ -564,17 +576,7 @@ final class PasskeyService {
             }
         }
         
-        // Create registration request as fallback
-        // For registration, we'll use a generated user ID since we don't have one yet
-        let tempUserId = UUID().uuidString.data(using: .utf8)!
-        let registrationRequest = platformProvider.createCredentialRegistrationRequest(
-            challenge: authChallengeData,
-            name: username ?? "user",
-            userID: tempUserId
-        )
-        
-        // Combine both requests - iOS will handle which flow to show
-        let authController = ASAuthorizationController(authorizationRequests: [assertionRequest, registrationRequest])
+        let authController = ASAuthorizationController(authorizationRequests: [assertionRequest])
         
         let passkeyResult = try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
@@ -588,17 +590,47 @@ final class PasskeyService {
             }
         }
         
-        // Determine if this was a registration or authentication based on the result
-        let isRegistration = passkeyResult.isRegistration
+        // Verify authentication with backend
+        return try await verifyPasskeyAuthentication(passkeyResult, challenge: challenge)
+    }
+    
+    @available(iOS 16.0, *)
+    private func registerPasskeyV2(username: String? = nil) async throws -> AuthTokens {
+        // Get authentication challenge (we'll use it for registration in V2)
+        let (challenge, optionsData) = try await getPasskeyChallenge(for: username, isRegistration: false)
         
-        if isRegistration {
-            // For new passkeys, we need to authenticate through V2 auth endpoint
-            // The backend will create the account and profile automatically
-            return try await handlePasskeyRegistrationV2(passkeyResult, challenge: authChallenge, username: username)
-        } else {
-            // For existing passkeys, verify with backend
-            return try await verifyPasskeyAuthentication(passkeyResult, challenge: authChallenge)
+        guard let options = try? JSONDecoder().decode(PasskeyOptions.self, from: optionsData),
+              let challengeData = Data(base64URLEncoded: challenge) else {
+            throw PasskeyError.registrationFailed
         }
+        
+        let rpId = options.rp?.id ?? PasskeyService.getDefaultRPID()
+        let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
+        
+        // Create registration request
+        let tempUserId = UUID().uuidString.data(using: .utf8)!
+        let registrationRequest = platformProvider.createCredentialRegistrationRequest(
+            challenge: challengeData,
+            name: username ?? "user",
+            userID: tempUserId
+        )
+        
+        let authController = ASAuthorizationController(authorizationRequests: [registrationRequest])
+        
+        let passkeyResult = try await withCheckedThrowingContinuation { continuation in
+            Task { @MainActor in
+                let delegate = PasskeyAuthorizationDelegate { result in
+                    continuation.resume(with: result)
+                }
+                
+                authController.delegate = delegate
+                authController.presentationContextProvider = delegate
+                authController.performRequests()
+            }
+        }
+        
+        // For new passkeys, authenticate through V2 auth endpoint
+        return try await handlePasskeyRegistrationV2(passkeyResult, challenge: challenge, username: username)
     }
     
     @available(iOS 16.0, *)
