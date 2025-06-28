@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Existing configurations... -->
+    
+    <!-- OAuth Client IDs -->
+    <key>DISCORD_CLIENT_ID</key>
+    <string>${DISCORD_CLIENT_ID}</string>
+    
+    <key>EPIC_CLIENT_ID</key>
+    <string>${EPIC_CLIENT_ID}</string>
+    
+    <key>FACEBOOK_CLIENT_ID</key>
+    <string>${FACEBOOK_CLIENT_ID}</string>
+    
+    <key>GITHUB_CLIENT_ID</key>
+    <string>${GITHUB_CLIENT_ID}</string>
+    
+    <key>GOOGLE_CLIENT_ID</key>
+    <string>${GOOGLE_CLIENT_ID}</string>
+    
+    <key>SHOPIFY_CLIENT_ID</key>
+    <string>${SHOPIFY_CLIENT_ID}</string>
+    
+    <key>SPOTIFY_CLIENT_ID</key>
+    <string>${SPOTIFY_CLIENT_ID}</string>
+    
+    <key>TIKTOK_CLIENT_KEY</key>
+    <string>${TIKTOK_CLIENT_KEY}</string>
+    
+    <key>TWITTER_CLIENT_ID</key>
+    <string>${TWITTER_CLIENT_ID}</string>
+    
+    <!-- URL Types for OAuth redirects -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <!-- Interspace OAuth redirects -->
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.interspace.ios.oauth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.interspace.ios</string>
+            </array>
+        </dict>
+        <!-- Google Sign-In -->
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.interspace.ios.google</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.${GOOGLE_CLIENT_ID}</string>
+            </array>
+        </dict>
+        <!-- Existing wallet schemes... -->
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.interspace.ios.wallet</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>interspace</string>
+            </array>
+        </dict>
+    </array>
+    
+    <!-- Queried URL Schemes for app detection -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <!-- Wallet apps -->
+        <string>metamask</string>
+        <string>cbwallet</string>
+        <string>trust</string>
+        <string>rainbow</string>
+        <!-- OAuth provider apps -->
+        <string>discord</string>
+        <string>fb</string>
+        <string>spotify</string>
+        <string>tiktok</string>
+        <string>twitter</string>
+        <string>github</string>
+    </array>
+    
+    <!-- Existing configurations continue... -->
+</dict>
+</plist>

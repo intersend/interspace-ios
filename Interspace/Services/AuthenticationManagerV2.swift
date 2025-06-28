@@ -14,6 +14,14 @@ enum AccountType: String, Codable {
     case guest
 }
 
+struct OAuthTokenResponse {
+    let accessToken: String
+    let refreshToken: String?
+    let idToken: String?
+    let expiresIn: TimeInterval?
+    let provider: String
+}
+
 enum PrivacyMode: String, Codable {
     case linked
     case partial
@@ -98,11 +106,15 @@ final class AuthenticationManagerV2: ObservableObject {
                 credential = signature
                 
             case .google:
-                // Handle Google auth - needs oauth code
-                guard let code = config.oauthCode else {
+                // Handle Google auth - needs oauth code or access token
+                if let code = config.oauthCode {
+                    oauthCode = code
+                } else if let token = config.accessToken {
+                    // For AppAuth flow, we get access token directly
+                    credential = token
+                } else {
                     throw AuthenticationError.invalidCredentials
                 }
-                oauthCode = code
                 
             default:
                 throw AuthenticationError.unknown("Unsupported authentication strategy")
@@ -125,7 +137,9 @@ final class AuthenticationManagerV2: ObservableObject {
                 message: config.strategy == .wallet ? config.message : nil,
                 walletType: config.strategy == .wallet ? config.walletType : nil,
                 // Social-specific fields
-                idToken: nil
+                idToken: config.idToken,
+                accessToken: config.accessToken,
+                shopDomain: config.shopDomain
             )
             
             // Call V2 authentication endpoint
@@ -227,6 +241,48 @@ final class AuthenticationManagerV2: ObservableObject {
             await ProfileViewModel.shared.loadProfile()
         } catch {
             print("🔐 AuthenticationManagerV2: Failed to switch profile: \(error)")
+            throw error
+        }
+    }
+    
+    // MARK: - OAuth Authentication
+    
+    /// Authenticate with OAuth provider
+    func authenticateWithOAuth(provider: String, tokens: OAuthTokenResponse) async throws {
+        isLoading = true
+        error = nil
+        
+        do {
+            let request = AuthenticationRequestV2(
+                strategy: provider.lowercased(),
+                identifier: nil,
+                credential: nil,
+                oauthCode: nil,
+                appleAuth: nil,
+                privacyMode: privacyMode.rawValue,
+                deviceId: UIDevice.current.identifierForVendor?.uuidString,
+                email: nil,
+                verificationCode: nil,
+                walletAddress: nil,
+                signature: nil,
+                message: nil,
+                walletType: nil,
+                idToken: tokens.idToken,
+                accessToken: tokens.accessToken,
+                shopDomain: provider.lowercased() == "shopify" ? UserDefaults.standard.string(forKey: "shopify_shop_domain") : nil
+            )
+            
+            // Call V2 authentication endpoint
+            let response = try await authAPI.authenticateV2(request: request)
+            
+            // Process response
+            await processAuthResponse(response)
+            
+            isLoading = false
+            
+        } catch {
+            isLoading = false
+            self.error = error as? AuthenticationError ?? .unknown("OAuth authentication failed")
             throw error
         }
     }
@@ -501,7 +557,7 @@ extension AuthenticationManagerV2 {
         guard isAuthenticated else { return }
         
         do {
-            let user = try await authAPI.getCurrentUser()
+            let user = try await UserAPI.shared.getCurrentUser()
             await MainActor.run {
                 // Convert User to UserV2
                 self.currentUser = UserV2(
@@ -522,33 +578,40 @@ extension AuthenticationManagerV2 {
         throw AuthenticationError.unknown("Profile creation is automatic in V2")
     }
     
-    /// Authenticate with Google
+    /// Authenticate with Google using AppAuth
     func authenticateWithGoogle() async throws {
         isLoading = true
         error = nil
         
         do {
-            let googleResult = try await GoogleSignInService.shared.signIn()
+            guard let provider = OAuthProviderService.shared.provider(for: "google") else {
+                throw AuthenticationError.unknown("Google provider not configured")
+            }
             
-            let config = WalletConnectionConfig(
-                strategy: .google,
-                walletType: nil,
-                email: googleResult.email,
-                verificationCode: nil,
-                walletAddress: nil,
-                signature: nil,
-                message: nil,
-                socialProvider: "google",
-                socialProfile: SocialProfile(
-                    id: googleResult.userId,
-                    email: googleResult.email,
-                    name: googleResult.name,
-                    picture: googleResult.imageURL
-                ),
-                oauthCode: googleResult.idToken
+            guard let windowScene = await UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let viewController = await windowScene.windows.first?.rootViewController else {
+                throw AuthenticationError.unknown("Unable to present OAuth flow")
+            }
+            
+            let tokens = try await withCheckedThrowingContinuation { continuation in
+                OAuthProviderService.shared.authenticate(
+                    with: provider,
+                    presentingViewController: viewController
+                ) { result in
+                    continuation.resume(with: result)
+                }
+            }
+            
+            try await authenticateWithOAuth(
+                provider: "google",
+                tokens: OAuthTokenResponse(
+                    accessToken: tokens.accessToken,
+                    refreshToken: tokens.refreshToken,
+                    idToken: tokens.idToken,
+                    expiresIn: tokens.expiresIn,
+                    provider: tokens.provider
+                )
             )
-            
-            try await authenticate(with: config)
             
         } catch {
             await MainActor.run {

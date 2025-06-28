@@ -41,7 +41,7 @@ struct AuthView: View {
                     
                     // Loading Overlay
                     if authManager.isLoading || walletService.connectionStatus == .connecting || isLoading {
-                        LiquidGlassLoadingOverlay()
+                        LoadingOverlay()
                     }
                 }
             }
@@ -304,9 +304,8 @@ struct UnauthenticatedView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .sheet(isPresented: $showUniversalAddTray) {
-            UniversalAddTray(
+            UniversalAddTrayV2(
                 isPresented: $showUniversalAddTray,
-                initialSection: .none,
                 isForAuthentication: true,
                 authViewModel: AuthViewModel()
             )

@@ -3,6 +3,7 @@ import metamask_ios_sdk
 import CoinbaseWalletSDK
 import GoogleSignIn
 import WalletConnectSign
+import AppAuth
 
 public class AppDelegate: UIResponder, UIApplicationDelegate {
   public var window: UIWindow?
@@ -149,6 +150,15 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
     if url.absoluteString.contains("walletconnect") {
         print("📱 AppDelegate: Detected WalletConnect universal link")
         return true
+    }
+    
+    // Check for OAuth redirect URLs
+    if url.scheme == "com.interspace.ios" && url.host == "oauth2redirect" {
+        print("📱 AppDelegate: Handling OAuth redirect URL")
+        if OAuthProviderService.shared.handleRedirect(url: url) {
+            print("📱 AppDelegate: OAuth redirect handled successfully")
+            return true
+        }
     }
     
     print("📱 AppDelegate: URL not handled by any service")
