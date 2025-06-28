@@ -125,6 +125,9 @@ struct WalletConnectionConfig {
     let socialProvider: String?
     let socialProfile: SocialProfile?
     let oauthCode: String?
+    let idToken: String?
+    let accessToken: String?
+    let shopDomain: String?
 }
 
 struct SocialProfile {
@@ -363,6 +366,8 @@ struct AuthenticationRequestV2: Codable {
     
     // Social-specific fields
     let idToken: String?
+    let accessToken: String?
+    let shopDomain: String? // For Shopify OAuth
 }
 
 struct LinkAccountRequestV2: Codable {
