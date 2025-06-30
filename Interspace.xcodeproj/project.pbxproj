@@ -12,6 +12,12 @@
 		7861E3192E0114AD005D228A /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7861E2D22E0114AD005D228A /* GoogleService-Info.plist */; };
 		7861E31A2E0114AD005D228A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7861E2DD2E0114AD005D228A /* PrivacyInfo.xcprivacy */; };
 		7861E31C2E0114AD005D228A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7861E2D02E0114AD005D228A /* Assets.xcassets */; };
+		788B6D3F2E12FA7000EDAAC5 /* duo_schnorr in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D3E2E12FA7000EDAAC5 /* duo_schnorr */; };
+		788B6D412E12FA7000EDAAC5 /* silentshardduo in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D402E12FA7000EDAAC5 /* silentshardduo */; };
+		788B6D432E12FAB000EDAAC5 /* c2dkls in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D422E12FAB000EDAAC5 /* c2dkls */; };
+		788B6D452E12FAB000EDAAC5 /* duo_schnorr in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D442E12FAB000EDAAC5 /* duo_schnorr */; };
+		788B6D472E12FAB000EDAAC5 /* silentshardduo in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D462E12FAB000EDAAC5 /* silentshardduo */; };
+		788B6D492E12FAB800EDAAC5 /* c2dkls in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D482E12FAB800EDAAC5 /* c2dkls */; };
 		789C7C922E02421B00FF5B32 /* metamask-ios-sdk in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C912E02421B00FF5B32 /* metamask-ios-sdk */; };
 		789C7C952E02423600FF5B32 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C942E02423600FF5B32 /* GoogleSignIn */; };
 		789C7C972E02424200FF5B32 /* CoinbaseWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C962E02424200FF5B32 /* CoinbaseWalletSDK */; };
@@ -125,6 +131,8 @@
 				ErrorWrapper.swift,
 				InterspaceCache.xcdatamodeld,
 				MPCError.swift,
+				OAuthProviderIcons.swift,
+				OAuthProviderInfo.swift,
 				SIWEModels.swift,
 				SmartProfileModels.swift,
 				SocialAccount.swift,
@@ -154,6 +162,8 @@
 				MPC/MPCSessionManager.swift,
 				MPC/MPCWalletService.swift,
 				NetworkMonitor.swift,
+				OAuthErrorHandler.swift,
+				OAuthProviderService.swift,
 				PasskeyService.swift,
 				ProfileAPI.swift,
 				ProfileIconGenerator.swift,
@@ -216,6 +226,7 @@
 				Components/LiquidGlassWalletScanner.swift,
 				Components/LoadingSkeletons.swift,
 				Components/NativeCodeInput.swift,
+				Components/OAuthProviderIcon.swift,
 				Components/ProfileSelectorCard.swift,
 				Components/QRCodeScannerView.swift,
 				Components/SafariNavigationBar.swift,
@@ -303,13 +314,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				78CFC5642E0ED25600999473 /* WalletConnectVerify in Frameworks */,
+				788B6D452E12FAB000EDAAC5 /* duo_schnorr in Frameworks */,
 				78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */,
 				78CFC5602E0ED25600999473 /* ReownWalletKit in Frameworks */,
 				789C7C972E02424200FF5B32 /* CoinbaseWalletSDK in Frameworks */,
 				789C7C922E02421B00FF5B32 /* metamask-ios-sdk in Frameworks */,
 				78CFC5622E0ED25600999473 /* WalletConnect in Frameworks */,
 				78CFACFE2E0DEBD900999473 /* ReownWalletKit in Frameworks */,
+				788B6D412E12FA7000EDAAC5 /* silentshardduo in Frameworks */,
+				788B6D472E12FAB000EDAAC5 /* silentshardduo in Frameworks */,
+				788B6D3F2E12FA7000EDAAC5 /* duo_schnorr in Frameworks */,
+				788B6D492E12FAB800EDAAC5 /* c2dkls in Frameworks */,
 				789C7C952E02423600FF5B32 /* GoogleSignIn in Frameworks */,
+				788B6D432E12FAB000EDAAC5 /* c2dkls in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2168,6 +2185,7 @@
 				7861E7282E02317E005D228A /* XCRemoteSwiftPackageReference "wallet-mobile-sdk" */,
 				7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */,
 				789C7C932E02423600FF5B32 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */,
 			);
 			preferredProjectObjectVersion = 46;
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
@@ -2626,6 +2644,14 @@
 				minimumVersion = 1.6.5;
 			};
 		};
+		788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/dushyantsutharsilencelaboratories/silentshard-artifacts";
+			requirement = {
+				branch = duo;
+				kind = branch;
+			};
+		};
 		789C7C932E02423600FF5B32 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
@@ -2637,6 +2663,36 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		788B6D3E2E12FA7000EDAAC5 /* duo_schnorr */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
+			productName = duo_schnorr;
+		};
+		788B6D402E12FA7000EDAAC5 /* silentshardduo */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
+			productName = silentshardduo;
+		};
+		788B6D422E12FAB000EDAAC5 /* c2dkls */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
+			productName = c2dkls;
+		};
+		788B6D442E12FAB000EDAAC5 /* duo_schnorr */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
+			productName = duo_schnorr;
+		};
+		788B6D462E12FAB000EDAAC5 /* silentshardduo */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
+			productName = silentshardduo;
+		};
+		788B6D482E12FAB800EDAAC5 /* c2dkls */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
+			productName = c2dkls;
+		};
 		789C7C912E02421B00FF5B32 /* metamask-ios-sdk */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7861E7272E023147005D228A /* XCRemoteSwiftPackageReference "metamask-ios-sdk" */;

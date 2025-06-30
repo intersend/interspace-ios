@@ -345,8 +345,19 @@ final class AuthenticationManagerV2: ObservableObject {
             return
         }
         
-        // Set token in API service
+        // Set token in API service immediately
         APIService.shared.setAccessToken(accessToken)
+        print("🔐 AuthenticationManagerV2: Access token set in APIService")
+        
+        // Only mark as authenticated if we're not in a wallet connection flow
+        // This prevents interfering with wallet authentication
+        if !WalletService.shared.isConnectionInProgress {
+            // Mark as authenticated immediately since we have valid tokens
+            // This allows API calls to proceed with authentication
+            isAuthenticated = true
+        } else {
+            print("🔐 AuthenticationManagerV2: Wallet connection in progress, deferring auth state update")
+        }
         
         // Check if token is expired
         if keychainManager.isTokenExpired() {
@@ -355,8 +366,8 @@ final class AuthenticationManagerV2: ObservableObject {
                 await refreshTokenIfNeeded()
             }
         } else {
-            // Token is valid, fetch current session
-            print("🔐 AuthenticationManagerV2: Token valid, fetching session")
+            // Token is valid, fetch current session in background
+            print("🔐 AuthenticationManagerV2: Token valid, fetching session data")
             Task {
                 await fetchCurrentSession()
             }
@@ -405,6 +416,26 @@ final class AuthenticationManagerV2: ObservableObject {
                 await logout()
             }
         }
+    }
+    
+    /// Validate the current auth token
+    func validateAuthToken() async -> Bool {
+        guard let accessToken = keychainManager.getAccessToken() else {
+            print("🔐 AuthenticationManagerV2: No access token to validate")
+            return false
+        }
+        
+        // Ensure token is set in APIService
+        APIService.shared.setAccessToken(accessToken)
+        
+        // Check if token is expired locally first
+        if keychainManager.isTokenExpired() {
+            print("🔐 AuthenticationManagerV2: Token is expired locally")
+            return false
+        }
+        
+        // Token appears valid
+        return true
     }
     
     func refreshTokenIfNeeded() async {
@@ -500,7 +531,10 @@ extension AuthenticationManagerV2 {
             message: nil,
             socialProvider: nil,
             socialProfile: nil,
-            oauthCode: nil
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         try await authenticate(with: config)
     }
@@ -516,7 +550,10 @@ extension AuthenticationManagerV2 {
             message: message,
             socialProvider: nil,
             socialProfile: nil,
-            oauthCode: nil
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         try await authenticate(with: config)
     }
@@ -536,20 +573,6 @@ extension AuthenticationManagerV2 {
     /// Sign out (alias for logout)
     func signOut() async {
         await logout()
-    }
-    
-    /// Validate auth token
-    func validateAuthToken() async -> Bool {
-        // Check if token exists and is not expired
-        guard let _ = keychainManager.getAccessToken(),
-              !keychainManager.isTokenExpired() else {
-            return false
-        }
-        
-        // Try to refresh if needed
-        await refreshTokenIfNeeded()
-        
-        return isAuthenticated
     }
     
     /// Fetch current user (updates currentUser property)
@@ -661,7 +684,9 @@ extension AuthenticationManagerV2 {
                 signature: nil,
                 message: nil,
                 walletType: nil,
-                idToken: nil
+                idToken: nil,
+                accessToken: nil,
+                shopDomain: nil
             )
             
             let response = try await authAPI.authenticateV2(request: request)
@@ -728,7 +753,10 @@ extension AuthenticationManagerV2 {
             message: devMessage,
             socialProvider: nil,
             socialProfile: nil,
-            oauthCode: nil
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         
         try await authenticate(with: config)

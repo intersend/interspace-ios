@@ -90,8 +90,13 @@ struct TestDataFactory {
             verificationCode: nil,
             walletAddress: walletAddress,
             signature: signature,
+            message: nil,
             socialProvider: nil,
-            socialProfile: nil
+            socialProfile: nil,
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
     }
 }

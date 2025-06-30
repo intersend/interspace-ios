@@ -28,9 +28,13 @@ struct UniversalAddTray: View {
     @State private var showAddApp = false
     @State private var showProfileCreation = false
     @State private var availableWalletConnectWallets: [WalletType] = []
+    @State private var showOAuthFlow = false
+    @State private var selectedOAuthProvider: OAuthProviderInfo?
+    @State private var isProcessing = false
     // Removed showWalletConnectionTray - using direct authorization
     
     private let walletService = WalletService.shared
+    private let oauthService = OAuthProviderService.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -240,6 +244,43 @@ struct UniversalAddTray: View {
                     )
                     .padding(.horizontal, 20)
                     
+                    // OAuth Providers Section
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Social")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 20)
+                        
+                        VStack(spacing: 0) {
+                            ForEach(Array(OAuthProviderInfo.providers.enumerated()), id: \.element.id) { index, provider in
+                                // Skip Apple since it's already shown above
+                                if provider.id != "apple" {
+                                    if index > 0 && provider.id != OAuthProviderInfo.providers.first(where: { $0.id != "apple" })?.id {
+                                        Divider()
+                                            .padding(.leading, 72)
+                                    }
+                                    
+                                    AddOptionRow(
+                                        icon: provider.iconName,
+                                        iconType: .asset,
+                                        title: provider.displayName,
+                                        iconColor: provider.tintColor,
+                                        isFirst: provider.id == OAuthProviderInfo.providers.first(where: { $0.id != "apple" })?.id,
+                                        isLast: provider.id == OAuthProviderInfo.providers.filter({ $0.id != "apple" }).last?.id
+                                    ) {
+                                        HapticManager.impact(.light)
+                                        handleOAuthProvider(provider)
+                                    }
+                                }
+                            }
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(white: 0.15))
+                        )
+                        .padding(.horizontal, 20)
+                    }
+                    
                     // App Section - only show when authenticated and not in auth mode
                     if !isForAuthentication && authManager.isAuthenticated {
                         VStack(alignment: .leading, spacing: 16) {
@@ -368,6 +409,26 @@ struct UniversalAddTray: View {
                 }
             }
         }
+        .sheet(isPresented: $showOAuthFlow) {
+            if let provider = selectedOAuthProvider {
+                OAuthFlowView(provider: provider, isForAuthentication: isForAuthentication) { result in
+                    Task {
+                        await handleOAuthResult(provider: provider, result: result)
+                    }
+                }
+            }
+        }
+        .overlay {
+            if isProcessing {
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+                    .overlay {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.2)
+                    }
+            }
+        }
         .onAppear {
             Task {
                 if !isForAuthentication {
@@ -425,6 +486,60 @@ struct UniversalAddTray: View {
                 HapticManager.notification(.error)
             }
         }
+    }
+    
+    private func handleOAuthProvider(_ provider: OAuthProviderInfo) {
+        selectedOAuthProvider = provider
+        showOAuthFlow = true
+    }
+    
+    private func handleOAuthResult(provider: OAuthProviderInfo, result: Result<OAuthTokens, Error>) async {
+        isProcessing = true
+        
+        do {
+            switch result {
+            case .success(let tokens):
+                if isForAuthentication {
+                    try await authManager.authenticateWithOAuth(
+                        provider: provider.id,
+                        tokens: OAuthTokenResponse(
+                            accessToken: tokens.accessToken,
+                            refreshToken: tokens.refreshToken,
+                            idToken: tokens.idToken,
+                            expiresIn: tokens.expiresIn,
+                            provider: tokens.provider
+                        )
+                    )
+                    
+                    await MainActor.run {
+                        isPresented = false
+                        showOAuthFlow = false
+                    }
+                } else {
+                    // Handle account linking
+                    try await authManager.linkAccount(
+                        type: .social,
+                        identifier: "", // Will be determined by backend
+                        provider: provider.id
+                    )
+                    
+                    await MainActor.run {
+                        isPresented = false
+                        showOAuthFlow = false
+                    }
+                }
+                
+            case .failure(let error):
+                print("OAuth error: \(error)")
+                // Show error to user
+                HapticManager.notification(.error)
+            }
+        } catch {
+            print("Authentication error: \(error)")
+            HapticManager.notification(.error)
+        }
+        
+        isProcessing = false
     }
     
     private func createProfile(name: String) async {
@@ -515,15 +630,27 @@ struct AddOptionRow: View {
                                     .fill(iconColor)
                             )
                     } else {
-                        // Asset icons (MetaMask, Coinbase)
-                        Image(icon)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color(white: 0.15))
-                            )
+                        // Asset icons - check if it's an OAuth provider icon
+                        if icon.hasSuffix("_icon") {
+                            // Extract provider ID from icon name (e.g., "google_icon" -> "google")
+                            let providerId = String(icon.dropLast(5))
+                            OAuthProviderIcon(provider: providerId, size: 32)
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(iconColor)
+                                )
+                        } else {
+                            // Regular asset icons (MetaMask, Coinbase)
+                            Image(icon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(Color(white: 0.15))
+                                )
+                        }
                     }
                 }
                 
@@ -801,6 +928,67 @@ extension SocialProvider {
             return .purple
         case .github:
             return .gray
+        }
+    }
+}
+
+// MARK: - OAuth Flow View
+struct OAuthFlowView: View {
+    let provider: OAuthProviderInfo
+    let isForAuthentication: Bool
+    let completion: (Result<OAuthTokens, Error>) -> Void
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var isLoading = true
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // OAuth web view or native flow would go here
+                if isLoading {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(1.5)
+                        
+                        Text("Connecting to \(provider.displayName)...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Sign in with \(provider.displayName)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            initiateOAuthFlow()
+        }
+    }
+    
+    private func initiateOAuthFlow() {
+        guard let oauthProvider = OAuthProviderService.shared.provider(for: provider.id) else {
+            completion(.failure(AuthenticationError.unknown("Provider not configured")))
+            return
+        }
+        
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let viewController = windowScene.windows.first?.rootViewController else {
+            completion(.failure(AuthenticationError.unknown("Unable to present OAuth flow")))
+            return
+        }
+        
+        OAuthProviderService.shared.authenticate(
+            with: oauthProvider,
+            presentingViewController: viewController
+        ) { result in
+            completion(result)
         }
     }
 }

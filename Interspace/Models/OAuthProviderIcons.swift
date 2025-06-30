@@ -20,6 +20,11 @@ struct OAuthProviderIconURLs {
             retina: "\(baseURL)epic_icon@2x.png",
             retinaHD: "\(baseURL)epic_icon@3x.png"
         ),
+        "epicgames": IconSet(
+            standard: "\(baseURL)epic_icon.png",
+            retina: "\(baseURL)epic_icon@2x.png",
+            retinaHD: "\(baseURL)epic_icon@3x.png"
+        ),
         "facebook": IconSet(
             standard: "\(baseURL)facebook_icon.png",
             retina: "\(baseURL)facebook_icon@2x.png",

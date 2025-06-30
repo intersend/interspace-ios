@@ -380,14 +380,10 @@ final class WalletService: ObservableObject {
             
             switch walletType {
             case .metamask:
-                // Try different connection methods based on a flag
-                if ProcessInfo.processInfo.environment["USE_METAMASK_CONNECT_AND_SIGN"] == "true" {
-                    print("💰 WalletService: Using connectAndSign method")
-                    result = try await connectMetaMaskWithSignature()
-                } else {
-                    print("💰 WalletService: Using standard connect then sign method")
-                    result = try await connectMetaMask()
-                }
+                // Always use connectAndSign for SIWE authentication
+                // This is more reliable than the two-step process
+                print("💰 WalletService: Using connectAndSign method for SIWE")
+                result = try await connectMetaMaskWithSIWE()
             case .coinbase:
                 result = try await connectCoinbaseWallet()
             case .walletConnect, .rainbow, .trust, .argent, .gnosisSafe, .family, .phantom, .oneInch, .zerion, .imToken, .tokenPocket, .spot, .omni:
@@ -482,10 +478,11 @@ final class WalletService: ObservableObject {
         
         // Always connect for authentication
         print("💰 WalletService: Initiating MetaMask connection...")
+        print("💰 WalletService: Current time: \(Date())")
         
         let connectResult = await sdk.connect()
         
-        print("💰 WalletService: Connect result received")
+        print("💰 WalletService: Connect result received at: \(Date())")
         print("💰 WalletService: Current account after connect: \(sdk.account.isEmpty ? "none" : sdk.account)")
         
         switch connectResult {
@@ -615,10 +612,17 @@ final class WalletService: ObservableObject {
         }
     }
     
-    // MARK: - Alternative MetaMask Connection Method
+    // MARK: - MetaMask SIWE Connection Method
     
-    private func connectMetaMaskWithSignature() async throws -> WalletConnectionResult {
-        print("💰 WalletService: Starting MetaMask connectAndSign")
+    private func connectMetaMaskWithSIWE() async throws -> WalletConnectionResult {
+        print("💰 WalletService: Starting MetaMask SIWE authentication with connectAndSign")
+        
+        // Ensure SDK is initialized
+        if !isInitialized {
+            print("💰 WalletService: SDK not initialized, performing lazy initialization")
+            await initializeSDKsIfNeeded()
+        }
+        
         guard let sdk = metamaskSDK else {
             print("💰 WalletService: MetaMask SDK not initialized")
             throw WalletError.sdkNotInitialized
@@ -630,40 +634,104 @@ final class WalletService: ObservableObject {
             throw WalletError.connectionFailed("MetaMask app is not installed. Please install MetaMask from the App Store.")
         }
         
-        // Create message for authentication
-        let timestamp = Int(Date().timeIntervalSince1970)
-        let message = "Welcome to Interspace!\n\nSign this message to authenticate your wallet.\n\nTimestamp: \(timestamp)"
-        print("💰 WalletService: Message to sign: \(message)")
+        // For authentication flow, ensure clean state
+        // This is important because we want a fresh connection for authentication
+        if !sdk.account.isEmpty {
+            print("💰 WalletService: Clearing existing connection for fresh authentication")
+            sdk.disconnect()
+            sdk.clearSession()
+            // Give SDK time to clear
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        }
         
-        // Use connectAndSign
-        print("💰 WalletService: Using connectAndSign method...")
-        let result = await sdk.connectAndSign(message: message)
+        // Get SIWE nonce from backend first
+        let nonce: String
+        do {
+            nonce = try await getSIWENonce()
+            print("💰 WalletService: Got SIWE nonce: \(nonce)")
+        } catch {
+            print("💰 WalletService: Failed to get SIWE nonce: \(error)")
+            throw WalletError.networkError("Failed to get authentication nonce")
+        }
         
-        switch result {
-        case .success(let signature):
-            print("💰 WalletService: ConnectAndSign successful")
+        // For initial connection, we can't use connectAndSign directly because
+        // it requires an existing connection. We need to use the two-step process:
+        // 1. Connect to get the user's MetaMask address
+        // 2. Sign the SIWE message with that address
+        
+        print("💰 WalletService: Step 1: Connecting to MetaMask...")
+        let connectResult = await sdk.connect()
+        
+        switch connectResult {
+        case .success:
+            print("💰 WalletService: Connection successful")
             
-            // Get the connected account
-            let account = sdk.account
-            guard !account.isEmpty else {
-                print("💰 WalletService: No account found after connectAndSign")
+            // Get the connected account (user's MetaMask address)
+            guard !sdk.account.isEmpty else {
+                print("💰 WalletService: No account found after connection")
                 throw WalletError.noAccountsFound
             }
             
-            let connectionResult = WalletConnectionResult(
-                address: account,
-                signature: signature,
-                message: message,
-                walletType: .metamask
+            let userAddress = sdk.account
+            print("💰 WalletService: Connected to user's MetaMask account: \(userAddress)")
+            
+            // Now create the proper SIWE message with the user's address
+            let siweMessage = createSIWEMessage(
+                address: userAddress,
+                nonce: nonce,
+                chainId: 1 // Ethereum mainnet
+            )
+            print("💰 WalletService: Created SIWE message for user's address")
+            
+            // Step 2: Sign the SIWE message
+            print("💰 WalletService: Step 2: Requesting signature...")
+            let signRequest = EthereumRequest(
+                method: .personalSign,
+                params: [siweMessage, userAddress] // message first, then address
             )
             
-            print("💰 WalletService: MetaMask connection successful")
-            print("💰 WalletService: Address: \(account)")
-            print("💰 WalletService: Signature: \(signature.prefix(20))...")
-            return connectionResult
+            let signResult = await sdk.request(signRequest)
+            
+            switch signResult {
+            case .success(let signature):
+                print("💰 WalletService: Signature received successfully")
+                
+                let connectionResult = WalletConnectionResult(
+                    address: userAddress,
+                    signature: signature,
+                    message: siweMessage,
+                    walletType: .metamask
+                )
+                
+                print("💰 WalletService: SIWE authentication complete")
+                print("💰 WalletService: User's address: \(userAddress)")
+                print("💰 WalletService: Signature: \(signature.prefix(20))...")
+                
+                return connectionResult
+                
+            case .failure(let error):
+                print("💰 WalletService: Signature failed: \(error)")
+                sdk.disconnect()
+                
+                let errorMessage = error.localizedDescription.lowercased()
+                if errorMessage.contains("user denied") || errorMessage.contains("cancelled") || errorMessage.contains("rejected") {
+                    throw WalletError.userCancelled
+                }
+                throw WalletError.signatureFailed(error.localizedDescription)
+            }
             
         case .failure(let error):
-            print("💰 WalletService: ConnectAndSign failed: \(error)")
+            print("💰 WalletService: MetaMask connection failed: \(error)")
+            
+            // Check if user cancelled
+            let errorMessage = error.localizedDescription.lowercased()
+            if errorMessage.contains("user denied") || errorMessage.contains("cancelled") || errorMessage.contains("rejected") {
+                // Clear connection flags on user cancellation
+                isConnectionInProgress = false
+                isAuthenticationFlow = false
+                throw WalletError.userCancelled
+            }
+            
             throw WalletError.connectionFailed(error.localizedDescription)
         }
     }

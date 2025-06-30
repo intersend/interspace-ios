@@ -51,6 +51,10 @@ class APIService {
         self.accessToken = token
     }
     
+    func getAccessToken() -> String? {
+        return self.accessToken
+    }
+    
     func clearAccessToken() {
         self.accessToken = nil
     }
@@ -108,8 +112,17 @@ class APIService {
         }
 
         // Add authorization header if required and available
-        if requiresAuth, let token = accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if requiresAuth {
+            if let token = accessToken {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                #if DEBUG
+                print("🌐 APIService: Added auth header for \(endpoint)")
+                #endif
+            } else {
+                #if DEBUG
+                print("🔴 APIService: No access token available for authenticated request to \(endpoint)")
+                #endif
+            }
         }
 
         if let body = body {

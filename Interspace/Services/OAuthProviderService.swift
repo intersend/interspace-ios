@@ -114,6 +114,16 @@ struct EpicGamesOAuthProvider: OAuthProvider {
     let additionalParameters: [String: String]? = nil
 }
 
+struct AppleOAuthProvider: OAuthProvider {
+    let providerName = "apple"
+    let authorizationEndpoint = URL(string: "https://appleid.apple.com/auth/authorize")!
+    let tokenEndpoint = URL(string: "https://appleid.apple.com/auth/token")!
+    let clientId = Bundle.main.object(forInfoDictionaryKey: "APPLE_CLIENT_ID") as? String ?? ""
+    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/apple")!
+    let scopes = ["name", "email"]
+    let additionalParameters: [String: String]? = ["response_mode": "form_post"]
+}
+
 // MARK: - OAuth Service
 class OAuthProviderService: NSObject {
     static let shared = OAuthProviderService()
@@ -123,6 +133,7 @@ class OAuthProviderService: NSObject {
     // Get provider by name
     func provider(for name: String) -> OAuthProvider? {
         switch name.lowercased() {
+        case "apple": return AppleOAuthProvider()
         case "google": return GoogleOAuthProvider()
         case "discord": return DiscordOAuthProvider()
         case "spotify": return SpotifyOAuthProvider()

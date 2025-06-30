@@ -328,7 +328,10 @@ struct WalletAuthenticationView: View {
                     message: result.message,
                     socialProvider: nil,
                     socialProfile: nil,
-                    oauthCode: nil
+                    oauthCode: nil,
+                    idToken: nil,
+                    accessToken: nil,
+                    shopDomain: nil
                 )
                 
                 // Try to authenticate directly
@@ -389,7 +392,10 @@ struct WalletAuthenticationView: View {
                     message: walletMessage ?? "",
                     socialProvider: nil,
                     socialProfile: nil,
-                    oauthCode: nil
+                    oauthCode: nil,
+                    idToken: nil,
+                    accessToken: nil,
+                    shopDomain: nil
                 )
                 
                 await completeAuthentication(config: config)

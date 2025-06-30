@@ -84,6 +84,11 @@ class ProfileViewModel: ObservableObject {
     }
     
     private func loadProfileDetails(profileId: String) async {
+        // Clear accounts before loading new profile details
+        await MainActor.run {
+            self.linkedAccounts = []
+        }
+        
         do {
             // Load linked accounts for the profile
             async let accountsTask = loadLinkedAccounts(profileId: profileId)
@@ -111,12 +116,21 @@ class ProfileViewModel: ObservableObject {
     private func loadLinkedAccounts(profileId: String) async {
         do {
             let fetchedAccounts = try await profileAPI.getLinkedAccounts(profileId: profileId)
+            
+            // Debug logging
+            print("🟢 ProfileViewModel.loadLinkedAccounts - Fetched \(fetchedAccounts.count) accounts:")
+            for account in fetchedAccounts {
+                print("  - ID: \(account.id), Address: \(account.address)")
+            }
+            
             await MainActor.run {
+                // Always update the linkedAccounts array, even if empty
                 self.linkedAccounts = fetchedAccounts
             }
         } catch {
             print("Error loading linked accounts: \(error)")
             await MainActor.run {
+                // Clear accounts on error as well
                 self.linkedAccounts = []
             }
         }
@@ -169,6 +183,13 @@ class ProfileViewModel: ObservableObject {
     func switchProfile(_ profile: SmartProfile) async {
         isLoading = true
         
+        // Clear existing accounts data before switching
+        await MainActor.run {
+            self.linkedAccounts = []
+            self.socialAccounts = []
+            self.emailAccounts = []
+        }
+        
         do {
             // Activate the selected profile
             let _ = try await profileAPI.activateProfile(profileId: profile.id)
@@ -190,6 +211,13 @@ class ProfileViewModel: ObservableObject {
     
     func createProfile(name: String) async {
         isLoading = true
+        
+        // Clear existing accounts data before creating new profile
+        await MainActor.run {
+            self.linkedAccounts = []
+            self.socialAccounts = []
+            self.emailAccounts = []
+        }
         
         do {
             // For now, always create development profiles to simplify testing
@@ -393,6 +421,12 @@ class ProfileViewModel: ObservableObject {
     
     func unlinkAccount(_ account: LinkedAccount) async {
         isLoading = true
+        
+        // Debug logging
+        print("🔴 ProfileViewModel.unlinkAccount - Account to delete:")
+        print("  - LinkedAccount ID: \(account.id)")
+        print("  - Address: \(account.address)")
+        print("  - Wallet Type: \(account.walletType)")
         
         do {
             let _ = try await profileAPI.unlinkAccount(accountId: account.id)

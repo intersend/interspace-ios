@@ -13,6 +13,12 @@ final class ProfileAPI {
     
     /// GET /profiles
     func getProfiles() async throws -> [SmartProfile] {
+        // Check if we have a token before making the request
+        if apiService.getAccessToken() == nil {
+            print("🔴 ProfileAPI: No access token available for getProfiles request")
+            throw APIError.unauthorized
+        }
+        
         // The backend returns a wrapped response
         let response: ProfilesResponse = try await apiService.performRequest(
             endpoint: "/profiles",
