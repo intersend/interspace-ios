@@ -367,7 +367,10 @@ struct AppleSignInRow: View {
                         message: nil,
                         socialProvider: "apple",
                         socialProfile: socialProfile,
-                        oauthCode: nil
+                        oauthCode: nil,
+                        idToken: nil,
+                        accessToken: nil,
+                        shopDomain: nil
                     )
                     
                     try await AuthenticationManagerV2.shared.authenticate(with: config)

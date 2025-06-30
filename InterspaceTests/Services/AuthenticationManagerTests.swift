@@ -78,8 +78,13 @@ class AuthenticationManagerTests: XCTestCase {
             verificationCode: "123456",
             walletAddress: nil,
             signature: nil,
+            message: nil,
             socialProvider: nil,
-            socialProfile: nil
+            socialProfile: nil,
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         let authResponse = TestDataFactory.createAuthResponse()
         let testUser = TestDataFactory.createTestUser(email: "test@example.com")
@@ -105,8 +110,13 @@ class AuthenticationManagerTests: XCTestCase {
             verificationCode: nil,
             walletAddress: nil,
             signature: nil,
+            message: nil,
             socialProvider: nil,
-            socialProfile: nil
+            socialProfile: nil,
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         let authResponse = TestDataFactory.createAuthResponse()
         

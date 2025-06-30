@@ -1,4 +1,5 @@
 import Foundation
+import AuthenticationServices
 
 // MARK: - OAuth Error Types
 enum OAuthProviderError: LocalizedError {

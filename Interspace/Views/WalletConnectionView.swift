@@ -20,7 +20,10 @@ extension ProfileViewModel: WalletConnectionHandler {
             message: message,
             socialProvider: nil,
             socialProfile: nil,
-            oauthCode: nil
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         try await linkWallet(config: config)
     }
@@ -40,7 +43,10 @@ extension AuthViewModel: WalletConnectionHandler {
             message: message,
             socialProvider: nil,
             socialProfile: nil,
-            oauthCode: nil
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         try await authManager.authenticate(with: config)
     }
@@ -595,7 +601,10 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
                 message: message,
                 socialProvider: nil,
                 socialProfile: nil,
-                oauthCode: nil
+                oauthCode: nil,
+                idToken: nil,
+                accessToken: nil,
+                shopDomain: nil
             )
             
             // Authenticate with the wallet

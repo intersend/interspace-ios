@@ -199,8 +199,13 @@ class AuthModelsTests: XCTestCase {
             verificationCode: nil,
             walletAddress: "0x1234",
             signature: "0xsignature",
+            message: nil,
             socialProvider: nil,
-            socialProfile: nil
+            socialProfile: nil,
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         
         XCTAssertEqual(config.strategy, .wallet)
@@ -219,8 +224,13 @@ class AuthModelsTests: XCTestCase {
             verificationCode: "123456",
             walletAddress: nil,
             signature: nil,
+            message: nil,
             socialProvider: nil,
-            socialProfile: nil
+            socialProfile: nil,
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         
         XCTAssertEqual(config.strategy, .email)
@@ -245,8 +255,13 @@ class AuthModelsTests: XCTestCase {
             verificationCode: nil,
             walletAddress: nil,
             signature: nil,
+            message: nil,
             socialProvider: "google",
-            socialProfile: socialProfile
+            socialProfile: socialProfile,
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         
         XCTAssertEqual(config.strategy, .google)

@@ -11,7 +11,7 @@ class V2APITestRunner {
     init() {
         // Use production API for testing
         let config = APIConfiguration(
-            baseURL: "https://7d4b-184-147-176-114.ngrok-free.app/api/v2",
+            baseURL: "https://9e68-184-147-176-114.ngrok-free.app/api/v2",
             timeout: 30,
             retryCount: 3
         )

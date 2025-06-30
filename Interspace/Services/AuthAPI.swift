@@ -159,7 +159,9 @@ final class AuthAPI {
             signature: signature,
             message: message,
             walletType: nil,
-            idToken: nil
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         
         return try await authenticateV2(request: request)

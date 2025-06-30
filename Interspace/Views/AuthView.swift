@@ -304,8 +304,9 @@ struct UnauthenticatedView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .sheet(isPresented: $showUniversalAddTray) {
-            UniversalAddTrayV2(
+            UniversalAddTray(
                 isPresented: $showUniversalAddTray,
+                initialSection: .none,
                 isForAuthentication: true,
                 authViewModel: AuthViewModel()
             )

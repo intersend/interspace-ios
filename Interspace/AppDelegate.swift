@@ -101,9 +101,18 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
             if let metamaskSDK = WalletService.shared.metamaskSDK {
                 print("📱 AppDelegate: Passing URL to MetaMask SDK")
                 print("📱 AppDelegate: SDK account before handleUrl: \(metamaskSDK.account.isEmpty ? "none" : metamaskSDK.account)")
+                print("📱 AppDelegate: Is connection in progress: \(WalletService.shared.isConnectionInProgress)")
+                
+                // Handle the URL - this should trigger the SDK's internal callback
                 metamaskSDK.handleUrl(url)
+                
                 print("📱 AppDelegate: MetaMask SDK handled URL successfully")
                 print("📱 AppDelegate: SDK account after handleUrl: \(metamaskSDK.account.isEmpty ? "none" : metamaskSDK.account)")
+                
+                // If we're in a connection flow, the SDK should now have the account
+                if WalletService.shared.isConnectionInProgress && !metamaskSDK.account.isEmpty {
+                    print("📱 AppDelegate: Connection flow detected with account available")
+                }
                 
                 // Clear the handling flag after a short delay
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in

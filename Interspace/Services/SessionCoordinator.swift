@@ -145,7 +145,15 @@ final class SessionCoordinator: ObservableObject {
         }
         
         // Check if user is already authenticated (stored tokens)
+        // This synchronously sets the token in APIService if found
         authManager.checkAuthenticationStatus()
+        
+        // If authenticated after token check, ensure token is set before any API calls
+        if authManager.isAuthenticated {
+            print("🔐 SessionCoordinator: User authenticated from stored tokens")
+            // Token should already be set in APIService by checkAuthenticationStatus
+            // The auth state change will trigger loadUserSession via the binding
+        }
     }
     
     private func loadCachedSession() async {
@@ -208,6 +216,13 @@ final class SessionCoordinator: ObservableObject {
     func loadUserSession() async {
         do {
             sessionState = .loading
+            
+            // Ensure we have a valid token before proceeding
+            guard APIService.shared.getAccessToken() != nil else {
+                print("🔴 SessionCoordinator: No access token available, cannot load user session")
+                sessionState = .unauthenticated
+                return
+            }
             
             // Check if current user is a guest
             if let currentUser = authManager.currentUser, currentUser.isGuest {
@@ -813,3 +828,4 @@ extension Notification.Name {
     static let sessionTimedOut = Notification.Name("sessionTimedOut")
     static let orphanAccountAssociated = Notification.Name("orphanAccountAssociated")
 }
+

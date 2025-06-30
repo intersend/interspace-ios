@@ -102,7 +102,10 @@ extension AuthenticationManagerV2 {
             message: nil,
             socialProvider: nil,
             socialProfile: nil,
-            oauthCode: nil
+            oauthCode: nil,
+            idToken: nil,
+            accessToken: nil,
+            shopDomain: nil
         )
         
         try await authenticate(with: config)

@@ -189,7 +189,10 @@ final class AuthViewModel: ObservableObject {
                     message: result.message, // Include the message for verification
                     socialProvider: nil,
                     socialProfile: nil,
-                    oauthCode: nil
+                    oauthCode: nil,
+                    idToken: nil,
+                    accessToken: nil,
+                    shopDomain: nil
                 )
                 
                 try await authManager.authenticate(with: config)
@@ -314,7 +317,10 @@ final class AuthViewModel: ObservableObject {
                         message: nil,
                         socialProvider: "apple",
                         socialProfile: socialProfile,
-                        oauthCode: nil
+                        oauthCode: nil,
+                        idToken: nil,
+                        accessToken: nil,
+                        shopDomain: nil
                     )
                     
                     try await authManager.authenticate(with: config)
@@ -349,7 +355,10 @@ final class AuthViewModel: ObservableObject {
                     message: nil,
                     socialProvider: "google",
                     socialProfile: nil,
-                    oauthCode: nil
+                    oauthCode: nil,
+                    idToken: nil,
+                    accessToken: nil,
+                    shopDomain: nil
                 )
                 
                 try await authManager.authenticate(with: config)
