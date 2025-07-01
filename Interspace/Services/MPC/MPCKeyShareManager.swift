@@ -1,10 +1,5 @@
 import Foundation
-// TODO: Import Silence Labs SDK when module conflicts are resolved
-// import silentshard
-// import silentshardduo
-
-// Using placeholder types for now
-// Remove this comment when Silence Labs SDK module conflicts are resolved
+import silentshardduo
 
 // MARK: - MPCKeyShareManager
 
@@ -276,10 +271,17 @@ struct MPCKeyShare: Codable {
     let address: String
     let algorithm: MPCAlgorithm
     let createdAt: Date
+    let keyId: String
     
-    var keyId: String {
-        // Generate a unique key ID from the share data
-        return shareData.prefix(32).base64EncodedString()
+    // Backward compatibility initializer
+    init(shareData: Data, publicKey: String, address: String, algorithm: MPCAlgorithm, createdAt: Date, keyId: String? = nil) {
+        self.shareData = shareData
+        self.publicKey = publicKey
+        self.address = address
+        self.algorithm = algorithm
+        self.createdAt = createdAt
+        // Use provided keyId or generate from share data
+        self.keyId = keyId ?? shareData.prefix(32).base64EncodedString()
     }
 }
 
@@ -292,6 +294,20 @@ enum MPCAlgorithm: String, Codable {
 
 final class MPCConfiguration {
     static let shared = MPCConfiguration()
+    
+    enum Environment {
+        case development
+        case staging
+        case production
+    }
+    
+    var environment: Environment {
+        #if DEBUG
+        return .development
+        #else
+        return .production
+        #endif
+    }
     
     var duoNodeUrl: String {
         #if DEBUG

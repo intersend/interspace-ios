@@ -5,6 +5,7 @@ import GoogleSignIn
 import WalletConnectSign
 import AppAuth
 
+
 public class AppDelegate: UIResponder, UIApplicationDelegate {
   public var window: UIWindow?
   
@@ -42,6 +43,12 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
     // Configure Google Sign-In
     print("📱 AppDelegate: Configuring Google Sign-In")
     GoogleSignInService.shared.configure()
+    
+    // Enable MPC wallet for testing in debug builds
+    #if DEBUG
+    print("📱 AppDelegate: Enabling MPC wallet for debug testing")
+    MPCDebugHelper.initializeForTesting()
+    #endif
     
     // Track end of app delegate
     AppLaunchPerformance.shared.markAppDelegateEnd()
@@ -224,5 +231,3 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
 //         self.swizzledOpen(url, options: options, completionHandler: completion)
 //     }
 // }
-
-

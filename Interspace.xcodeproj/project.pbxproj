@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		784D9DDD2E1353FC00D65859 /* MPCWalletUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784D9DDC2E1353FC00D65859 /* MPCWalletUITests.swift */; };
+		784D9DDF2E13541200D65859 /* MPCIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784D9DDE2E13541200D65859 /* MPCIntegrationTests.swift */; };
 		785509202E098AD400EDDF1C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7861E6D62E021F38005D228A /* AppDelegate.swift */; };
 		78550C542E098EC600EDDF1C /* interspace_iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACBAFBC0CADEC4B3E2D7592B /* interspace_iosApp.swift */; };
 		7861E3192E0114AD005D228A /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7861E2D22E0114AD005D228A /* GoogleService-Info.plist */; };
@@ -77,6 +79,8 @@
 		6C07C0813EA54A6423D59A68 /* AuthModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthModels.swift; path = Interspace/Models/AuthModels.swift; sourceTree = "<group>"; };
 		6F9999CA76DA1D01D689B958 /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthService.swift; path = Interspace/Services/AuthService.swift; sourceTree = "<group>"; };
 		75F5608FB1806F3D4B04A488 /* AccountDetailCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AccountDetailCard.swift; path = Interspace/Views/AccountDetailCard.swift; sourceTree = "<group>"; };
+		784D9DDC2E1353FC00D65859 /* MPCWalletUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MPCWalletUITests.swift; path = InterspaceUITests/MPCWalletUITests.swift; sourceTree = "<group>"; };
+		784D9DDE2E13541200D65859 /* MPCIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MPCIntegrationTests.swift; path = InterspaceTests/MPCIntegrationTests.swift; sourceTree = "<group>"; };
 		7861E2D02E0114AD005D228A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7861E2D22E0114AD005D228A /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		7861E2D32E0114AD005D228A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -156,16 +160,21 @@
 				KeychainManager.swift,
 				MetadataFetcher.swift,
 				MPC/BiometricAuthManager.swift,
+				MPC/MPCDebugHelper.swift,
+				MPC/MPCHTTPSessionManager.swift,
 				MPC/MPCKeyShareManager.swift,
+				MPC/MPCKeyShareManagerHTTP.swift,
 				MPC/MPCPlaceholderTypes.swift,
 				MPC/MPCSecureStorage.swift,
 				MPC/MPCSessionManager.swift,
 				MPC/MPCWalletService.swift,
+				MPC/MPCWalletServiceHTTP.swift,
 				NetworkMonitor.swift,
 				OAuthErrorHandler.swift,
 				OAuthProviderService.swift,
 				PasskeyService.swift,
 				ProfileAPI.swift,
+				"ProfileAPI+MPC.swift",
 				ProfileIconGenerator.swift,
 				ServiceInitializer.swift,
 				SessionCoordinator.swift,
@@ -255,6 +264,7 @@
 				Modifiers/ScrollOffsetModifier.swift,
 				Modifiers/ShakeDetector.swift,
 				OnboardingView.swift,
+				"Profile/CreateProfileView+MPC.swift",
 				Profile/MPCTransactionApprovalView.swift,
 				Profile/MPCWalletSetupView.swift,
 				Profile/ProfileAboutView.swift,
@@ -1107,6 +1117,8 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				784D9DDE2E13541200D65859 /* MPCIntegrationTests.swift */,
+				784D9DDC2E1353FC00D65859 /* MPCWalletUITests.swift */,
 				780212432E00478000A47913 /* Interspace */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -2240,6 +2252,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				784D9DDF2E13541200D65859 /* MPCIntegrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2247,6 +2260,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				784D9DDD2E1353FC00D65859 /* MPCWalletUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2273,6 +2287,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 579ZB4FX6N;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2394,6 +2409,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 579ZB4FX6N;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2535,6 +2551,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 579ZB4FX6N;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2560,6 +2577,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 579ZB4FX6N;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (

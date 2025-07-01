@@ -6,6 +6,12 @@ struct interspace_iosApp: App {
     
     // Initialize shared services on app launch
     init() {
+        // Skip initialization if running tests
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            print("Running in test mode - skipping service initialization")
+            return
+        }
+        
         // Perform critical initialization synchronously
         Task { @MainActor in
             await ServiceInitializer.shared.initializeCriticalServices()
@@ -14,23 +20,28 @@ struct interspace_iosApp: App {
     
     var body: some Scene {
         WindowGroup {
-            // TestView() // Works correctly - fills screen
-            ContentView()
-                .environmentObject(serviceInitializer.auth)
-                .environmentObject(serviceInitializer.session)
-                .environmentObject(serviceInitializer)
-                .preferredColorScheme(.dark)
-                .onAppear {
-                    // Configure global app appearance
-                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-                        windowScene.windows.forEach { window in
-                            window.overrideUserInterfaceStyle = .dark
+            // Check if running tests
+            if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+                // Minimal view for tests
+                EmptyView()
+            } else {
+                // TestView() // Works correctly - fills screen
+                ContentView()
+                    .environmentObject(serviceInitializer.auth)
+                    .environmentObject(serviceInitializer.session)
+                    .environmentObject(serviceInitializer)
+                    .preferredColorScheme(.dark)
+                    .onAppear {
+                        // Configure global app appearance
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                            windowScene.windows.forEach { window in
+                                window.overrideUserInterfaceStyle = .dark
+                            }
                         }
+                        
+                        // Initialize deferred services after UI is ready
+                        ServiceInitializer.shared.initializeDeferredServices()
                     }
-                    
-                    // Initialize deferred services after UI is ready
-                    ServiceInitializer.shared.initializeDeferredServices()
-                }
                 .onOpenURL { url in
                     print("📱 SwiftUI App: Received URL: \(url.absoluteString)")
                     print("📱 SwiftUI App: URL scheme: \(url.scheme ?? "none")")
@@ -46,6 +57,7 @@ struct interspace_iosApp: App {
                         }
                     }
                 }
+            }
         }
     }
 }

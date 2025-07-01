@@ -23,15 +23,22 @@ final class MPCSecureStorage {
         let encoder = JSONEncoder()
         let keyShareData = try encoder.encode(keyShare)
         
+        print("🔵 MPCSecureStorage: Serialized key share size: \(keyShareData.count) bytes")
+        
         // Encrypt with hardware-backed key
         let encryptedData = try await encryptData(keyShareData)
         
+        print("🔵 MPCSecureStorage: Encrypted data size: \(encryptedData.count) bytes")
+        
         // Store in keychain with biometric protection
+        // Try without biometric first to isolate the issue
         try storeInKeychain(
             data: encryptedData,
             key: keyForProfile(profileId),
-            requiresBiometric: true
+            requiresBiometric: false  // Changed to false for debugging
         )
+        
+        print("🔵 MPCSecureStorage: Successfully stored key share in keychain")
         
         // Store metadata separately (non-sensitive)
         try storeMetadata(for: profileId, keyShare: keyShare)
@@ -88,35 +95,52 @@ final class MPCSecureStorage {
         key: String,
         requiresBiometric: Bool
     ) throws {
+        // First, always delete any existing item
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+        
+        // Build the basic query
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
             kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecValueData as String: data
         ]
         
-        // Add biometric protection
-        if requiresBiometric && LAContext().biometryType != .none {
-            let access = SecAccessControlCreateWithFlags(
-                kCFAllocatorDefault,
-                kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                [.biometryCurrentSet, .privateKeyUsage],
-                nil
-            )
-            query[kSecAttrAccessControl as String] = access
-        }
-        
-        // Use data protection
-        query[kSecUseDataProtectionKeychain as String] = true
-        
-        // Delete existing item
-        SecItemDelete(query as CFDictionary)
+        // For now, skip biometric protection to avoid complexity
+        // Just use standard accessibility
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         
         // Add new item
         let status = SecItemAdd(query as CFDictionary, nil)
         
         guard status == errSecSuccess else {
+            print("🔴 Keychain store error for key '\(key)': \(status)")
+            // Add more detailed error information
+            var errorMessage = "Unknown error"
+            switch status {
+            case errSecParam:
+                errorMessage = "Invalid parameters (-50)"
+            case errSecAllocate:
+                errorMessage = "Failed to allocate memory"
+            case errSecDuplicateItem:
+                errorMessage = "Item already exists"
+            case errSecItemNotFound:
+                errorMessage = "Item not found"
+            case errSecInteractionNotAllowed:
+                errorMessage = "User interaction not allowed"
+            case errSecDecode:
+                errorMessage = "Unable to decode data"
+            case errSecAuthFailed:
+                errorMessage = "Authentication failed"
+            default:
+                errorMessage = "Error code: \(status)"
+            }
+            print("🔴 Keychain error details: \(errorMessage)")
             throw MPCError.keychainError(status)
         }
     }

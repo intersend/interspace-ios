@@ -5,7 +5,7 @@ import CryptoKit
 
 final class ProfileAPI {
     static let shared = ProfileAPI()
-    private let apiService = APIService.shared
+    let apiService = APIService.shared
     
     private init() {}
     
@@ -319,6 +319,69 @@ final class ProfileAPI {
             responseType: FolderContentsResponse.self
         )
     }
+    
+    // MARK: - MPC Endpoints
+    
+    /// POST /mpc/webhook/key-generated - Confirm key generation (internal use)
+    func confirmKeyGeneration(profileId: String, keyId: String, publicKey: String, address: String) async throws -> MPCConfirmResponse {
+        let request = MPCKeyGeneratedRequest(
+            profileId: profileId,
+            keyId: keyId,
+            publicKey: publicKey,
+            address: address
+        )
+        return try await apiService.performRequest(
+            endpoint: "/mpc/webhook/key-generated",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: MPCConfirmResponse.self
+        )
+    }
+    
+    /// POST /mpc/rotate - Initiate key rotation
+    func confirmKeyRotation(profileId: String, twoFactorCode: String?) async throws -> MPCRotateResponse {
+        let request = MPCRotateRequest(
+            profileId: profileId,
+            twoFactorCode: twoFactorCode
+        )
+        return try await apiService.performRequest(
+            endpoint: "/mpc/rotate",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: MPCRotateResponse.self
+        )
+    }
+    
+    /// POST /mpc/backup - Create MPC backup
+    func createMPCBackup(profileId: String, rsaPubkeyPem: String, label: String, twoFactorCode: String?) async throws -> MPCBackupResponse {
+        let request = MPCBackupRequest(
+            profileId: profileId,
+            rsaPubkeyPem: rsaPubkeyPem,
+            label: label,
+            twoFactorCode: twoFactorCode
+        )
+        return try await apiService.performRequest(
+            endpoint: "/mpc/backup",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: MPCBackupResponse.self
+        )
+    }
+    
+    /// POST /mpc/export - Export MPC key
+    func exportMPCKey(profileId: String, clientEncKey: String, twoFactorCode: String?) async throws -> MPCExportResponse {
+        let request = MPCExportRequest(
+            profileId: profileId,
+            clientEncKey: clientEncKey,
+            twoFactorCode: twoFactorCode
+        )
+        return try await apiService.performRequest(
+            endpoint: "/mpc/export",
+            method: .POST,
+            body: try JSONEncoder().encode(request),
+            responseType: MPCExportResponse.self
+        )
+    }
 }
 
 // MARK: - Response Models
@@ -355,5 +418,92 @@ struct FolderContentsResponse: Codable {
     
     struct FolderContents: Codable {
         let apps: [BookmarkedApp]
+    }
+}
+
+// MARK: - MPC Request Models
+
+struct MPCGenerateRequest: Codable {
+    let profileId: String
+}
+
+struct MPCKeyGeneratedRequest: Codable {
+    let profileId: String
+    let keyId: String
+    let publicKey: String
+    let address: String
+}
+
+struct MPCRotateRequest: Codable {
+    let profileId: String
+    let twoFactorCode: String?
+}
+
+struct MPCBackupRequest: Codable {
+    let profileId: String
+    let rsaPubkeyPem: String
+    let label: String
+    let twoFactorCode: String?
+}
+
+struct MPCExportRequest: Codable {
+    let profileId: String
+    let clientEncKey: String
+    let twoFactorCode: String?
+}
+
+// MARK: - MPC Response Models
+
+struct MPCGenerateResponse: Codable {
+    let success: Bool
+    let data: MPCGenerateData
+    
+    struct MPCGenerateData: Codable {
+        let profileId: String
+        let cloudPublicKey: String
+        let duoNodeUrl: String
+        let message: String
+    }
+}
+
+struct MPCConfirmResponse: Codable {
+    let success: Bool
+    let message: String
+}
+
+struct MPCRotateResponse: Codable {
+    let success: Bool
+    let message: String
+    let data: MPCRotateData
+    
+    struct MPCRotateData: Codable {
+        let profileId: String
+        let status: String
+    }
+}
+
+struct MPCBackupResponse: Codable {
+    let success: Bool
+    let data: MPCBackupData
+    
+    struct MPCBackupData: Codable {
+        let profileId: String
+        let keyId: String
+        let algorithm: String
+        let verifiableBackup: String
+        let timestamp: String
+    }
+}
+
+struct MPCExportResponse: Codable {
+    let success: Bool
+    let data: MPCExportData
+    
+    struct MPCExportData: Codable {
+        let profileId: String
+        let keyId: String
+        let serverPublicKey: String
+        let encryptedServerShare: String
+        let timestamp: String
     }
 }
