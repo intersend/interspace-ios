@@ -175,4 +175,5 @@ logs/
 # API keys file (create from template)
 APIKeys.swift
 
-CLAUDE.mdInterspace.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+Interspace.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+CLAUDE.md
