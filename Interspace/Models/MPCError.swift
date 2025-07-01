@@ -31,6 +31,7 @@ enum MPCError: LocalizedError, Equatable {
     case operationInProgress
     case operationCancelled(String)
     case profileNotFound
+    case sessionNotFound
     case userCancelled
     
     // Storage Errors
@@ -62,6 +63,7 @@ enum MPCError: LocalizedError, Equatable {
              (.requestTimeout, .requestTimeout),
              (.operationInProgress, .operationInProgress),
              (.profileNotFound, .profileNotFound),
+             (.sessionNotFound, .sessionNotFound),
              (.userCancelled, .userCancelled),
              (.encryptionFailed, .encryptionFailed),
              (.decryptionFailed, .decryptionFailed),
@@ -148,6 +150,9 @@ enum MPCError: LocalizedError, Equatable {
             
         case .profileNotFound:
             return "No active profile found. Please select a profile first."
+            
+        case .sessionNotFound:
+            return "Session not found. Please try again."
             
         case .userCancelled:
             return "Operation cancelled by user."

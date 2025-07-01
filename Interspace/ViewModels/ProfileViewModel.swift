@@ -25,7 +25,7 @@ class ProfileViewModel: ObservableObject {
     
     private let profileAPI = ProfileAPI.shared
     private let userAPI = UserAPI.shared
-    private let mpcWalletService = MPCWalletService.shared
+    private let mpcWalletService = MPCWalletServiceHTTP.shared
     private var versionTapCount = 0
     private var tapResetTimer: Timer?
     private var hasLoadedInitialData = false
@@ -220,8 +220,8 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            // For now, always create development profiles to simplify testing
-            let isDevelopmentMode = true
+            // Use MPC mode for real wallet generation
+            let isDevelopmentMode = false
             
             let newProfile = try await profileAPI.createProfile(
                 name: name,
@@ -239,6 +239,20 @@ class ProfileViewModel: ObservableObject {
             
             // Reload profile data to include the new profile
             await loadProfile()
+            
+            // Generate MPC wallet for the new profile if not in development mode
+            if !isDevelopmentMode && MPCWalletServiceHTTP.isEnabled {
+                print("✅ MPC wallet generation enabled for profile: \(newProfile.id)")
+                // Set the new profile as active temporarily to generate wallet
+                await MainActor.run {
+                    self.activeProfile = newProfile
+                }
+                
+                // Generate MPC wallet
+                await generateMPCWallet()
+            } else {
+                print("❌ MPC wallet generation skipped - developmentMode: \(isDevelopmentMode), isEnabled: \(MPCWalletServiceHTTP.isEnabled)")
+            }
             
             await MainActor.run {
                 // Show success feedback
@@ -531,7 +545,10 @@ class ProfileViewModel: ObservableObject {
     /// Generate MPC wallet for the active profile
     func generateMPCWallet() async {
         guard let activeProfile = activeProfile else { return }
-        guard MPCWalletService.isEnabled else { return }
+        guard MPCWalletServiceHTTP.isEnabled else {
+            print("❌ MPC wallet generation skipped - MPCWalletServiceHTTP.isEnabled = false")
+            return
+        }
         
         isGeneratingMPCWallet = true
         mpcOperationError = nil
@@ -602,7 +619,10 @@ class ProfileViewModel: ObservableObject {
     /// Check if active profile has MPC wallet
     func checkMPCWalletStatus() async {
         guard let activeProfile = activeProfile else { return }
-        guard MPCWalletService.isEnabled else { return }
+        guard MPCWalletServiceHTTP.isEnabled else {
+            print("❌ MPC wallet check skipped - MPCWalletServiceHTTP.isEnabled = false")
+            return
+        }
         
         let hasWallet = await mpcWalletService.hasWallet(for: activeProfile.id)
         if hasWallet {

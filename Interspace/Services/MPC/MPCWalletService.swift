@@ -66,7 +66,7 @@ final class MPCWalletService: ObservableObject {
             try await biometricAuth.authenticate(reason: "Generate MPC Wallet")
             
             // Step 2: Get cloud public key from backend
-            let cloudPublicKey = try await fetchCloudPublicKey()
+            let cloudPublicKey = try await fetchCloudPublicKey(for: profileId)
             
             // Step 3: Initialize session
             try await sessionManager.connect()
@@ -292,13 +292,10 @@ final class MPCWalletService: ObservableObject {
     
     // MARK: - Private Methods
     
-    private func fetchCloudPublicKey() async throws -> String {
+    private func fetchCloudPublicKey(for profileId: String) async throws -> String {
         // Call backend API to get cloud public key
-        // TODO: Implement ProfileAPI.getCloudPublicKey()
-        // return try await ProfileAPI.shared.getCloudPublicKey()
-        
-        // Temporary placeholder - this should come from the backend
-        return "placeholder_cloud_public_key"
+        let response = try await ProfileAPI.shared.getCloudPublicKey(profileId: profileId)
+        return response.data.cloudPublicKey
     }
     
     private func notifyBackendOfKeyGeneration(
@@ -307,18 +304,13 @@ final class MPCWalletService: ObservableObject {
         address: String
     ) async throws {
         // Notify backend that key generation is complete
-        // TODO: Implement ProfileAPI.confirmKeyGeneration
-        // try await ProfileAPI.shared.confirmKeyGeneration(
-        //     profileId: profileId,
-        //     publicKey: publicKey,
-        //     address: address
-        // )
+        // For now, we don't need to call this as the duo-node will notify backend via webhook
+        // The iOS client just needs to complete the key generation with duo-node
     }
     
     private func notifyBackendOfKeyRotation(profileId: String) async throws {
         // Notify backend that key rotation is complete
-        // TODO: Implement ProfileAPI.confirmKeyRotation
-        // try await ProfileAPI.shared.confirmKeyRotation(profileId: profileId)
+        _ = try await ProfileAPI.shared.confirmKeyRotation(profileId: profileId, twoFactorCode: nil)
     }
     
     private func createBackupViaBackend(
@@ -334,12 +326,19 @@ final class MPCWalletService: ObservableObject {
         //     label: label
         // )
         
-        // Temporary placeholder
+        // Call backend API
+        let response = try await ProfileAPI.shared.createMPCBackup(
+            profileId: profileId,
+            rsaPubkeyPem: rsaPublicKey,
+            label: label,
+            twoFactorCode: nil
+        )
+        
         return BackupData(
-            keyId: UUID().uuidString,
-            algorithm: "ECDSA",
-            verifiableBackup: "placeholder_backup",
-            timestamp: Date()
+            keyId: response.data.keyId,
+            algorithm: response.data.algorithm,
+            verifiableBackup: response.data.verifiableBackup,
+            timestamp: ISO8601DateFormatter().date(from: response.data.timestamp) ?? Date()
         )
     }
     
@@ -354,10 +353,16 @@ final class MPCWalletService: ObservableObject {
         //     clientEncryptionKey: clientEncryptionKey.base64EncodedString()
         // )
         
-        // Temporary placeholder
+        // Call backend API
+        let response = try await ProfileAPI.shared.exportMPCKey(
+            profileId: profileId,
+            clientEncKey: clientEncryptionKey.base64EncodedString(),
+            twoFactorCode: nil
+        )
+        
         return ServerExportData(
-            encryptedServerShare: "placeholder_encrypted_share",
-            serverPublicKey: [UInt8](repeating: 0, count: 32)
+            encryptedServerShare: response.data.encryptedServerShare,
+            serverPublicKey: Array(Data(base64Encoded: response.data.serverPublicKey) ?? Data())
         )
     }
     
@@ -430,10 +435,6 @@ struct ServerExportData: Codable {
 
 extension MPCWalletService {
     static var isEnabled: Bool {
-        #if DEBUG
-        return UserDefaults.standard.bool(forKey: "mpcWalletEnabled")
-        #else
-        return true // Enable in production
-        #endif
+        return true
     }
 }
