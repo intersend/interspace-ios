@@ -268,17 +268,29 @@ class ProfileViewModel: ObservableObject {
     }
     
     func deleteProfile(_ profile: SmartProfile) async {
+        // Check if trying to delete active profile
+        guard !profile.isActive else {
+            await MainActor.run {
+                self.error = ProfileError.cannotDeleteActiveProfile
+                self.showError = true
+            }
+            return
+        }
+        
         isLoading = true
         
         do {
             let _ = try await profileAPI.deleteProfile(profileId: profile.id)
             
-            // Reload profile data to remove the deleted profile
-            await loadProfile()
-            
             await MainActor.run {
+                // Remove from local profiles array
+                self.profiles.removeAll { $0.id == profile.id }
                 // Show success feedback
+                HapticManager.notification(.success)
             }
+            
+            // Reload profile data to ensure consistency
+            await loadProfiles()
             
         } catch {
             await MainActor.run {
@@ -845,43 +857,6 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Profile Management V2
-    
-    /// Delete a profile (only non-active profiles can be deleted)
-    func deleteProfile(_ profile: SmartProfile) async {
-        guard !profile.isActive else {
-            await MainActor.run {
-                self.error = ProfileError.cannotDeleteActiveProfile
-                self.showError = true
-            }
-            return
-        }
-        
-        isLoading = true
-        
-        do {
-            // Call profile deletion API
-            _ = try await profileAPI.deleteProfile(profileId: profile.id)
-            
-            await MainActor.run {
-                // Remove from local profiles array
-                self.profiles.removeAll { $0.id == profile.id }
-                isLoading = false
-                
-                // Show success feedback
-                HapticManager.notification(.success)
-            }
-            
-            // Reload profiles to ensure consistency
-            await loadProfiles()
-            
-        } catch {
-            await MainActor.run {
-                self.showError(error)
-                isLoading = false
-            }
-        }
-    }
 }
 
 // MARK: - Profile Errors
