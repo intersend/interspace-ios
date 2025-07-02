@@ -213,6 +213,7 @@
 			membershipExceptions = (
 				AccountDetailCard.swift,
 				AccountDetailView.swift,
+				AccountDetailViewV2.swift,
 				AddAccountView.swift,
 				AddAppView.swift,
 				AddSocialAccountView.swift,

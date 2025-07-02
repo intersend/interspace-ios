@@ -62,7 +62,7 @@ struct AccountDetailViewV2: View {
                                     }
                                 }
                                 
-                                if account.verified {
+                                if account.verified == true {
                                     HStack(spacing: 4) {
                                         Image(systemName: "checkmark.seal.fill")
                                             .font(.system(size: 12))
@@ -94,7 +94,8 @@ struct AccountDetailViewV2: View {
                         }
                         
                         // Provider (for social accounts)
-                        if let provider = account.provider {
+                        if account.accountType == "social",
+                           let provider = account.metadata?["provider"] {
                             HStack {
                                 Text("Provider")
                                 Spacer()
@@ -174,7 +175,8 @@ struct AccountDetailViewV2: View {
     }
     
     private var socialIcon: Image {
-        switch account.provider?.lowercased() {
+        let provider = account.metadata?["provider"]?.lowercased()
+        switch provider {
         case "google":
             return Image(systemName: "g.circle.fill")
         case "apple":
@@ -202,7 +204,8 @@ struct AccountDetailViewV2: View {
     }
     
     private var socialColor: Color {
-        switch account.provider?.lowercased() {
+        let provider = account.metadata?["provider"]?.lowercased()
+        switch provider {
         case "google":
             return .red
         case "apple":
@@ -226,7 +229,7 @@ struct AccountDetailViewV2: View {
             }
             return "Wallet"
         } else if account.accountType == "social" {
-            return account.provider?.capitalized ?? "Social Account"
+            return account.metadata?["provider"]?.capitalized ?? "Social Account"
         }
         return account.accountType.capitalized
     }
@@ -264,9 +267,9 @@ struct AccountDetailViewV2_Previews: PreviewProvider {
         AccountDetailViewV2(
             account: AccountV2(
                 id: "1",
-                accountType: "email",
+                type: "email",
+                strategy: nil,
                 identifier: "test@example.com",
-                provider: nil,
                 metadata: [:],
                 verified: true,
                 createdAt: ISO8601DateFormatter().string(from: Date()),
