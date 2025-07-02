@@ -108,7 +108,7 @@ struct AccountDetailViewV2: View {
                         HStack {
                             Text("Added")
                             Spacer()
-                            Text(formatDate(account.createdAt))
+                            Text(formatDate(account.createdAt ?? ""))
                                 .foregroundColor(.gray)
                         }
                     }

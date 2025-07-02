@@ -319,7 +319,7 @@ struct ProfileView: View {
                     }
                     .foregroundColor(.red)
                 }
-                .disabled(viewModel.activeProfile?.isActive == true)
+                .disabled(false) // Profile deletion check is handled in viewModel
             }
             
             // Sign Out

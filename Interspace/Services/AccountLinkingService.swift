@@ -219,12 +219,24 @@ final class AccountLinkingService: ObservableObject {
         error = nil
         
         do {
-            // For V2 API, we need to use a different endpoint
-            // The unlink operation should remove the account from the identity graph
-            // This is a placeholder - need to implement the actual API call
+            // Call the unlink accounts endpoint
+            struct UnlinkRequest: Codable {
+                let targetAccountId: String
+            }
             
-            // TODO: Call the actual unlink API endpoint when available
-            // For now, we'll just remove it from local state
+            struct UnlinkResponse: Codable {
+                let success: Bool
+                let message: String?
+            }
+            
+            let request = UnlinkRequest(targetAccountId: account.id)
+            
+            let _: UnlinkResponse = try await APIService.shared.performRequest(
+                endpoint: "/auth/unlink-accounts",
+                method: .POST,
+                body: try JSONEncoder().encode(request),
+                responseType: UnlinkResponse.self
+            )
             
             // Remove from local array
             linkedAccounts.removeAll { $0.id == account.id }
