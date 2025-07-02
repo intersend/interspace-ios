@@ -15,13 +15,13 @@
 		<string>webcredentials:interspace.fi</string>
 		<string>webcredentials:staging-api.interspace.fi</string>
 		<string>webcredentials:api.interspace.fi</string>
-		<string>webcredentials:f621-184-147-176-114.ngrok-free.app</string>
+		<string>webcredentials:06cb-184-147-176-114.ngrok-free.app</string>
 		<string>applinks:interspace.app</string>
 		<string>applinks:interspace.com</string>
 		<string>applinks:interspace.fi</string>
 		<string>applinks:staging-api.interspace.fi</string>
 		<string>applinks:api.interspace.fi</string>
-		<string>applinks:f621-184-147-176-114.ngrok-free.app</string>
+		<string>applinks:06cb-184-147-176-114.ngrok-free.app</string>
 	</array>
 	<key>com.apple.developer.nfc.readersession.formats</key>
 	<array>

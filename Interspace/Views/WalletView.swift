@@ -462,13 +462,13 @@ struct TokenListSection: View {
                 
                 Spacer()
                 
-                Text("\(tokens.count) tokens")
+                Text("\(tokens.count)")
                     .font(DesignTokens.Typography.caption)
                     .foregroundColor(DesignTokens.Colors.textSecondary)
             }
             .padding(.horizontal, DesignTokens.Spacing.screenPadding)
             
-            LazyVStack(spacing: 0) {
+            VStack(spacing: 0) {
                 ForEach(Array(tokens.enumerated()), id: \.element.standardizedTokenId) { index, token in
                     TokenRow(
                         token: token,
@@ -478,12 +478,8 @@ struct TokenListSection: View {
                     }
                 }
             }
-            .background(DesignTokens.GlassEffect.ultraThin)
+            .background(Color(UIColor.secondarySystemBackground))
             .cornerRadius(DesignTokens.CornerRadius.md)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                    .stroke(DesignTokens.Colors.borderSecondary, lineWidth: 0.5)
-            )
             .padding(.horizontal, DesignTokens.Spacing.screenPadding)
         }
     }
@@ -500,53 +496,38 @@ struct TokenRow: View {
         Button(action: onTap) {
             HStack(spacing: DesignTokens.Spacing.md) {
                 // Token Icon
-                ZStack {
-                    Circle()
-                        .fill(DesignTokens.Colors.primary.opacity(0.1))
-                        .frame(width: 40, height: 40)
-                    
-                    Text(token.symbol.prefix(1))
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(DesignTokens.Colors.primary)
-                }
+                SimpleTokenIcon(symbol: token.symbol)
+                    .frame(width: 40, height: 40)
                 
-                // Token Info
+                // Token Name & Symbol
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(token.name)
-                        .font(DesignTokens.Typography.bodyMedium)
+                    Text(token.symbol)
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(DesignTokens.Colors.textPrimary)
-                        .lineLimit(1)
                     
-                    Text("\(token.balancesPerChain.count) networks")
-                        .font(DesignTokens.Typography.caption)
+                    Text(token.name)
+                        .font(.system(size: 14))
                         .foregroundColor(DesignTokens.Colors.textSecondary)
+                        .lineLimit(1)
                 }
                 
                 Spacer()
                 
-                // Balance Info
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("$\(formatCurrency(token.totalUsdValue))")
-                        .font(DesignTokens.Typography.bodyMedium)
-                        .foregroundColor(DesignTokens.Colors.textPrimary)
-                    
-                    Text(formatTokenAmount(token.totalAmount, decimals: token.decimals))
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundColor(DesignTokens.Colors.textSecondary)
-                }
+                // USD Value
+                Text("$\(formatCurrency(token.totalUsdValue))")
+                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .foregroundColor(DesignTokens.Colors.textPrimary)
             }
             .padding(.horizontal, DesignTokens.Spacing.md)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
             .background(Color.clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         .overlay(alignment: .bottom) {
             if !isLast {
-                Rectangle()
-                    .fill(DesignTokens.Colors.borderSecondary)
-                    .frame(height: 0.5)
-                    .padding(.leading, 68)
+                Divider()
+                    .padding(.leading, 60)
             }
         }
     }
@@ -557,20 +538,11 @@ struct TokenRow: View {
             formatter.numberStyle = .decimal
             formatter.maximumFractionDigits = 2
             formatter.minimumFractionDigits = 2
+            formatter.groupingSeparator = ","
+            formatter.usesGroupingSeparator = true
             return formatter.string(from: NSNumber(value: doubleValue)) ?? value
         }
         return value
-    }
-    
-    private func formatTokenAmount(_ amount: String, decimals: Int) -> String {
-        if let doubleValue = Double(amount) {
-            let adjustedValue = doubleValue / pow(10, Double(decimals))
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-            formatter.maximumFractionDigits = min(6, decimals)
-            return formatter.string(from: NSNumber(value: adjustedValue)) ?? amount
-        }
-        return amount
     }
 }
 
@@ -639,6 +611,22 @@ struct GuestWalletState: View {
             .cornerRadius(DesignTokens.CornerRadius.button)
         }
         .padding(.horizontal, DesignTokens.Spacing.screenPadding)
+    }
+}
+
+// MARK: - Simple Token Icon
+
+struct SimpleTokenIcon: View {
+    let symbol: String
+    
+    var body: some View {
+        Circle()
+            .fill(Color(UIColor.tertiarySystemFill))
+            .overlay(
+                Text(symbol.prefix(2).uppercased())
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color(UIColor.label))
+            )
     }
 }
 

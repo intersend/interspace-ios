@@ -69,8 +69,71 @@ struct UniversalAddTray: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
                     
-                    // Profile Section - only show when authenticated and not in auth mode
+                    // Suggested Section - Context-aware suggestions (not shown during auth)
                     if !isForAuthentication && authManager.isAuthenticated {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Suggested")
+                                .font(.headline)
+                                .foregroundColor(.gray)
+                                .padding(.horizontal, 20)
+                            
+                            VStack(spacing: 0) {
+                                // Show context-specific suggestion based on initialSection
+                                switch initialSection {
+                                case .app:
+                                    // Apps page - suggest adding an app
+                                    AddOptionRow(
+                                        icon: "plus.app.fill",
+                                        iconType: .system,
+                                        title: "Add App",
+                                        iconColor: .blue,
+                                        isFirst: true,
+                                        isLast: true
+                                    ) {
+                                        HapticManager.impact(.light)
+                                        showAddApp = true
+                                    }
+                                    
+                                case .wallet:
+                                    // Wallet view - suggest linking a wallet
+                                    AddOptionRow(
+                                        icon: "wallet.pass.fill",
+                                        iconType: .system,
+                                        title: "Link Wallet",
+                                        iconColor: .orange,
+                                        isFirst: true,
+                                        isLast: true
+                                    ) {
+                                        HapticManager.impact(.light)
+                                        selectedWalletType = .metamask
+                                        showWalletAuthorization = true
+                                    }
+                                    
+                                default:
+                                    // Profile page or other - suggest adding a profile
+                                    AddOptionRow(
+                                        icon: "person.crop.circle.badge.plus",
+                                        iconType: .system,
+                                        title: "Add Profile",
+                                        iconColor: .green,
+                                        isFirst: true,
+                                        isLast: true
+                                    ) {
+                                        HapticManager.impact(.light)
+                                        showProfileCreation = true
+                                    }
+                                }
+                            }
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(white: 0.15))
+                            )
+                            .padding(.horizontal, 20)
+                        }
+                    }
+                    
+                    // Profile Section - only show when authenticated and not in auth mode
+                    if !isForAuthentication && authManager.isAuthenticated && initialSection != .none {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Profile")
                                 .font(.headline)
@@ -531,12 +594,15 @@ struct UniversalAddTray: View {
                 
             case .failure(let error):
                 print("OAuth error: \(error)")
-                // Show error to user
-                HapticManager.notification(.error)
+                await MainActor.run {
+                    HapticManager.notification(.error)
+                }
             }
         } catch {
             print("Authentication error: \(error)")
-            HapticManager.notification(.error)
+            await MainActor.run {
+                HapticManager.notification(.error)
+            }
         }
         
         isProcessing = false

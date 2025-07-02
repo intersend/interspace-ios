@@ -16,7 +16,7 @@ final class AuthAPI {
     
     // MARK: - V2 API Methods (Flat Identity Model)
     
-    /// POST /api/auth/authenticate
+    /// POST /api/v2/auth/authenticate
     func authenticateV2(request: AuthenticationRequestV2) async throws -> AuthResponseV2 {
         return try await apiService.performRequest(
             endpoint: "/auth/authenticate",
@@ -27,7 +27,7 @@ final class AuthAPI {
         )
     }
     
-    /// POST /api/auth/switch-profile/:profileId
+    /// POST /api/v2/auth/switch-profile/:profileId
     func switchProfileV2(profileId: String) async throws -> AuthResponseV2 {
         return try await apiService.performRequest(
             endpoint: "/auth/switch-profile/\(profileId)",
@@ -36,17 +36,18 @@ final class AuthAPI {
         )
     }
     
-    /// POST /api/auth/link-accounts
+    /// POST /api/v2/auth/link-accounts
     func linkAccountsV2(request: LinkAccountRequestV2) async throws -> LinkAccountResponseV2 {
         return try await apiService.performRequest(
             endpoint: "/auth/link-accounts",
             method: .POST,
             body: try JSONEncoder().encode(request),
-            responseType: LinkAccountResponseV2.self
+            responseType: LinkAccountResponseV2.self,
+            requiresAuth: true
         )
     }
     
-    /// PUT /api/auth/link-privacy
+    /// PUT /api/v2/auth/link-privacy
     func updateLinkPrivacyV2(targetAccountId: String, privacyMode: String) async throws -> SuccessResponse {
         struct UpdatePrivacyRequest: Codable {
             let targetAccountId: String
@@ -61,7 +62,7 @@ final class AuthAPI {
         )
     }
     
-    /// POST /api/auth/refresh
+    /// POST /api/v2/auth/refresh
     func refreshTokenV2(refreshToken: String) async throws -> AuthResponseV2 {
         let request = RefreshTokenRequest(refreshToken: refreshToken)
         return try await apiService.performRequest(
@@ -73,7 +74,7 @@ final class AuthAPI {
         )
     }
     
-    /// POST /api/auth/logout
+    /// POST /api/v2/auth/logout
     func logoutV2() async throws -> LogoutResponse {
         return try await apiService.performRequest(
             endpoint: "/auth/logout",
@@ -82,7 +83,7 @@ final class AuthAPI {
         )
     }
     
-    /// POST /api/auth/send-email-code
+    /// POST /api/v2/auth/send-email-code
     func sendEmailCodeV2(email: String) async throws -> EmailCodeResponse {
         let request = SendEmailCodeRequest(email: email)
         return try await apiService.performRequest(
@@ -94,7 +95,7 @@ final class AuthAPI {
         )
     }
     
-    /// POST /api/auth/resend-email-code
+    /// POST /api/v2/auth/resend-email-code
     func resendEmailCodeV2(email: String) async throws -> EmailCodeResponse {
         let request = SendEmailCodeRequest(email: email)
         return try await apiService.performRequest(
@@ -106,7 +107,7 @@ final class AuthAPI {
         )
     }
     
-    /// POST /api/auth/verify-email-code
+    /// POST /api/v2/auth/verify-email-code
     func verifyEmailCodeV2(email: String, code: String) async throws -> EmailCodeResponse {
         struct VerifyEmailCodeRequest: Codable {
             let email: String
@@ -122,7 +123,7 @@ final class AuthAPI {
         )
     }
     
-    /// GET /api/auth/identity-graph
+    /// GET /api/v2/auth/identity-graph
     func getIdentityGraph() async throws -> IdentityGraphResponse {
         return try await apiService.performRequest(
             endpoint: "/auth/identity-graph",
@@ -133,7 +134,7 @@ final class AuthAPI {
     
     // MARK: - V2 SIWE Methods
     
-    /// GET /api/siwe/nonce
+    /// GET /api/v2/siwe/nonce
     func getSIWENonceV2() async throws -> SIWENonceResponse {
         return try await apiService.performRequest(
             endpoint: "/siwe/nonce",

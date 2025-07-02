@@ -14,10 +14,12 @@ struct ProfileView: View {
     @State private var showProfileDetail = false
     @State private var selectedAccount: LinkedAccount?
     @State private var selectedSocialAccount: SocialAccount?
+    @State private var selectedEmailAccount: AccountV2?
     
     // UI states
     @State private var isAddressHidden = false
     @State private var showDeleteConfirmation = false
+    @State private var showDeleteProfileConfirmation = false
     
     @Namespace private var profileNamespace
     @Environment(\.colorScheme) var colorScheme
@@ -94,6 +96,9 @@ struct ProfileView: View {
         .sheet(item: $selectedSocialAccount) { account in
             SocialAccountDetailView(account: account, viewModel: viewModel)
         }
+        .sheet(item: $selectedEmailAccount) { account in
+            AccountDetailViewV2(account: account, viewModel: viewModel)
+        }
         .alert("Delete Account", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -108,6 +113,18 @@ struct ProfileView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(viewModel.error?.localizedDescription ?? "An error occurred")
+        }
+        .alert("Delete Profile", isPresented: $showDeleteProfileConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let profile = viewModel.activeProfile {
+                    Task {
+                        await viewModel.deleteProfile(profile)
+                    }
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete this profile? This action cannot be undone.")
         }
         .onAppear {
             Task {
@@ -205,30 +222,35 @@ struct ProfileView: View {
             .font(.system(size: 13, weight: .medium))
             .foregroundColor(.gray)) {
             ForEach(viewModel.emailAccounts) { account in
-                HStack(spacing: 16) {
-                    // Email Icon with background circle
-                    Image(systemName: "envelope.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
-                        .frame(width: 32, height: 32)
-                        .background(
-                            Circle()
-                                .fill(Color.blue.opacity(0.15))
-                        )
-                    
-                    // Email address
-                    Text(account.identifier)
-                        .font(.body)
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    // Chevron
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                Button(action: {
+                    selectedEmailAccount = account
+                }) {
+                    HStack(spacing: 16) {
+                        // Email Icon with background circle
+                        Image(systemName: "envelope.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.blue)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(Color.blue.opacity(0.15))
+                            )
+                        
+                        // Email address
+                        Text(account.identifier)
+                            .font(.body)
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                        
+                        // Chevron
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                    }
+                    .padding(.vertical, 8)
                 }
-                .padding(.vertical, 8)
+                .buttonStyle(PlainButtonStyle())
             }
         }
         .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))
@@ -283,7 +305,39 @@ struct ProfileView: View {
     // MARK: - Bottom Actions
     
     private var bottomActionsSection: some View {
-        EmptyView()
+        Section {
+            // Delete Profile (only show if there are multiple profiles and current profile can be deleted)
+            if viewModel.profiles.count > 1 {
+                Button(action: {
+                    showDeleteProfileConfirmation = true
+                }) {
+                    HStack {
+                        Image(systemName: "trash")
+                            .font(.system(size: 16))
+                        Text("Delete Profile")
+                        Spacer()
+                    }
+                    .foregroundColor(.red)
+                }
+                .disabled(viewModel.activeProfile?.isActive == true)
+            }
+            
+            // Sign Out
+            Button(action: {
+                Task {
+                    await sessionCoordinator.logout()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: 16))
+                    Text("Sign Out")
+                    Spacer()
+                }
+                .foregroundColor(.red)
+            }
+        }
+        .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))
     }
     
     // MARK: - Helper Methods

@@ -349,15 +349,10 @@ final class AuthenticationManagerV2: ObservableObject {
         APIService.shared.setAccessToken(accessToken)
         print("🔐 AuthenticationManagerV2: Access token set in APIService")
         
-        // Only mark as authenticated if we're not in a wallet connection flow
-        // This prevents interfering with wallet authentication
-        if !WalletService.shared.isConnectionInProgress {
-            // Mark as authenticated immediately since we have valid tokens
-            // This allows API calls to proceed with authentication
-            isAuthenticated = true
-        } else {
-            print("🔐 AuthenticationManagerV2: Wallet connection in progress, deferring auth state update")
-        }
+        // Mark as authenticated immediately since we have valid tokens
+        // This prevents race conditions where API calls fail due to missing auth state
+        isAuthenticated = true
+        print("🔐 AuthenticationManagerV2: Authentication state updated")
         
         // Check if token is expired
         if keychainManager.isTokenExpired() {
@@ -439,7 +434,28 @@ final class AuthenticationManagerV2: ObservableObject {
     }
     
     func refreshTokenIfNeeded() async {
-        guard !isRefreshing else { return }
+        // Simple approach: if already refreshing, wait a bit and return
+        if isRefreshing {
+            #if DEBUG
+            print("🔐 AuthenticationManagerV2: Token refresh already in progress, waiting...")
+            #endif
+            
+            // Wait up to 3 seconds for the refresh to complete
+            for _ in 0..<30 {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                if !isRefreshing {
+                    #if DEBUG
+                    print("🔐 AuthenticationManagerV2: Refresh completed, continuing...")
+                    #endif
+                    return
+                }
+            }
+            
+            #if DEBUG
+            print("🔐 AuthenticationManagerV2: Refresh timeout, continuing anyway...")
+            #endif
+            return
+        }
         
         guard let refreshToken = keychainManager.getRefreshToken() else {
             await logout()
@@ -447,9 +463,15 @@ final class AuthenticationManagerV2: ObservableObject {
         }
         
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer { 
+            isRefreshing = false
+        }
         
         do {
+            #if DEBUG
+            print("🔐 AuthenticationManagerV2: Starting token refresh...")
+            #endif
+            
             let response = try await authAPI.refreshTokenV2(refreshToken: refreshToken)
             
             try keychainManager.saveTokens(
@@ -460,12 +482,18 @@ final class AuthenticationManagerV2: ObservableObject {
             
             APIService.shared.setAccessToken(response.tokens.accessToken)
             
+            #if DEBUG
+            print("🔐 AuthenticationManagerV2: Token refreshed successfully")
+            print("🔐 AuthenticationManagerV2: New access token prefix: \(String(response.tokens.accessToken.prefix(20)))")
+            #endif
+            
             if !isAuthenticated {
                 await fetchCurrentSession()
             }
             
         } catch {
             print("🔐 AuthenticationManagerV2: Token refresh failed: \(error)")
+            
             if let apiError = error as? APIError, case .unauthorized = apiError {
                 await logout()
             }

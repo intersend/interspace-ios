@@ -132,6 +132,13 @@ final class AccountLinkingService: ObservableObject {
                 verificationCode: verificationCode
             )
             
+            #if DEBUG
+            print("🔗 AccountLinkingService: Linking email account")
+            print("🔗 AccountLinkingService: Email: \(email)")
+            print("🔗 AccountLinkingService: Verification code: \(verificationCode)")
+            print("🔗 AccountLinkingService: Request: \(request)")
+            #endif
+            
             let response = try await authAPI.linkAccountsV2(request: request)
             
             // Update local state with the new linked account
@@ -198,6 +205,39 @@ final class AccountLinkingService: ObservableObject {
         // For now, return the first account as primary
         // TODO: Add isPrimary property to AccountV2 when backend supports it
         linkedAccounts.first
+    }
+    
+    // MARK: - Account Unlinking
+    
+    /// Unlink an account from the identity graph
+    func unlinkAccount(_ account: AccountV2) async throws {
+        guard linkedAccounts.count > 1 else {
+            throw AuthenticationError.lastAccountCannotBeUnlinked
+        }
+        
+        isLoading = true
+        error = nil
+        
+        do {
+            // For V2 API, we need to use a different endpoint
+            // The unlink operation should remove the account from the identity graph
+            // This is a placeholder - need to implement the actual API call
+            
+            // TODO: Call the actual unlink API endpoint when available
+            // For now, we'll just remove it from local state
+            
+            // Remove from local array
+            linkedAccounts.removeAll { $0.id == account.id }
+            
+            // Refresh identity graph to ensure consistency
+            await refreshIdentityGraph()
+            
+            isLoading = false
+        } catch {
+            isLoading = false
+            self.error = error
+            throw error
+        }
     }
 }
 

@@ -113,10 +113,15 @@ class APIService {
 
         // Add authorization header if required and available
         if requiresAuth {
-            if let token = accessToken {
+            // Always get the latest token in case it was refreshed
+            if let token = self.accessToken {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 #if DEBUG
                 print("🌐 APIService: Added auth header for \(endpoint)")
+                if retryCount > 0 {
+                    print("🌐 APIService: This is a retry request (attempt \(retryCount + 1))")
+                    print("🌐 APIService: Token being used (prefix): \(String(token.prefix(20)))")
+                }
                 #endif
             } else {
                 #if DEBUG
@@ -127,6 +132,14 @@ class APIService {
 
         if let body = body {
             request.httpBody = body
+            
+            #if DEBUG
+            if endpoint.contains("link-accounts") {
+                if let jsonString = String(data: body, encoding: .utf8) {
+                    print("🌐 APIService: Request body for \(endpoint): \(jsonString)")
+                }
+            }
+            #endif
         }
 
         do {
@@ -149,8 +162,23 @@ class APIService {
             case 401:
                 // Token expired, try to refresh if this is the first retry
                 if requiresAuth && retryCount == 0 {
+                    #if DEBUG
+                    print("🌐 APIService: Got 401, attempting token refresh for \(endpoint)")
+                    #endif
+                    
                     // Request token refresh from AuthenticationManager
                     await AuthenticationManagerV2.shared.refreshTokenIfNeeded()
+                    
+                    // Small delay to ensure token is properly set
+                    try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+                    
+                    #if DEBUG
+                    print("🌐 APIService: Token refresh completed, retrying request to \(endpoint)")
+                    print("🌐 APIService: New token available: \(self.accessToken != nil)")
+                    if let token = self.accessToken {
+                        print("🌐 APIService: New token prefix: \(String(token.prefix(20)))")
+                    }
+                    #endif
                     
                     // Retry the request with new token
                     return try await performRequestWithRetry(

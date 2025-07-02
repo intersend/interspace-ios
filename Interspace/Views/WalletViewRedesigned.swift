@@ -58,13 +58,7 @@ struct WalletViewRedesigned: View {
                             tokens: filteredTokens(balance.unifiedBalance.tokens),
                             expandedTokenId: $expandedTokenId,
                             onTokenTap: { token in
-                                withAnimation(WalletDesign.Animation.spring) {
-                                    if expandedTokenId == token.standardizedTokenId {
-                                        expandedTokenId = nil
-                                    } else {
-                                        expandedTokenId = token.standardizedTokenId
-                                    }
-                                }
+                                selectedToken = token
                                 HapticManager.impact(.light)
                             },
                             onSendToken: { token in
@@ -279,21 +273,31 @@ struct EnhancedTokenSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Tokens")
-                .sectionHeaderStyle()
+            HStack {
+                Text("Assets")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text("\(tokens.count)")
+                    .font(.system(size: 16))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, WalletDesign.Spacing.regular)
+            .padding(.bottom, WalletDesign.Spacing.tight)
             
-            LazyVStack(spacing: 0) {
+            VStack(spacing: 0) {
                 ForEach(Array(tokens.enumerated()), id: \.element.standardizedTokenId) { index, token in
-                    EnhancedTokenCell(
+                    SimpleTokenCell(
                         token: token,
-                        isExpanded: expandedTokenId == token.standardizedTokenId,
-                        isFirst: index == 0,
                         isLast: index == tokens.count - 1,
                         onTap: { onTokenTap(token) }
                     )
                 }
             }
-            .walletCard()
+            .background(Color(UIColor.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .padding(.horizontal, WalletDesign.Spacing.regular)
         }
     }
@@ -655,6 +659,81 @@ struct ReceiveSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Simple Token Cell
+struct SimpleTokenCell: View {
+    let token: UnifiedBalance.TokenBalance
+    let isLast: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 16) {
+                // Token Icon
+                SimpleTokenLogo(symbol: token.symbol)
+                    .frame(width: 40, height: 40)
+                
+                // Token Info
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(token.symbol)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.primary)
+                    
+                    Text(token.name)
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                // USD Value
+                Text("$\(formatUSDValue(token.totalUsdValue))")
+                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .foregroundColor(.primary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .overlay(alignment: .bottom) {
+            if !isLast {
+                Divider()
+                    .padding(.leading, 56)
+            }
+        }
+    }
+    
+    private func formatUSDValue(_ value: String) -> String {
+        if let doubleValue = Double(value) {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+            formatter.maximumFractionDigits = 2
+            formatter.minimumFractionDigits = 2
+            formatter.groupingSeparator = ","
+            formatter.usesGroupingSeparator = true
+            return formatter.string(from: NSNumber(value: doubleValue)) ?? value
+        }
+        return value
+    }
+}
+
+// MARK: - Token Logo
+struct SimpleTokenLogo: View {
+    let symbol: String
+    
+    var body: some View {
+        Circle()
+            .fill(Color(UIColor.tertiarySystemFill))
+            .overlay(
+                Text(symbol.prefix(2).uppercased())
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color(UIColor.label))
+            )
     }
 }
 

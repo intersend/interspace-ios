@@ -26,6 +26,7 @@ class ProfileViewModel: ObservableObject {
     private let profileAPI = ProfileAPI.shared
     private let userAPI = UserAPI.shared
     private let mpcWalletService = MPCWalletServiceHTTP.shared
+    private let authManager = AuthenticationManagerV2.shared
     private var versionTapCount = 0
     private var tapResetTimer: Timer?
     private var hasLoadedInitialData = false
@@ -382,6 +383,17 @@ class ProfileViewModel: ObservableObject {
     }
     
     func linkWallet(config: WalletConnectionConfig) async throws {
+        // Ensure user is authenticated before linking
+        guard authManager.isAuthenticated else {
+            throw AuthenticationError.tokenExpired
+        }
+        
+        // Validate token is present in APIService
+        guard APIService.shared.getAccessToken() != nil else {
+            print("🔴 ProfileViewModel: No access token available for linkWallet")
+            throw AuthenticationError.tokenExpired
+        }
+        
         // Link wallet to the active profile
         guard let activeProfile = activeProfile,
               let address = config.walletAddress,
@@ -785,5 +797,102 @@ class ProfileViewModel: ObservableObject {
     func dismissError() {
         error = nil
         showError = false
+    }
+    
+    // MARK: - V2 Account Management
+    
+    /// Unlink any type of account using AccountV2
+    func unlinkAccount(_ account: AccountV2) async {
+        isLoading = true
+        
+        do {
+            // Use AccountLinkingService to unlink the account
+            let linkingService = AccountLinkingService.shared
+            try await linkingService.unlinkAccount(account)
+            
+            // Refresh the identity graph
+            await linkingService.refreshIdentityGraph()
+            
+            // Update local state based on account type
+            await MainActor.run {
+                switch account.accountType {
+                case "email":
+                    self.emailAccounts.removeAll { $0.id == account.id }
+                case "wallet":
+                    // Note: wallet accounts are in linkedAccounts, not identity graph
+                    // This case might not be reached for wallets
+                    break
+                case "social":
+                    // Social accounts have their own array
+                    break
+                default:
+                    break
+                }
+                
+                // Reload email accounts from refreshed identity graph
+                Task {
+                    await loadEmailAccounts()
+                }
+                
+                isLoading = false
+            }
+            
+        } catch {
+            await MainActor.run {
+                self.showError(error)
+                isLoading = false
+            }
+        }
+    }
+    
+    // MARK: - Profile Management V2
+    
+    /// Delete a profile (only non-active profiles can be deleted)
+    func deleteProfile(_ profile: SmartProfile) async {
+        guard !profile.isActive else {
+            await MainActor.run {
+                self.error = ProfileError.cannotDeleteActiveProfile
+                self.showError = true
+            }
+            return
+        }
+        
+        isLoading = true
+        
+        do {
+            // Call profile deletion API
+            _ = try await profileAPI.deleteProfile(profileId: profile.id)
+            
+            await MainActor.run {
+                // Remove from local profiles array
+                self.profiles.removeAll { $0.id == profile.id }
+                isLoading = false
+                
+                // Show success feedback
+                HapticManager.notification(.success)
+            }
+            
+            // Reload profiles to ensure consistency
+            await loadProfiles()
+            
+        } catch {
+            await MainActor.run {
+                self.showError(error)
+                isLoading = false
+            }
+        }
+    }
+}
+
+// MARK: - Profile Errors
+
+enum ProfileError: LocalizedError {
+    case cannotDeleteActiveProfile
+    
+    var errorDescription: String? {
+        switch self {
+        case .cannotDeleteActiveProfile:
+            return "Cannot delete the active profile. Please switch to another profile first."
+        }
     }
 }
