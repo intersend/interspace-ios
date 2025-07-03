@@ -98,7 +98,7 @@ struct LegacySocialAccount: Codable {
 }
 
 
-// MARK: - User Model
+// MARK: - Account Model (Legacy compatibility)
 struct User: Codable, Identifiable {
     let id: String
     let email: String?
@@ -168,7 +168,7 @@ struct AuthenticationResponseV2: Codable {
     let account: AccountV2?
     let profiles: [ProfileSummaryV2]?
     let activeProfile: ProfileSummaryV2?
-    let isNewUser: Bool?
+    let isNewAccount: Bool?  // Changed from isNewUser to reflect account-centric model
     let privacyMode: String?
     let sessionToken: String?
     let message: String?
@@ -190,6 +190,7 @@ enum AuthenticationError: LocalizedError, Identifiable {
     case tokenExpired
     case unknown(String)
     case passkeyNotSupported
+    case passkeyNotFound
     case passkeyAuthenticationFailed(String)
     case passkeyRegistrationFailed(String)
     case notAuthenticated
@@ -213,6 +214,8 @@ enum AuthenticationError: LocalizedError, Identifiable {
             return "unknown-\(message)"
         case .passkeyNotSupported:
             return "passkeyNotSupported"
+        case .passkeyNotFound:
+            return "passkeyNotFound"
         case .passkeyAuthenticationFailed(let message):
             return "passkeyAuthenticationFailed-\(message)"
         case .passkeyRegistrationFailed(let message):
@@ -242,6 +245,8 @@ enum AuthenticationError: LocalizedError, Identifiable {
             return message
         case .passkeyNotSupported:
             return "Passkeys are only supported on iOS 16 and later."
+        case .passkeyNotFound:
+            return "No passkey found for this account. Please register a passkey first."
         case .passkeyAuthenticationFailed(let message):
             return "Passkey authentication failed: \(message)"
         case .passkeyRegistrationFailed(let message):
@@ -276,7 +281,7 @@ struct DeviceInfo {
 
 // MARK: - Apple Sign-In Models
 struct AppleSignInResult {
-    let userId: String
+    let accountId: String
     let identityToken: String
     let authorizationCode: String
     let email: String?
@@ -287,13 +292,13 @@ struct AppleSignInResult {
 struct AppleAuthRequest: Codable {
     let identityToken: String
     let authorizationCode: String
-    let user: AppleUserInfo
+    let account: AppleUserInfo  // Changed from 'user' to 'account' for consistency
     let deviceId: String
     let deviceName: String
     let deviceType: String
 }
 
-struct AppleUserInfo: Codable {
+struct AppleUserInfo: Codable {  // Kept name for backward compatibility, but represents account info
     let id: String
     let email: String?
     let firstName: String?
@@ -327,7 +332,7 @@ struct ProfileSummaryV2: Codable {
     var isActive: Bool
 }
 
-struct UserV2: Codable {
+struct UserV2: Codable {  // Legacy compatibility - represents account in flat identity model
     let id: String
     let email: String?
     let isGuest: Bool
@@ -340,7 +345,7 @@ struct AuthResponseV2: Codable {
     let profiles: [ProfileSummaryV2]
     let activeProfile: ProfileSummaryV2?
     let tokens: AuthTokens
-    let isNewUser: Bool
+    let isNewAccount: Bool  // Changed from isNewUser to reflect account-centric model
     let privacyMode: String
     let sessionId: String
 }

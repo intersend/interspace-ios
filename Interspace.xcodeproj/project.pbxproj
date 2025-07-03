@@ -220,6 +220,7 @@
 				AppsView.swift,
 				Authentication/EmailAuthenticationView.swift,
 				Authentication/EmailLinkingView.swift,
+				Authentication/PasskeyAuthenticationView.swift,
 				AuthView.swift,
 				Components/AddToProfileTray.swift,
 				Components/AuthLoadingOverlay.swift,

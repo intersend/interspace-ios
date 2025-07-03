@@ -19,38 +19,29 @@ struct AppsView: View {
             Color.black
                 .ignoresSafeArea(.all)
             
-            VStack(spacing: 0) {
-                // Custom large title header that mimics native iOS style
-                HStack(alignment: .bottom) {
-                    Text("Apps")
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundColor(.white)
+            ScrollView {
+                VStack(spacing: 0) {
+                    if viewModel.apps.isEmpty && viewModel.folders.isEmpty && !viewModel.isLoading {
+                        emptyStateView
+                    } else {
+                        // Main springboard grid
+                        SpringboardGrid(
+                            apps: $viewModel.apps,
+                            folders: $viewModel.folders,
+                            isEditMode: $isEditMode,
+                            onAppTap: handleAppTap,
+                            onFolderTap: handleFolderTap,
+                            onAddApp: {
+                                showAddApp = true
+                            },
+                            viewModel: viewModel
+                        )
+                    }
                     
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
-                
-                if viewModel.apps.isEmpty && viewModel.folders.isEmpty && !viewModel.isLoading {
-                    emptyStateView
-                } else {
-                    // Main springboard grid
-                    SpringboardGrid(
-                        apps: $viewModel.apps,
-                        folders: $viewModel.folders,
-                        isEditMode: $isEditMode,
-                        onAppTap: handleAppTap,
-                        onFolderTap: handleFolderTap,
-                        onAddApp: {
-                            showAddApp = true
-                        },
-                        viewModel: viewModel
-                    )
-                }
-                
-                Spacer()
             }
+            .scrollIndicators(.hidden)
             
             // Loading overlay
             if viewModel.isLoading {
@@ -64,8 +55,10 @@ struct AppsView: View {
                 }
             }
         }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Apps")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 StandardToolbarButtons(

@@ -53,9 +53,7 @@ final class AccountLinkingService: ObservableObject {
     
     /// Unlink an account
     func unlinkAccount(_ accountId: String) async throws {
-        guard linkedAccounts.count > 1 else {
-            throw AuthenticationError.lastAccountCannotBeUnlinked
-        }
+        // Removed check for last account - flat identity model allows removing any account
         
         isLoading = true
         error = nil
@@ -211,9 +209,7 @@ final class AccountLinkingService: ObservableObject {
     
     /// Unlink an account from the identity graph
     func unlinkAccount(_ account: AccountV2) async throws {
-        guard linkedAccounts.count > 1 else {
-            throw AuthenticationError.lastAccountCannotBeUnlinked
-        }
+        // Removed check for last account - flat identity model allows removing any account
         
         isLoading = true
         error = nil
@@ -254,7 +250,4 @@ final class AccountLinkingService: ObservableObject {
 }
 
 // MARK: - Authentication Error Extension
-
-extension AuthenticationError {
-    static let lastAccountCannotBeUnlinked = AuthenticationError.unknown("Cannot unlink the last remaining account")
-}
+// Removed lastAccountCannotBeUnlinked error - flat identity model allows removing any account

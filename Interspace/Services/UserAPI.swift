@@ -1,17 +1,19 @@
 import Foundation
 
-// MARK: - User API Service
+// MARK: - Account API Service
+// Note: This file maintains the UserAPI name for backward compatibility,
+// but represents account management in the flat identity model
 
-final class UserAPI {
+final class UserAPI {  // Kept name for backward compatibility
     static let shared = UserAPI()
     private let apiService = APIService.shared
     
     private init() {}
     
-    // MARK: - User Management Endpoints
+    // MARK: - Account Management Endpoints
     
-    /// GET /users/me
-    func getCurrentUser() async throws -> User {
+    /// GET /users/me (Legacy endpoint - returns account information)
+    func getCurrentUser() async throws -> User {  // Returns User struct which represents Account
         let response: CurrentUserResponse = try await apiService.performRequest(
             endpoint: "/users/me",
             method: .GET,
@@ -20,7 +22,7 @@ final class UserAPI {
         return response.data
     }
     
-    /// GET /users/me/social-accounts
+    /// GET /users/me/social-accounts (Returns linked social accounts)
     func getSocialAccounts() async throws -> [SocialAccount] {
         let response: SocialAccountsResponse = try await apiService.performRequest(
             endpoint: "/users/me/social-accounts",
@@ -30,7 +32,7 @@ final class UserAPI {
         return response.data
     }
     
-    /// POST /users/me/social-accounts
+    /// POST /users/me/social-accounts (Link a social account)
     func linkSocialAccount(request: LinkSocialAccountRequest) async throws -> SocialAccount {
         let response: SocialAccountResponse = try await apiService.performRequest(
             endpoint: "/users/me/social-accounts",
@@ -41,7 +43,7 @@ final class UserAPI {
         return response.data
     }
     
-    /// DELETE /users/me/social-accounts/:id
+    /// DELETE /users/me/social-accounts/:id (Unlink a social account)
     func unlinkSocialAccount(socialAccountId: String) async throws -> UnlinkSocialAccountResponse {
         return try await apiService.performRequest(
             endpoint: "/users/me/social-accounts/\(socialAccountId)",
@@ -61,9 +63,9 @@ struct LinkSocialAccountRequest: Codable {
 
 // MARK: - Response Models
 
-struct CurrentUserResponse: Codable {
+struct CurrentUserResponse: Codable {  // Legacy response structure
     let success: Bool
-    let data: User
+    let data: User  // User struct represents Account in flat identity model
 }
 
 struct SocialAccountsResponse: Codable {

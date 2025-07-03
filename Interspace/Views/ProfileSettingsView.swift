@@ -150,7 +150,7 @@ struct ProfileSettingsView: View {
                                     iconColor: DesignTokens.Colors.primary,
                                     showChevron: true,
                                     isFirst: true,
-                                    isLast: !(profile.isDevelopmentWallet ?? false) && profile.isActive
+                                    isLast: (profile.isDevelopmentWallet ?? false)
                                 ) {
                                     showWalletSecurity = true
                                 }
@@ -164,23 +164,22 @@ struct ProfileSettingsView: View {
                                         iconColor: DesignTokens.Colors.textSecondary,
                                         showChevron: true,
                                         isFirst: false,
-                                        isLast: profile.isActive
+                                        isLast: false
                                     ) {
                                         // Handle key share export
                                     }
                                 }
                                 
-                                if !profile.isActive {
-                                    ActionRow(
-                                        title: "Delete Profile",
-                                        subtitle: "Permanently remove this profile",
-                                        icon: "trash",
-                                        iconColor: DesignTokens.Colors.error,
-                                        isFirst: false,
-                                        isLast: true
-                                    ) {
-                                        showDeleteConfirmation = true
-                                    }
+                                // Show delete button for all profiles (including active ones)
+                                ActionRow(
+                                    title: "Delete Profile",
+                                    subtitle: "Permanently remove this profile",
+                                    icon: "trash",
+                                    iconColor: DesignTokens.Colors.error,
+                                    isFirst: false,
+                                    isLast: true
+                                ) {
+                                    showDeleteConfirmation = true
                                 }
                             }
                             .background(DesignTokens.GlassEffect.thin)

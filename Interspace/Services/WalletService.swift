@@ -1226,6 +1226,7 @@ final class WalletService: ObservableObject {
     @MainActor
     func openWalletWithDeepLink(walletType: WalletType, uri: String) {
         print("📱 WalletService: Opening wallet app with deep link for \(walletType.displayName)")
+        print("📱 WalletService: URI: \(uri)")
         
         // Get the URL scheme for the wallet
         let scheme: String
@@ -1263,6 +1264,7 @@ final class WalletService: ObservableObject {
                 scheme = firstApp.scheme
             } else {
                 print("❌ WalletService: No compatible wallet apps found")
+                showNoWalletInstalledAlert()
                 return
             }
         default:
@@ -1270,15 +1272,164 @@ final class WalletService: ObservableObject {
             return
         }
         
-        // Create the deep link URL
-        let deepLink = "\(scheme)://wc?uri=\(uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri)"
+        // Create the deep link URL based on wallet type
+        let deepLink: String
         
-        if let url = URL(string: deepLink), UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url, options: [:]) { success in
-                print("📱 WalletService: Opened \(walletType.displayName): \(success)")
+        // Special handling for Phantom wallet
+        if walletType == .phantom {
+            // Phantom uses a different deep link format
+            // First, ensure the URI is properly formatted
+            let encodedUri = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
+            deepLink = "phantom://wc?uri=\(encodedUri)"
+            print("📱 WalletService: Using Phantom-specific deep link format")
+        } else {
+            // Standard WalletConnect deep link format for other wallets
+            // Properly encode the URI
+            let encodedUri = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
+            deepLink = "\(scheme)://wc?uri=\(encodedUri)"
+        }
+        
+        print("📱 WalletService: Deep link: \(deepLink)")
+        print("📱 WalletService: Encoded URI: \(uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "encoding failed")")
+        
+        if let url = URL(string: deepLink) {
+            // Check if we can open the URL first
+            if UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url, options: [:]) { success in
+                    print("📱 WalletService: Opened \(walletType.displayName): \(success)")
+                    if !success {
+                        // Try alternative formats if the standard one fails
+                        if walletType == .phantom {
+                            // Try Phantom's universal link format
+                            self.tryPhantomUniversalLink(uri: uri)
+                        } else {
+                            self.showWalletOpenFailedAlert(walletType: walletType)
+                        }
+                    }
+                }
+            } else {
+                print("❌ WalletService: Cannot open \(walletType.displayName) - app not installed")
+                showWalletNotInstalledAlert(walletType: walletType)
             }
         } else {
-            print("❌ WalletService: Could not open \(walletType.displayName) - app not installed or URL invalid")
+            print("❌ WalletService: Invalid deep link URL")
+            showWalletOpenFailedAlert(walletType: walletType)
+        }
+    }
+    
+    /// Try Phantom's universal link format as fallback
+    @MainActor
+    private func tryPhantomUniversalLink(uri: String) {
+        print("📱 WalletService: Trying Phantom universal link format")
+        
+        // Phantom also supports universal links
+        let encodedUri = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
+        let universalLink = "https://phantom.app/ul/v1/connect?uri=\(encodedUri)"
+        
+        if let url = URL(string: universalLink) {
+            UIApplication.shared.open(url, options: [:]) { success in
+                print("📱 WalletService: Opened Phantom via universal link: \(success)")
+                if !success {
+                    self.showWalletOpenFailedAlert(walletType: .phantom)
+                }
+            }
+        }
+    }
+    
+    /// Show alert when wallet app is not installed
+    @MainActor
+    private func showWalletNotInstalledAlert(walletType: WalletType) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            return
+        }
+        
+        let alert = UIAlertController(
+            title: "\(walletType.displayName) Not Found",
+            message: "The \(walletType.displayName) app doesn't appear to be installed. Would you like to view it on the App Store?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "View on App Store", style: .default) { _ in
+            if let appStoreUrl = self.getAppStoreUrl(for: walletType),
+               let url = URL(string: appStoreUrl) {
+                UIApplication.shared.open(url)
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        rootViewController.present(alert, animated: true)
+    }
+    
+    /// Show alert when no wallet apps are installed
+    @MainActor
+    private func showNoWalletInstalledAlert() {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            return
+        }
+        
+        let alert = UIAlertController(
+            title: "No Wallet Apps Found",
+            message: "You need a crypto wallet app to continue. Would you like to browse wallet apps on the App Store?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Browse Wallets", style: .default) { _ in
+            // Open App Store search for crypto wallets
+            if let url = URL(string: "https://apps.apple.com/search?term=crypto+wallet") {
+                UIApplication.shared.open(url)
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        rootViewController.present(alert, animated: true)
+    }
+    
+    /// Show alert when wallet connection fails
+    @MainActor
+    private func showWalletOpenFailedAlert(walletType: WalletType) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            return
+        }
+        
+        let alert = UIAlertController(
+            title: "Connection Failed",
+            message: "Unable to open \(walletType.displayName). Please make sure the app is installed and try again.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        
+        rootViewController.present(alert, animated: true)
+    }
+    
+    /// Get App Store URL for wallet apps
+    private func getAppStoreUrl(for walletType: WalletType) -> String? {
+        switch walletType {
+        case .trust:
+            return "https://apps.apple.com/app/trust-crypto-bitcoin-wallet/id1288339409"
+        case .rainbow:
+            return "https://apps.apple.com/app/rainbow-ethereum-wallet/id1457119021"
+        case .metamask:
+            return "https://apps.apple.com/app/metamask-blockchain-wallet/id1438144202"
+        case .argent:
+            return "https://apps.apple.com/app/argent/id1358741926"
+        case .coinbase:
+            return "https://apps.apple.com/app/coinbase-wallet/id1278383455"
+        case .zerion:
+            return "https://apps.apple.com/app/zerion-wallet/id1456732565"
+        case .oneInch:
+            return "https://apps.apple.com/app/1inch-defi-wallet/id1546049391"
+        case .imToken:
+            return "https://apps.apple.com/app/imtoken-crypto-wallet/id1153230571"
+        case .phantom:
+            return "https://apps.apple.com/app/phantom-crypto-wallet/id1598432977"
+        default:
+            return nil
         }
     }
     

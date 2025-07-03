@@ -87,6 +87,8 @@ struct WalletViewRedesigned: View {
         .background(Color(UIColor.systemBackground))
         .navigationTitle("Wallet")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 StandardToolbarButtons(
