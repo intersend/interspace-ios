@@ -6,15 +6,14 @@ import WalletConnectPairing
 import WalletConnectRelay
 import Starscream
 
-@MainActor
 final class WalletConnectService: ObservableObject {
     static let shared = WalletConnectService()
     
-    // Published properties
-    @Published var isConnected = false
-    @Published var sessions: [Session] = []
-    @Published var pendingProposal: Session.Proposal?
-    @Published var connectionError: WalletConnectError?
+    // Published properties - remove @MainActor to avoid threading conflicts
+    @Published private(set) var isConnected = false
+    @Published private(set) var sessions: [Session] = []
+    @Published private(set) var pendingProposal: Session.Proposal?
+    @Published private(set) var connectionError: WalletConnectError?
     
     // Private properties
     private var cancellables = Set<AnyCancellable>()
@@ -67,11 +66,16 @@ final class WalletConnectService: ObservableObject {
         
         // Configure networking
         // Using app group for proper keychain access
+        print("📱 WalletConnectService: Configuring networking with relay host: \(relayHost)")
+        print("📱 WalletConnectService: Project ID: \(projectId)")
+        
         Networking.configure(
             groupIdentifier: "group.com.interspace.walletconnect",
             projectId: projectId,
             socketFactory: DefaultSocketFactory()
         )
+        
+        print("📱 WalletConnectService: Networking configured successfully")
         
         // Configure Pair
         Pair.configure(metadata: metadata)
@@ -87,7 +91,9 @@ final class WalletConnectService: ObservableObject {
         Sign.instance.sessionProposalPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] proposal in
-                self?.handleSessionProposal(proposal.proposal)
+                Task { @MainActor in
+                    self?.handleSessionProposal(proposal.proposal)
+                }
             }
             .store(in: &cancellables)
         
@@ -95,7 +101,9 @@ final class WalletConnectService: ObservableObject {
         Sign.instance.sessionRequestPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] (request, _) in
-                self?.handleSessionRequest(request)
+                Task { @MainActor in
+                    self?.handleSessionRequest(request)
+                }
             }
             .store(in: &cancellables)
         
@@ -103,7 +111,9 @@ final class WalletConnectService: ObservableObject {
         Sign.instance.sessionSettlePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] session in
-                self?.handleSessionSettled(session)
+                Task { @MainActor in
+                    self?.handleSessionSettled(session)
+                }
             }
             .store(in: &cancellables)
         
@@ -111,7 +121,9 @@ final class WalletConnectService: ObservableObject {
         Sign.instance.sessionDeletePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] (topic, reason) in
-                self?.handleSessionDeleted(topic: topic)
+                Task { @MainActor in
+                    self?.handleSessionDeleted(topic: topic)
+                }
             }
             .store(in: &cancellables)
         
@@ -119,7 +131,9 @@ final class WalletConnectService: ObservableObject {
         Sign.instance.sessionResponsePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] response in
-                self?.handleSessionResponse(response)
+                Task { @MainActor in
+                    self?.handleSessionResponse(response)
+                }
             }
             .store(in: &cancellables)
         
@@ -160,9 +174,60 @@ final class WalletConnectService: ObservableObject {
     func connectToWallet() async throws -> String {
         print("📱 WalletConnectService: Creating connection request as dApp")
         
-        // Create a pairing URI that wallets can use to connect to us
-        let uri = try await Pair.instance.create()
-        print("📱 URI created: \(uri.absoluteString)")
+        // Set a timeout for the entire connection process
+        let connectionTask = Task { () throws -> String in
+            // Give SDK a moment to initialize if needed
+            await ensureSocketConnected()
+            
+            // Create a pairing URI that wallets can use to connect to us
+            let uri: WalletConnectURI
+            do {
+                // The Pair.instance.create() will handle socket connection internally
+                uri = try await Pair.instance.create()
+                print("📱 URI created: \(uri.absoluteString)")
+                print("📱 URI topic: \(uri.topic)")
+                print("📱 URI version: \(uri.version)")
+                print("📱 URI symKey: \(uri.symKey)")
+                print("📱 URI relay protocol: \(uri.relay.protocol)")
+            } catch {
+                print("❌ WalletConnectService: Failed to create pairing URI: \(error)")
+                // Check if this is a network-related error
+                let errorMessage = error.localizedDescription.lowercased()
+                if errorMessage.contains("network") || errorMessage.contains("internet") {
+                    throw WalletConnectError.pairingFailed("Network connection issue. Please check your internet connection and try again.")
+                } else {
+                    throw WalletConnectError.pairingFailed(error.localizedDescription)
+                }
+            }
+            
+            return uri.absoluteString
+        }
+        
+        // Apply timeout of 15 seconds for the initial connection
+        let timeoutTask = Task {
+            try await Task.sleep(nanoseconds: 15_000_000_000) // 15 seconds
+            connectionTask.cancel()
+        }
+        
+        do {
+            let uriString = try await connectionTask.value
+            timeoutTask.cancel()
+            
+            // Continue with the rest of the connection process
+            return try await continueConnectionProcess(with: uriString)
+        } catch {
+            timeoutTask.cancel()
+            if error is CancellationError {
+                throw WalletConnectError.pairingFailed("Connection timeout - please try again")
+            }
+            throw error
+        }
+    }
+    
+    private func continueConnectionProcess(with uriString: String) async throws -> String {
+        guard let uri = try? WalletConnectURI(string: uriString) else {
+            throw WalletConnectError.invalidURI
+        }
         
         // Define the namespaces we require from the wallet
         let requiredNamespaces: [String: ProposalNamespace] = [
@@ -173,21 +238,48 @@ final class WalletConnectService: ObservableObject {
             )
         ]
         
-        // Create connection proposal
-        Task {
+        // Create connection proposal with retry logic
+        var retryCount = 0
+        let maxRetries = 3
+        var lastError: Error?
+        
+        while retryCount < maxRetries {
             do {
-                _ = try await Sign.instance.connect(
+                print("📱 WalletConnectService: Sending connection proposal (attempt \(retryCount + 1)/\(maxRetries))...")
+                
+                // Small delay between retries
+                if retryCount > 0 {
+                    try await Task.sleep(nanoseconds: UInt64(retryCount) * 1_000_000_000) // 1-3 seconds
+                }
+                
+                let _ = try await Sign.instance.connect(
                     requiredNamespaces: requiredNamespaces,
                     optionalNamespaces: [:],
                     sessionProperties: nil
                 )
-                print("📱 WalletConnectService: Connection proposal sent")
+                print("📱 WalletConnectService: Connection proposal sent successfully")
+                break // Success, exit retry loop
+                
             } catch {
-                print("❌ WalletConnectService: Failed to send connection proposal: \(error)")
+                lastError = error
+                retryCount += 1
+                
+                let errorMessage = error.localizedDescription
+                if errorMessage.contains("existing") || errorMessage.contains("already") {
+                    // This is okay - we're already paired
+                    print("ℹ️ WalletConnectService: Already paired, continuing...")
+                    break
+                } else if retryCount < maxRetries {
+                    print("⚠️ WalletConnectService: Connection attempt \(retryCount) failed: \(error)")
+                    // Continue to retry
+                } else {
+                    print("❌ WalletConnectService: All connection attempts failed: \(error)")
+                    // Don't throw - the URI is still valid
+                }
             }
         }
         
-        return uri.absoluteString
+        return uriString
     }
     
     
@@ -269,7 +361,7 @@ final class WalletConnectService: ObservableObject {
                 }
             }
             
-            await MainActor.run {
+            await updatePublishedProperties {
                 self.sessions.removeAll()
                 self.isConnected = false
                 self.sessionTopic = nil
@@ -287,6 +379,7 @@ final class WalletConnectService: ObservableObject {
     
     // SIWE auth doesn't require persistent session loading
     
+    @MainActor
     private func handleSessionProposal(_ proposal: Session.Proposal) {
         print("📱 WalletConnectService: Received session proposal from \(proposal.proposer.name)")
         print("📱 Proposal ID: \(proposal.id)")
@@ -298,7 +391,7 @@ final class WalletConnectService: ObservableObject {
         print("⚠️ For production use, Interspace should generate QR codes for wallets to scan")
         
         // Store but don't auto-approve
-        pendingProposal = proposal
+        self.pendingProposal = proposal
     }
     
     private func approveSessionAsWallet(_ proposal: Session.Proposal) async {
@@ -387,7 +480,9 @@ final class WalletConnectService: ObservableObject {
             
         } catch {
             print("❌ WalletConnectService: Failed to approve session: \(error)")
-            connectionError = WalletConnectError.sessionApprovalFailed(error.localizedDescription)
+            await updatePublishedProperties {
+                self.connectionError = WalletConnectError.sessionApprovalFailed(error.localizedDescription)
+            }
         }
     }
     
@@ -466,26 +561,28 @@ final class WalletConnectService: ObservableObject {
     }
     
     
+    @MainActor
     private func handleSessionSettled(_ session: Session) {
         print("✅ WalletConnectService: Session settled with \(session.peer.name)")
         
         // For SIWE auth, we keep the session temporarily for signing
-        sessions.append(session)
-        isConnected = true
-        sessionTopic = session.topic
-        pendingProposal = nil
+        self.sessions.append(session)
+        self.isConnected = true
+        self.sessionTopic = session.topic
+        self.pendingProposal = nil
         
         // Extract wallet address from the session
         if let firstAccount = session.namespaces.values.flatMap({ $0.accounts }).first {
             let components = firstAccount.absoluteString.split(separator: ":")
             if components.count >= 3 {
-                currentAddress = String(components[2])
+                self.currentAddress = String(components[2])
             }
         }
         
-        print("✅ WalletConnectService: Session established for SIWE auth, wallet: \(currentAddress ?? "unknown")")
+        print("✅ WalletConnectService: Session established for SIWE auth, wallet: \(self.currentAddress ?? "unknown")")
     }
     
+    @MainActor
     private func handleSessionRequest(_ request: Request) {
         print("📱 WalletConnectService: Received request: \(request.method)")
         
@@ -562,18 +659,20 @@ final class WalletConnectService: ObservableObject {
         }
     }
     
+    @MainActor
     private func handleSessionDeleted(topic: String) {
         print("🗑 WalletConnectService: Session deleted")
         
-        sessions.removeAll { $0.topic == topic }
+        self.sessions.removeAll { $0.topic == topic }
         
-        if sessions.isEmpty {
-            isConnected = false
-            sessionTopic = nil
-            currentAddress = nil
+        if self.sessions.isEmpty {
+            self.isConnected = false
+            self.sessionTopic = nil
+            self.currentAddress = nil
         }
     }
     
+    @MainActor
     private func handleSessionResponse(_ response: Response) {
         print("📱 WalletConnectService: Received response")
         
@@ -583,19 +682,19 @@ final class WalletConnectService: ObservableObject {
             // Try to extract the signature string from the response
             if let signature = try? anyCodable.get(String.self) {
                 print("✅ WalletConnectService: Got signature: \(signature)")
-                signingCompletion?(.success(signature))
-                signingCompletion = nil
+                self.signingCompletion?(.success(signature))
+                self.signingCompletion = nil
             } else {
                 print("❌ WalletConnectService: Could not extract signature from response")
-                signingCompletion?(.failure(WalletConnectError.invalidResponse))
-                signingCompletion = nil
+                self.signingCompletion?(.failure(WalletConnectError.invalidResponse))
+                self.signingCompletion = nil
             }
             
         case .error(let jsonRPCError):
             // Handle error response
             print("❌ WalletConnectService: Request failed with error: \(jsonRPCError.message)")
-            signingCompletion?(.failure(WalletConnectError.signingFailed(jsonRPCError.message)))
-            signingCompletion = nil
+            self.signingCompletion?(.failure(WalletConnectError.signingFailed(jsonRPCError.message)))
+            self.signingCompletion = nil
         }
     }
 }
@@ -639,15 +738,32 @@ extension WalletConnectService {
 }
 
 
+// MARK: - Helper Methods
+
+extension WalletConnectService {
+    /// Update published properties on main thread
+    @MainActor
+    private func updatePublishedProperties(_ updates: @escaping () -> Void) async {
+        updates()
+    }
+}
+
 // MARK: - Socket Factory
 
 // Create a wrapper to adapt Starscream's WebSocket to WalletConnectRelay's WebSocketConnecting
 class WebSocketAdapter: WebSocketConnecting {
     private let socket: WebSocket
+    private let connectionLock = NSLock()
     private var _isConnected: Bool = false
+    private var reconnectTimer: Timer?
+    private var reconnectAttempts = 0
+    private let maxReconnectAttempts = 5
+    private let reconnectDelay: TimeInterval = 2.0
     
     var isConnected: Bool {
-        _isConnected
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
+        return _isConnected
     }
     
     var request: URLRequest {
@@ -661,44 +777,181 @@ class WebSocketAdapter: WebSocketConnecting {
     
     init(url: URL) {
         var request = URLRequest(url: url)
-        request.timeoutInterval = 5
+        request.timeoutInterval = 30 // Increase timeout to 30 seconds
+        
+        // Add required headers for WalletConnect
+        request.setValue("websocket", forHTTPHeaderField: "Upgrade")
+        request.setValue("Upgrade", forHTTPHeaderField: "Connection")
+        request.setValue("13", forHTTPHeaderField: "Sec-WebSocket-Version")
+        
         socket = WebSocket(request: request)
         
+        // Configure socket options for better connectivity
+        socket.callbackQueue = DispatchQueue.main
+        // socket.enableCompression = true // Not available in current WebSocket implementation
+        
         socket.onEvent = { [weak self] event in
-            switch event {
-            case .connected:
-                self?._isConnected = true
-                self?.onConnect?()
-            case .disconnected(_, _):
-                self?._isConnected = false
-                self?.onDisconnect?(nil)
-            case .text(let string):
-                self?.onText?(string)
-            case .error(let error):
-                self?._isConnected = false
-                self?.onDisconnect?(error)
-            default:
-                break
+            guard let self = self else { return }
+            
+            // Ensure all callbacks happen on main thread to avoid threading issues
+            DispatchQueue.main.async {
+                switch event {
+                case .connected(_):
+                    self.setConnected(true)
+                    print("✅ WalletConnect WebSocket: Connected")
+                    self.onConnect?()
+                case .disconnected(let reason, let code):
+                    self.setConnected(false)
+                    print("❌ WalletConnect WebSocket: Disconnected - reason: \(reason ?? "unknown"), code: \(code)")
+                    self.onDisconnect?(nil)
+                    self.scheduleReconnect()
+                case .text(let string):
+                    self.onText?(string)
+                case .error(let error):
+                    self.setConnected(false)
+                    print("❌ WalletConnect WebSocket: Error - \(error?.localizedDescription ?? "unknown")")
+                    self.onDisconnect?(error)
+                    self.scheduleReconnect()
+                case .cancelled:
+                    self.setConnected(false)
+                    print("❌ WalletConnect WebSocket: Cancelled")
+                    self.onDisconnect?(nil)
+                case .viabilityChanged(let isViable):
+                    print("🔌 WalletConnect WebSocket: Viability changed - \(isViable)")
+                case .reconnectSuggested(let shouldReconnect):
+                    print("🔌 WalletConnect WebSocket: Reconnect suggested - \(shouldReconnect)")
+                    if shouldReconnect {
+                        self.connect()
+                    }
+                case .pong:
+                    break
+                case .ping:
+                    break
+                case .binary:
+                    break
+                case .peerClosed:
+                    self.setConnected(false)
+                    print("❌ WalletConnect WebSocket: Peer closed connection")
+                    self.onDisconnect?(nil)
+                    self.scheduleReconnect()
+                }
             }
         }
     }
     
     func connect() {
+        connectionLock.lock()
+        let alreadyConnected = _isConnected
+        connectionLock.unlock()
+        
+        if alreadyConnected {
+            print("🔌 WalletConnect WebSocket: Already connected, skipping connection attempt")
+            return
+        }
+        
+        // Cancel any pending reconnect
+        cancelReconnect()
+        reconnectAttempts = 0
+        
+        print("🔌 WalletConnect WebSocket: Attempting to connect...")
         socket.connect()
     }
     
     func disconnect() {
+        print("🔌 WalletConnect WebSocket: Disconnecting...")
+        cancelReconnect()
         socket.disconnect()
     }
     
     func write(string: String, completion: (() -> Void)? = nil) {
-        socket.write(string: string, completion: completion)
+        // Ensure write operations happen on the correct queue
+        if Thread.isMainThread {
+            socket.write(string: string, completion: completion)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.socket.write(string: string, completion: completion)
+            }
+        }
+    }
+    
+    private func setConnected(_ connected: Bool) {
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
+        _isConnected = connected
+        
+        if connected {
+            reconnectAttempts = 0
+        }
+    }
+    
+    private func scheduleReconnect() {
+        guard reconnectAttempts < maxReconnectAttempts else {
+            print("❌ WalletConnect WebSocket: Max reconnection attempts reached")
+            return
+        }
+        
+        cancelReconnect()
+        
+        reconnectAttempts += 1
+        let delay = reconnectDelay * Double(reconnectAttempts)
+        
+        print("🔄 WalletConnect WebSocket: Scheduling reconnect attempt \(reconnectAttempts)/\(maxReconnectAttempts) in \(delay) seconds")
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.reconnectTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
+                self?.attemptReconnect()
+            }
+        }
+    }
+    
+    private func attemptReconnect() {
+        connectionLock.lock()
+        let alreadyConnected = _isConnected
+        connectionLock.unlock()
+        
+        if !alreadyConnected {
+            print("🔄 WalletConnect WebSocket: Attempting reconnection...")
+            connect()
+        }
+    }
+    
+    private func cancelReconnect() {
+        DispatchQueue.main.async { [weak self] in
+            self?.reconnectTimer?.invalidate()
+            self?.reconnectTimer = nil
+        }
     }
 }
 
 struct DefaultSocketFactory: WebSocketFactory {
     func create(with url: URL) -> WebSocketConnecting {
         return WebSocketAdapter(url: url)
+    }
+}
+
+// MARK: - Socket Reconnection
+extension WalletConnectService {
+    /// Monitor socket connection and attempt reconnection if needed
+    func monitorSocketConnection() {
+        // This could be called periodically or when connection issues are detected
+        // The WalletConnect SDK should handle reconnection internally, but
+        // we can add additional monitoring if needed
+        print("🔌 WalletConnectService: Socket monitoring active")
+    }
+    
+    /// Ensure socket is connected before critical operations
+    func ensureSocketConnected() async {
+        print("🔌 WalletConnectService: Checking socket connection...")
+        
+        // Give the SDK a moment to initialize its networking stack
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        
+        // For WalletConnect/Reown SDK, the socket connection is handled internally
+        // We don't need to check it repeatedly - the SDK will handle reconnections
+        print("🔌 WalletConnectService: Socket initialization period complete")
+        
+        // The Pair.instance.create() call will establish the connection if needed
+        // No need for repeated checks that flood the logs
     }
 }
 

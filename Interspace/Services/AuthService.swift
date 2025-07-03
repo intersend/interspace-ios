@@ -42,9 +42,9 @@ struct LogoutResponse: Codable {
     let message: String
 }
 
-struct UserResponse: Codable {
+struct UserResponse: Codable {  // Legacy compatibility wrapper
     let success: Bool
-    let data: User
+    let data: User  // User struct represents Account in flat identity model
 }
 
 
@@ -95,7 +95,7 @@ struct GoogleSignInResult {
     let name: String?
     let imageURL: String?
     let idToken: String?
-    let userId: String
+    let accountId: String  // Changed from userId to accountId
 }
 
 final class GoogleSignInService {
@@ -229,7 +229,7 @@ final class GoogleSignInService {
                     
                     print("🔐 GoogleSignInService: Sign-in successful!")
                     print("🔐 GoogleSignInService: User email: \(profile.email)")
-                    print("🔐 GoogleSignInService: User name: \(profile.name ?? "N/A")")
+                    print("🔐 GoogleSignInService: User name: \(profile.name)")
                     print("🔐 GoogleSignInService: User ID: \(user.userID ?? "N/A")")
                     
                     // Refresh tokens to ensure we have the latest ID token
@@ -251,7 +251,7 @@ final class GoogleSignInService {
                             name: profile.name,
                             imageURL: profile.imageURL(withDimension: 100)?.absoluteString,
                             idToken: idToken,
-                            userId: user.userID ?? ""
+                            accountId: user.userID ?? ""
                         )
                         
                         continuation.resume(returning: result)
@@ -283,7 +283,7 @@ final class GoogleSignInService {
                 guard let user = user,
                       let profile = user.profile else {
                     print("🔐 GoogleSignInService: No previous sign-in found")
-                    continuation.resume(returning: nil)
+                    continuation.resume(throwing: GoogleSignInError.cancelled)
                     return
                 }
                 
@@ -303,7 +303,7 @@ final class GoogleSignInService {
                         name: profile.name,
                         imageURL: profile.imageURL(withDimension: 100)?.absoluteString,
                         idToken: idToken,
-                        userId: user.userID ?? ""
+                        accountId: user.userID ?? ""
                     )
                     
                     continuation.resume(returning: result)
@@ -319,6 +319,7 @@ enum GoogleSignInError: LocalizedError {
     case noViewController
     case signInFailed(String)
     case noUserData
+    case cancelled
     
     var errorDescription: String? {
         switch self {
@@ -328,6 +329,8 @@ enum GoogleSignInError: LocalizedError {
             return "Google Sign-In failed: \(message)"
         case .noUserData:
             return "No user data received from Google Sign-In"
+        case .cancelled:
+            return "Google Sign-In was cancelled"
         }
     }
 }
@@ -426,6 +429,11 @@ final class PasskeyService {
     static let shared = PasskeyService()
     
     private init() {}
+    
+    @available(iOS 16.0, *)
+    static func registerPasskeyForLinking(username: String? = nil) async throws -> AuthTokens {
+        return try await shared.registerPasskeyForLinking(username: username)
+    }
     
     static func isPasskeyAvailable() -> Bool {
         if #available(iOS 16.0, *) {
@@ -533,6 +541,13 @@ final class PasskeyService {
         } else {
             throw PasskeyError.registrationFailed
         }
+    }
+    
+    @available(iOS 16.0, *)
+    func registerPasskeyForLinking(username: String? = nil) async throws -> AuthTokens {
+        // For account linking, always register a new passkey without checking for existing ones
+        print("🔑 Registering new passkey for account linking")
+        return try await registerPasskeyV2(username: username)
     }
     
     @available(iOS 16.0, *)
@@ -658,6 +673,10 @@ final class PasskeyService {
                 throw PasskeyError.noCredentialsAvailable
             case .unknown:
                 throw PasskeyError.authenticationFailed
+            case .notInteractive:
+                throw PasskeyError.authenticationFailed
+            case .matchedExcludedCredential:
+                throw PasskeyError.noCredentialsAvailable
             @unknown default:
                 throw PasskeyError.authenticationFailed
             }
@@ -707,7 +726,7 @@ final class PasskeyService {
     private func handlePasskeyRegistrationV2(_ passkeyResult: PasskeyResult, challenge: String, username: String?) async throws -> AuthTokens {
         // For V2, we authenticate with the passkey strategy
         // The backend will handle account creation automatically
-        let verifyRequest = PasskeyVerifyRequest(
+        let _ = PasskeyVerifyRequest(
             response: PasskeyResponse(
                 id: passkeyResult.credentialID,
                 rawId: passkeyResult.credentialID,
@@ -731,8 +750,8 @@ final class PasskeyService {
         let authenticatorData = passkeyResult.authenticatorData ?? ""
         let signature = passkeyResult.signature
         let userHandle = passkeyResult.userHandle ?? ""
-        let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? ""
-        let deviceName = UIDevice.current.name
+        let deviceId = await MainActor.run { UIDevice.current.identifierForVendor?.uuidString ?? "" }
+        let deviceName = await MainActor.run { UIDevice.current.name }
         
         var requestBody: [String: Any] = [
             "strategy": "passkey",
@@ -960,6 +979,9 @@ private class PasskeySilentCheckDelegate: NSObject, ASAuthorizationControllerDel
             case .notInteractive:
                 // Cannot show UI - no credentials immediately available
                 completion(false)
+            case .matchedExcludedCredential:
+                // Matched excluded credential
+                completion(false)
             @unknown default:
                 completion(false)
             }
@@ -1094,10 +1116,16 @@ extension AppleSignInService: ASAuthorizationControllerDelegate {
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         print("🍎 AppleSignInService: Authorization completed successfully")
         
+        // Ensure we have a continuation to resume
+        guard let continuation = signInContinuation else {
+            print("🍎 AppleSignInService: WARNING - No continuation available, already resumed")
+            return
+        }
+        signInContinuation = nil // Clear immediately to prevent double resume
+        
         guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
             print("🍎 AppleSignInService: ERROR - Invalid credential type")
-            signInContinuation?.resume(throwing: AppleSignInError.invalidCredential)
-            signInContinuation = nil
+            continuation.resume(throwing: AppleSignInError.invalidCredential)
             return
         }
         
@@ -1105,8 +1133,7 @@ extension AppleSignInService: ASAuthorizationControllerDelegate {
         guard let identityTokenData = appleIDCredential.identityToken,
               let identityToken = String(data: identityTokenData, encoding: .utf8) else {
             print("🍎 AppleSignInService: ERROR - No identity token")
-            signInContinuation?.resume(throwing: AppleSignInError.noIdentityToken)
-            signInContinuation = nil
+            continuation.resume(throwing: AppleSignInError.noIdentityToken)
             return
         }
         
@@ -1114,8 +1141,7 @@ extension AppleSignInService: ASAuthorizationControllerDelegate {
         guard let authorizationCodeData = appleIDCredential.authorizationCode,
               let authorizationCode = String(data: authorizationCodeData, encoding: .utf8) else {
             print("🍎 AppleSignInService: ERROR - No authorization code")
-            signInContinuation?.resume(throwing: AppleSignInError.noAuthorizationCode)
-            signInContinuation = nil
+            continuation.resume(throwing: AppleSignInError.noAuthorizationCode)
             return
         }
         
@@ -1173,7 +1199,7 @@ extension AppleSignInService: ASAuthorizationControllerDelegate {
         }
         
         let result = AppleSignInResult(
-            userId: appleIDCredential.user,
+            accountId: appleIDCredential.user,
             identityToken: identityToken,
             authorizationCode: authorizationCode,
             email: email,
@@ -1181,45 +1207,49 @@ extension AppleSignInService: ASAuthorizationControllerDelegate {
             realUserStatus: appleIDCredential.realUserStatus
         )
         
-        signInContinuation?.resume(returning: result)
-        signInContinuation = nil
+        continuation.resume(returning: result)
     }
     
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         print("🍎 AppleSignInService: Authorization failed with error: \(error)")
         
+        // Ensure we have a continuation to resume
+        guard let continuation = signInContinuation else {
+            print("🍎 AppleSignInService: WARNING - No continuation available, already resumed")
+            return
+        }
+        signInContinuation = nil // Clear immediately to prevent double resume
+        
         if let authError = error as? ASAuthorizationError {
             switch authError.code {
             case .canceled:
                 print("🍎 AppleSignInService: User cancelled sign-in")
-                signInContinuation?.resume(throwing: AppleSignInError.userCancelled)
+                continuation.resume(throwing: AppleSignInError.userCancelled)
             case .failed:
                 print("🍎 AppleSignInService: Authorization failed")
-                signInContinuation?.resume(throwing: AppleSignInError.authorizationFailed)
+                continuation.resume(throwing: AppleSignInError.authorizationFailed)
             case .invalidResponse:
                 print("🍎 AppleSignInService: Invalid response")
-                signInContinuation?.resume(throwing: AppleSignInError.invalidResponse)
+                continuation.resume(throwing: AppleSignInError.invalidResponse)
             case .notHandled:
                 print("🍎 AppleSignInService: Authorization not handled")
-                signInContinuation?.resume(throwing: AppleSignInError.notHandled)
+                continuation.resume(throwing: AppleSignInError.notHandled)
             case .unknown:
                 print("🍎 AppleSignInService: Unknown error")
-                signInContinuation?.resume(throwing: AppleSignInError.unknown)
+                continuation.resume(throwing: AppleSignInError.unknown)
             case .notInteractive:
                 print("🍎 AppleSignInService: Not interactive")
-                signInContinuation?.resume(throwing: AppleSignInError.notHandled)
+                continuation.resume(throwing: AppleSignInError.notHandled)
             case .matchedExcludedCredential:
                 print("🍎 AppleSignInService: Matched excluded credential")
-                signInContinuation?.resume(throwing: AppleSignInError.invalidCredential)
+                continuation.resume(throwing: AppleSignInError.invalidCredential)
             default:
                 print("🍎 AppleSignInService: Other error: \(authError)")
-                signInContinuation?.resume(throwing: error)
+                continuation.resume(throwing: error)
             }
         } else {
-            signInContinuation?.resume(throwing: error)
+            continuation.resume(throwing: error)
         }
-        
-        signInContinuation = nil
     }
 }
 

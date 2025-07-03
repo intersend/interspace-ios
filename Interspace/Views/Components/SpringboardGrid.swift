@@ -32,7 +32,7 @@ struct SpringboardGrid: View {
     private let sideMargin: CGFloat = 27
     private let horizontalSpacing: CGFloat = 27
     private let verticalSpacing: CGFloat = 39
-    private let topMargin: CGFloat = 82
+    private let topMargin: CGFloat = 20
     private let bottomMargin: CGFloat = 30
     
     @State private var currentPage: Int? = 0

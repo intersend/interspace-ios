@@ -77,54 +77,70 @@ struct SocialConnectionTray: View {
                             .padding(.horizontal, 20)
                         }
                         
-                        // Coming Soon Section
+                        // Additional Providers Section
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Coming Soon")
+                            Text("More Providers")
                                 .font(.headline)
                                 .foregroundColor(DesignTokens.Colors.textSecondary)
                                 .padding(.horizontal, 20)
                             
                             VStack(spacing: 0) {
-                                ComingSoonSocialRow(
+                                // Twitter/X - OAuth implementation available
+                                SocialOptionButton(
                                     provider: .twitter,
                                     title: "Twitter / X",
                                     subtitle: "Connect with Twitter",
                                     isFirst: true,
                                     isLast: false
-                                )
+                                ) {
+                                    handleOAuthProvider("twitter")
+                                }
                                 
                                 Divider()
                                     .padding(.leading, 72)
                                 
-                                ComingSoonSocialRow(
-                                    provider: .telegram,
-                                    title: "Telegram",
-                                    subtitle: "Connect with Telegram",
-                                    isFirst: false,
-                                    isLast: false
-                                )
-                                
-                                Divider()
-                                    .padding(.leading, 72)
-                                
-                                ComingSoonSocialRow(
-                                    provider: .farcaster,
-                                    title: "Farcaster",
-                                    subtitle: "Connect with Farcaster",
-                                    isFirst: false,
-                                    isLast: false
-                                )
-                                
-                                Divider()
-                                    .padding(.leading, 72)
-                                
-                                ComingSoonSocialRow(
+                                // GitHub - OAuth implementation available
+                                SocialOptionButton(
                                     provider: .github,
                                     title: "GitHub",
                                     subtitle: "Connect with GitHub",
                                     isFirst: false,
+                                    isLast: false
+                                ) {
+                                    handleOAuthProvider("github")
+                                }
+                                
+                                Divider()
+                                    .padding(.leading, 72)
+                                
+                                // Discord - OAuth implementation available
+                                SocialOptionButton(
+                                    provider: nil,
+                                    icon: "discord",
+                                    iconColor: Color(red: 114/255, green: 137/255, blue: 218/255),
+                                    title: "Discord",
+                                    subtitle: "Connect with Discord",
+                                    isFirst: false,
+                                    isLast: false
+                                ) {
+                                    handleOAuthProvider("discord")
+                                }
+                                
+                                Divider()
+                                    .padding(.leading, 72)
+                                
+                                // Spotify - OAuth implementation available
+                                SocialOptionButton(
+                                    provider: nil,
+                                    icon: "music.note",
+                                    iconColor: Color(red: 30/255, green: 215/255, blue: 96/255),
+                                    title: "Spotify",
+                                    subtitle: "Connect with Spotify",
+                                    isFirst: false,
                                     isLast: true
-                                )
+                                ) {
+                                    handleOAuthProvider("spotify")
+                                }
                             }
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
@@ -196,6 +212,61 @@ struct SocialConnectionTray: View {
         Task {
             do {
                 try await authManager.authenticateWithPasskey()
+                await MainActor.run {
+                    isLoading = false
+                    HapticManager.notification(.success)
+                    isPresented = false
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    HapticManager.notification(.error)
+                }
+            }
+        }
+    }
+    
+    private func handleOAuthProvider(_ providerName: String) {
+        // Use the OAuthProviderService to get provider configuration
+        guard let provider = OAuthProviderService.shared.provider(for: providerName) else {
+            errorMessage = "Provider not configured"
+            showError = true
+            return
+        }
+        
+        isLoading = true
+        
+        Task {
+            do {
+                // Get presenting view controller
+                guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                      let viewController = windowScene.windows.first?.rootViewController else {
+                    throw AuthenticationError.unknown("Unable to present OAuth flow")
+                }
+                
+                let tokens = try await withCheckedThrowingContinuation { continuation in
+                    OAuthProviderService.shared.authenticate(
+                        with: provider,
+                        presentingViewController: viewController
+                    ) { result in
+                        continuation.resume(with: result)
+                    }
+                }
+                
+                // Use the tokens to authenticate
+                try await authManager.authenticateWithOAuth(
+                    provider: providerName,
+                    tokens: OAuthTokenResponse(
+                        accessToken: tokens.accessToken,
+                        refreshToken: tokens.refreshToken,
+                        idToken: tokens.idToken,
+                        expiresIn: tokens.expiresIn,
+                        provider: tokens.provider
+                    )
+                )
+                
                 await MainActor.run {
                     isLoading = false
                     HapticManager.notification(.success)

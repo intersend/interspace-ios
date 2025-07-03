@@ -42,7 +42,7 @@ X-Platform: iOS
    ```swift
    POST /auth/login
    {
-     "email": "user@example.com",
+     "email": "account@example.com",
      "password": "secure_password"
    }
    
@@ -50,9 +50,9 @@ X-Platform: iOS
    {
      "accessToken": "eyJ...",
      "refreshToken": "eyJ...",
-     "user": {
-       "id": "user_id",
-       "email": "user@example.com",
+     "account": {  // Changed from 'user' to 'account' for flat identity model
+       "id": "account_id",
+       "email": "account@example.com",
        "profiles": [...]
      }
    }
@@ -72,8 +72,8 @@ X-Platform: iOS
    {
      "identityToken": "apple_identity_token",
      "authorizationCode": "apple_auth_code",
-     "user": {
-       "email": "user@privaterelay.apple.com",
+     "account": {  // Changed from 'user' to 'account' for flat identity model
+       "email": "account@privaterelay.apple.com",
        "firstName": "John",
        "lastName": "Doe"
      }

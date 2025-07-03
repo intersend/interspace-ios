@@ -178,7 +178,7 @@ final class AuthenticationManagerV2: ObservableObject {
         currentUser = response.user
         profiles = response.profiles
         activeProfile = response.activeProfile
-        isNewUser = response.isNewUser
+        isNewUser = response.isNewAccount
         privacyMode = PrivacyMode(rawValue: response.privacyMode) ?? .linked
         sessionToken = response.sessionId
         isAuthenticated = true
@@ -687,8 +687,8 @@ extension AuthenticationManagerV2 {
             let appleAuth = AppleAuthRequest(
                 identityToken: appleResult.identityToken,
                 authorizationCode: appleResult.authorizationCode,
-                user: AppleUserInfo(
-                    id: appleResult.userId,
+                account: AppleUserInfo(
+                    id: appleResult.accountId,
                     email: appleResult.email,
                     firstName: appleResult.fullName?.givenName,
                     lastName: appleResult.fullName?.familyName

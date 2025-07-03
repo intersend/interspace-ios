@@ -277,7 +277,7 @@ struct UniversalAddTray: View {
                             if isForAuthentication {
                                 handlePasskeyAuthentication()
                             } else {
-                                showPasskeyAuth = true
+                                handlePasskeyLinking()
                             }
                         }
                         
@@ -294,11 +294,8 @@ struct UniversalAddTray: View {
                             isLast: true
                         ) {
                             HapticManager.impact(.light)
-                            if isForAuthentication {
-                                handleAppleAuthentication()
-                            } else {
-                                showAppleSignIn = true
-                            }
+                            // Apple Sign In doesn't need a separate sheet
+                            handleAppleAuthentication()
                         }
                     }
                     .background(
@@ -446,18 +443,12 @@ struct UniversalAddTray: View {
             }
         }
         .sheet(isPresented: $showPasskeyAuth) {
-            // TODO: Implement passkey authentication
-            Text("Passkey Authentication")
-                .background(Color.black.opacity(0.001))
-                .background(Material.ultraThinMaterial)
-                .preferredColorScheme(.dark)
-        }
-        .sheet(isPresented: $showAppleSignIn) {
-            // TODO: Implement Apple Sign In
-            Text("Apple Sign In")
-                .background(Color.black.opacity(0.001))
-                .background(Material.ultraThinMaterial)
-                .preferredColorScheme(.dark)
+            PasskeyAuthenticationView(isPresented: $showPasskeyAuth) {
+                // Handle successful authentication
+                if authManager.isAuthenticated {
+                    isPresented = false
+                }
+            }
         }
         .sheet(isPresented: $showAddApp) {
             AddAppView(viewModel: AppsViewModel())
@@ -667,6 +658,38 @@ struct UniversalAddTray: View {
         }
         
         availableWalletConnectWallets = available
+    }
+    
+    private func handlePasskeyLinking() {
+        Task {
+            isProcessing = true
+            defer { 
+                Task { @MainActor in
+                    isProcessing = false
+                }
+            }
+            
+            do {
+                // Register a new passkey for linking
+                _ = try await PasskeyService.shared.registerPasskeyForLinking()
+                
+                // Refresh profile data
+                await profileViewModel.refreshProfile()
+                
+                // Close the tray
+                await MainActor.run {
+                    isPresented = false
+                }
+                
+                HapticManager.notification(.success)
+            } catch {
+                print("🔴 Passkey linking failed: \(error)")
+                await MainActor.run {
+                    // Show error alert or handle error appropriately
+                    HapticManager.notification(.error)
+                }
+            }
+        }
     }
 }
 

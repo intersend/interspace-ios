@@ -60,6 +60,8 @@ struct ProfileView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 StandardToolbarButtons(
@@ -306,20 +308,17 @@ struct ProfileView: View {
     
     private var bottomActionsSection: some View {
         Section {
-            // Delete Profile (only show if there are multiple profiles and current profile can be deleted)
-            if viewModel.profiles.count > 1 {
-                Button(action: {
-                    showDeleteProfileConfirmation = true
-                }) {
-                    HStack {
-                        Image(systemName: "trash")
-                            .font(.system(size: 16))
-                        Text("Delete Profile")
-                        Spacer()
-                    }
-                    .foregroundColor(.red)
+            // Delete Profile
+            Button(action: {
+                showDeleteProfileConfirmation = true
+            }) {
+                HStack {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16))
+                    Text("Delete Profile")
+                    Spacer()
                 }
-                .disabled(false) // Profile deletion check is handled in viewModel
+                .foregroundColor(.red)
             }
             
             // Sign Out

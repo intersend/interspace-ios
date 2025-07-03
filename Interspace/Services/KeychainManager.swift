@@ -13,11 +13,11 @@ final class KeychainManager {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
         case tokenExpiry = "token_expiry"
-        case userInfo = "user_info"
-        case appleUserID = "apple_user_id"
-        case appleUserInfo = "apple_user_info"
-        case appleUserEmail = "apple_user_email"
-        case appleUserFullName = "apple_user_full_name"
+        case userInfo = "user_info"  // Legacy key name for backward compatibility
+        case appleUserID = "apple_user_id"  // Legacy key name for backward compatibility
+        case appleUserInfo = "apple_user_info"  // Legacy key name for backward compatibility
+        case appleUserEmail = "apple_user_email"  // Represents account email in flat identity model
+        case appleUserFullName = "apple_user_full_name"  // Represents account full name in flat identity model
     }
     
     // MARK: - Save
