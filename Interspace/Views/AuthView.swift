@@ -230,7 +230,7 @@ struct AuthenticatedView: View {
                 Button("Sign Out") {
                     HapticManager.impact(.light)
                     Task {
-                        await authManager.logout()
+                        await SessionCoordinator.shared.logout()
                     }
                 }
                 .buttonStyle(LiquidGlassButtonStyle(variant: .destructive, size: .medium))

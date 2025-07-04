@@ -31,472 +31,99 @@ struct UniversalAddTray: View {
     @State private var showOAuthFlow = false
     @State private var selectedOAuthProvider: OAuthProviderInfo?
     @State private var isProcessing = false
+    @State private var showFarcasterAuth = false
     // Removed showWalletConnectionTray - using direct authorization
     
     private let walletService = WalletService.shared
     private let oauthService = OAuthProviderService.shared
     
     var body: some View {
+        mainContent
+            .background(Color.black.opacity(0.001))
+            .background(Material.regularMaterial)
+            .preferredColorScheme(.dark)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.hidden)
+            .sheet(isPresented: $showWalletAuthorization) {
+                walletAuthorizationSheet
+            }
+            .sheet(isPresented: $showWalletConnection) {
+                walletConnectionSheet
+            }
+            .sheet(isPresented: $showEmailAuth) {
+                emailAuthSheet
+            }
+            .sheet(isPresented: $showPasskeyAuth) {
+                passkeyAuthSheet
+            }
+            .sheet(isPresented: $showAddApp) {
+                addAppSheet
+            }
+            .sheet(isPresented: $showProfileCreation) {
+                profileCreationSheet
+            }
+            .sheet(isPresented: $showOAuthFlow) {
+                oauthFlowSheet
+            }
+            .sheet(isPresented: $showFarcasterAuth) {
+                farcasterAuthSheet
+            }
+            .overlay {
+                if isProcessing {
+                    processingOverlay
+                }
+            }
+            .onAppear {
+                onAppearActions()
+            }
+            .onChange(of: authManager.isAuthenticated) { newValue in
+                onAuthenticationChange(newValue)
+            }
+    }
+    
+    private var mainContent: some View {
         VStack(spacing: 0) {
-            // Custom navigation bar to avoid black background
-            HStack {
-                Spacer()
-                
-                Button(action: {
-                    isPresented = false
-                }) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundColor(.gray)
-                        .frame(width: 30, height: 30)
-                        .background(
-                            Circle()
-                                .fill(Color(white: 0.15))
-                        )
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 8)
-            
+            navigationBar
             ScrollView {
-                VStack(alignment: .leading, spacing: 32) {
-                    // Header - iOS 18 Apple style
-                    Text(isForAuthentication ? "Connect to Interspace" : "Add to Interspace")
-                        .font(.system(.largeTitle, design: .rounded))
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
-                    
-                    // Suggested Section - Context-aware suggestions (not shown during auth)
-                    if !isForAuthentication && authManager.isAuthenticated {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Suggested")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                                .padding(.horizontal, 20)
-                            
-                            VStack(spacing: 0) {
-                                // Show context-specific suggestion based on initialSection
-                                switch initialSection {
-                                case .app:
-                                    // Apps page - suggest adding an app
-                                    AddOptionRow(
-                                        icon: "plus.app.fill",
-                                        iconType: .system,
-                                        title: "Add App",
-                                        iconColor: .blue,
-                                        isFirst: true,
-                                        isLast: true
-                                    ) {
-                                        HapticManager.impact(.light)
-                                        showAddApp = true
-                                    }
-                                    
-                                case .wallet:
-                                    // Wallet view - suggest linking a wallet
-                                    AddOptionRow(
-                                        icon: "wallet.pass.fill",
-                                        iconType: .system,
-                                        title: "Link Wallet",
-                                        iconColor: .orange,
-                                        isFirst: true,
-                                        isLast: true
-                                    ) {
-                                        HapticManager.impact(.light)
-                                        selectedWalletType = .metamask
-                                        showWalletAuthorization = true
-                                    }
-                                    
-                                default:
-                                    // Profile page or other - suggest adding a profile
-                                    AddOptionRow(
-                                        icon: "person.crop.circle.badge.plus",
-                                        iconType: .system,
-                                        title: "Add Profile",
-                                        iconColor: .green,
-                                        isFirst: true,
-                                        isLast: true
-                                    ) {
-                                        HapticManager.impact(.light)
-                                        showProfileCreation = true
-                                    }
-                                }
-                            }
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(white: 0.15))
-                            )
-                            .padding(.horizontal, 20)
-                        }
-                    }
-                    
-                    // Profile Section - only show when authenticated and not in auth mode
-                    if !isForAuthentication && authManager.isAuthenticated && initialSection != .none {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Profile")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                                .padding(.horizontal, 20)
-                            
-                            VStack(spacing: 0) {
-                                // Add Profile
-                                AddOptionRow(
-                                    icon: "person.crop.circle.badge.plus",
-                                    iconType: .system,
-                                    title: "Add Profile",
-                                    iconColor: .blue,
-                                    isFirst: true,
-                                    isLast: true
-                                ) {
-                                    HapticManager.impact(.light)
-                                    showProfileCreation = true
-                                }
-                            }
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(white: 0.15))
-                            )
-                            .padding(.horizontal, 20)
-                        }
-                    }
-                        
-                    // Account Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text(isForAuthentication ? "Wallet" : "Account")
-                            .font(.headline)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 20)
-                        
-                        VStack(spacing: 0) {
-                            // MetaMask
-                            AddOptionRow(
-                                icon: "metamask",
-                                iconType: .asset,
-                                title: "MetaMask",
-                                iconColor: .orange,
-                                isFirst: true,
-                                isLast: false
-                            ) {
-                                HapticManager.impact(.light)
-                                selectedWalletType = .metamask
-                                // Show authorization directly without intermediate tray
-                                DispatchQueue.main.async {
-                                    showWalletAuthorization = true
-                                }
-                            }
-                            
-                            Divider()
-                                .padding(.leading, 72)
-                            
-                            // Coinbase Wallet
-                            AddOptionRow(
-                                icon: "coinbase",
-                                iconType: .asset,
-                                title: "Coinbase Wallet",
-                                iconColor: .blue,
-                                isFirst: false,
-                                isLast: availableWalletConnectWallets.isEmpty
-                            ) {
-                                HapticManager.impact(.light)
-                                selectedWalletType = .coinbase
-                                // Show authorization directly without intermediate tray
-                                DispatchQueue.main.async {
-                                    showWalletAuthorization = true
-                                }
-                            }
-                            
-                            if !availableWalletConnectWallets.isEmpty {
-                                Divider()
-                                    .padding(.leading, 72)
-                            }
-                            
-                            // Add individual WalletConnect-compatible wallets
-                            ForEach(Array(availableWalletConnectWallets.enumerated()), id: \.element) { index, walletType in
-                                if index > 0 {
-                                    Divider()
-                                        .padding(.leading, 72)
-                                }
-                                
-                                AddOptionRow(
-                                    icon: walletType.systemIconName,
-                                    iconType: .system,
-                                    title: walletType.displayName,
-                                    iconColor: walletType.primaryColor,
-                                    isFirst: false,
-                                    isLast: index == availableWalletConnectWallets.count - 1
-                                ) {
-                                    HapticManager.impact(.light)
-                                    selectedWalletType = walletType
-                                    DispatchQueue.main.async {
-                                        showWalletAuthorization = true
-                                    }
-                                }
-                            }
-                        }
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(white: 0.15))
-                        )
-                        .padding(.horizontal, 20)
-                    }
-                        
-                    // Authentication Methods (with visual gap)
-                    VStack(spacing: 0) {
-                        // Email
-                        AddOptionRow(
-                            icon: "envelope.fill",
-                            iconType: .system,
-                            title: "Email",
-                            iconColor: .blue,
-                            isFirst: true,
-                            isLast: false
-                        ) {
-                            HapticManager.impact(.light)
-                            if isForAuthentication {
-                                handleEmailAuthentication()
-                            } else {
-                                showEmailAuth = true
-                            }
-                        }
-                        
-                        Divider()
-                            .padding(.leading, 72)
-                        
-                        // Passkey
-                        AddOptionRow(
-                            icon: "key.fill",
-                            iconType: .system,
-                            title: "Passkey",
-                            iconColor: .green,
-                            isFirst: false,
-                            isLast: false
-                        ) {
-                            HapticManager.impact(.light)
-                            if isForAuthentication {
-                                handlePasskeyAuthentication()
-                            } else {
-                                handlePasskeyLinking()
-                            }
-                        }
-                        
-                        Divider()
-                            .padding(.leading, 72)
-                        
-                        // Apple
-                        AddOptionRow(
-                            icon: "apple.logo",
-                            iconType: .system,
-                            title: "Apple",
-                            iconColor: .white,
-                            isFirst: false,
-                            isLast: true
-                        ) {
-                            HapticManager.impact(.light)
-                            // Apple Sign In doesn't need a separate sheet
-                            handleAppleAuthentication()
-                        }
-                    }
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(white: 0.15))
-                    )
-                    .padding(.horizontal, 20)
-                    
-                    // OAuth Providers Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Social")
-                            .font(.headline)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 20)
-                        
-                        VStack(spacing: 0) {
-                            ForEach(Array(OAuthProviderInfo.providers.enumerated()), id: \.element.id) { index, provider in
-                                // Skip Apple since it's already shown above
-                                if provider.id != "apple" {
-                                    if index > 0 && provider.id != OAuthProviderInfo.providers.first(where: { $0.id != "apple" })?.id {
-                                        Divider()
-                                            .padding(.leading, 72)
-                                    }
-                                    
-                                    AddOptionRow(
-                                        icon: provider.iconName,
-                                        iconType: .asset,
-                                        title: provider.displayName,
-                                        iconColor: provider.tintColor,
-                                        isFirst: provider.id == OAuthProviderInfo.providers.first(where: { $0.id != "apple" })?.id,
-                                        isLast: provider.id == OAuthProviderInfo.providers.filter({ $0.id != "apple" }).last?.id
-                                    ) {
-                                        HapticManager.impact(.light)
-                                        handleOAuthProvider(provider)
-                                    }
-                                }
-                            }
-                        }
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(white: 0.15))
-                        )
-                        .padding(.horizontal, 20)
-                    }
-                    
-                    // App Section - only show when authenticated and not in auth mode
-                    if !isForAuthentication && authManager.isAuthenticated {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("App")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                                .padding(.horizontal, 20)
-                            
-                            VStack(spacing: 0) {
-                                // Add App
-                                AddOptionRow(
-                                    icon: "square.grid.2x2",
-                                    iconType: .system,
-                                    title: "Add App",
-                                    iconColor: .orange,
-                                    isFirst: true,
-                                    isLast: true
-                                ) {
-                                    HapticManager.impact(.light)
-                                    showAddApp = true
-                                }
-                            }
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(white: 0.15))
-                            )
-                            .padding(.horizontal, 20)
-                        }
-                    }
-                        
-                        Spacer(minLength: 40)
-                }
+                scrollContent
             }
         }
-        .background(Color.black.opacity(0.001))
-        .background(Material.regularMaterial)
-        .preferredColorScheme(.dark)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
-        .sheet(isPresented: $showWalletAuthorization) {
-            if let walletType = selectedWalletType {
-                if isForAuthentication {
-                    // For authentication, use WalletConnectionView with AuthViewModel
-                    WalletConnectionView(
-                        walletType: walletType,
-                        viewModel: authViewModel ?? AuthViewModel(),
-                        onComplete: {
-                            isPresented = false
-                        },
-                        isForAuthentication: true
-                    )
-                } else {
-                    // For account linking, show authorization tray first
-                    WalletAuthorizationTray(
-                        walletType: walletType,
-                        onAuthorize: {
-                            showWalletAuthorization = false
-                            // Small delay to ensure smooth transition
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showWalletConnection = true
-                            }
-                        },
-                        onCancel: {
-                            showWalletAuthorization = false
-                            selectedWalletType = nil
-                        }
-                    )
-                }
+    }
+    
+    private var scrollContent: some View {
+        VStack(alignment: .leading, spacing: 32) {
+            headerView
+            
+            if showSuggestedSection {
+                suggestedSection
             }
-        }
-        .onChange(of: showWalletAuthorization) { newValue in
-            if newValue && selectedWalletType == nil {
-                // This should never happen, but handle it gracefully
-                showWalletAuthorization = false
+            
+            if showProfileSection {
+                profileSection
             }
-        }
-        .sheet(isPresented: $showWalletConnection) {
-            if let walletType = selectedWalletType {
-                WalletConnectionView(
-                    walletType: walletType,
-                    viewModel: profileViewModel,
-                    onComplete: {
-                        isPresented = false
-                    }
-                )
+            
+            accountSection
+            authenticationMethodsSection
+            socialProvidersSection
+            
+            if showAppSection {
+                appSection
             }
+            
+            Spacer(minLength: 40)
         }
-        // Removed WalletConnectionTray - now using direct wallet authorization
-        .sheet(isPresented: $showEmailAuth) {
-            if isForAuthentication {
-                EmailAuthenticationView(isPresented: $showEmailAuth)
-                    .onDisappear {
-                        // Check if authentication succeeded
-                        if authManager.isAuthenticated {
-                            isPresented = false
-                        }
-                    }
-            } else {
-                EmailLinkingView(isPresented: $showEmailAuth)
-            }
-        }
-        .sheet(isPresented: $showPasskeyAuth) {
-            PasskeyAuthenticationView(isPresented: $showPasskeyAuth) {
-                // Handle successful authentication
-                if authManager.isAuthenticated {
-                    isPresented = false
-                }
-            }
-        }
-        .sheet(isPresented: $showAddApp) {
-            AddAppView(viewModel: AppsViewModel())
-                .background(Color.black.opacity(0.001))
-                .background(Material.ultraThinMaterial)
-                .preferredColorScheme(.dark)
-        }
-        .sheet(isPresented: $showProfileCreation) {
-            ProfileCreationTray(isPresented: $showProfileCreation) { profileName in
-                Task {
-                    await createProfile(name: profileName)
-                }
-            }
-        }
-        .sheet(isPresented: $showOAuthFlow) {
-            if let provider = selectedOAuthProvider {
-                OAuthFlowView(provider: provider, isForAuthentication: isForAuthentication) { result in
-                    Task {
-                        await handleOAuthResult(provider: provider, result: result)
-                    }
-                }
-            }
-        }
-        .overlay {
-            if isProcessing {
-                Color.black.opacity(0.5)
-                    .ignoresSafeArea()
-                    .overlay {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.2)
-                    }
-            }
-        }
-        .onAppear {
-            Task {
-                if !isForAuthentication {
-                    await profileViewModel.loadProfile()
-                }
-            }
-            checkAvailableWallets()
-        }
-        .onChange(of: authManager.isAuthenticated) { newValue in
-            // Close the tray when authentication succeeds
-            if isForAuthentication && newValue {
-                isPresented = false
-            }
-        }
+    }
+    
+    private var showSuggestedSection: Bool {
+        !isForAuthentication && authManager.isAuthenticated
+    }
+    
+    private var showProfileSection: Bool {
+        !isForAuthentication && authManager.isAuthenticated && initialSection != .none
+    }
+    
+    private var showAppSection: Bool {
+        !isForAuthentication && authManager.isAuthenticated
     }
     
     // MARK: - Helper Methods
@@ -548,9 +175,19 @@ struct UniversalAddTray: View {
         }
     }
     
+    private func handleFarcasterAuthentication() {
+        // Show Farcaster auth view
+        showFarcasterAuth = true
+    }
+    
     private func handleOAuthProvider(_ provider: OAuthProviderInfo) {
-        selectedOAuthProvider = provider
-        showOAuthFlow = true
+        if provider.id == "farcaster" {
+            // Handle Farcaster authentication separately
+            handleFarcasterAuthentication()
+        } else {
+            selectedOAuthProvider = provider
+            showOAuthFlow = true
+        }
     }
     
     private func handleOAuthResult(provider: OAuthProviderInfo, result: Result<OAuthTokens, Error>) async {
@@ -666,6 +303,503 @@ struct UniversalAddTray: View {
         }
         
         availableWalletConnectWallets = available
+    }
+    
+    // MARK: - View Components
+    
+    private var navigationBar: some View {
+        HStack {
+            Spacer()
+            
+            Button(action: {
+                isPresented = false
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(.gray)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Circle()
+                            .fill(Color(white: 0.15))
+                    )
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 8)
+    }
+    
+    private var headerView: some View {
+        Text(isForAuthentication ? "Connect to Interspace" : "Add to Interspace")
+            .font(.system(.largeTitle, design: .rounded))
+            .fontWeight(.bold)
+            .foregroundColor(.white)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+    }
+    
+    @ViewBuilder
+    private var suggestedOptionForSection: some View {
+        switch initialSection {
+        case .app:
+            AddOptionRow(
+                icon: "plus.app.fill",
+                iconType: .system,
+                title: "Add App",
+                iconColor: .blue,
+                isFirst: true,
+                isLast: true
+            ) {
+                HapticManager.impact(.light)
+                showAddApp = true
+            }
+            
+        case .wallet:
+            AddOptionRow(
+                icon: "wallet.pass.fill",
+                iconType: .system,
+                title: "Link Wallet",
+                iconColor: .orange,
+                isFirst: true,
+                isLast: true
+            ) {
+                HapticManager.impact(.light)
+                selectedWalletType = .metamask
+                showWalletAuthorization = true
+            }
+            
+        default:
+            AddOptionRow(
+                icon: "person.crop.circle.badge.plus",
+                iconType: .system,
+                title: "Add Profile",
+                iconColor: .green,
+                isFirst: true,
+                isLast: true
+            ) {
+                HapticManager.impact(.light)
+                showProfileCreation = true
+            }
+        }
+    }
+    
+    private var suggestedSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Suggested")
+                .font(.headline)
+                .foregroundColor(.gray)
+                .padding(.horizontal, 20)
+            
+            VStack(spacing: 0) {
+                suggestedOptionForSection
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(white: 0.15))
+            )
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private var profileSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Profile")
+                .font(.headline)
+                .foregroundColor(.gray)
+                .padding(.horizontal, 20)
+            
+            VStack(spacing: 0) {
+                // Add Profile
+                AddOptionRow(
+                    icon: "person.crop.circle.badge.plus",
+                    iconType: .system,
+                    title: "Add Profile",
+                    iconColor: .blue,
+                    isFirst: true,
+                    isLast: true
+                ) {
+                    HapticManager.impact(.light)
+                    showProfileCreation = true
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(white: 0.15))
+            )
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(isForAuthentication ? "Wallet" : "Account")
+                .font(.headline)
+                .foregroundColor(.gray)
+                .padding(.horizontal, 20)
+            
+            walletOptionsContent
+        }
+    }
+    
+    private var walletOptionsContent: some View {
+        VStack(spacing: 0) {
+            // MetaMask
+            AddOptionRow(
+                icon: "metamask",
+                iconType: .asset,
+                title: "MetaMask",
+                iconColor: .orange,
+                isFirst: true,
+                isLast: false
+            ) {
+                HapticManager.impact(.light)
+                selectedWalletType = .metamask
+                // Show authorization directly without intermediate tray
+                DispatchQueue.main.async {
+                    showWalletAuthorization = true
+                }
+            }
+            
+            Divider()
+                .padding(.leading, 72)
+            
+            // Coinbase Wallet
+            AddOptionRow(
+                icon: "coinbase",
+                iconType: .asset,
+                title: "Coinbase Wallet",
+                iconColor: .blue,
+                isFirst: false,
+                isLast: availableWalletConnectWallets.isEmpty
+            ) {
+                HapticManager.impact(.light)
+                selectedWalletType = .coinbase
+                // Show authorization directly without intermediate tray
+                DispatchQueue.main.async {
+                    showWalletAuthorization = true
+                }
+            }
+            
+            if !availableWalletConnectWallets.isEmpty {
+                Divider()
+                    .padding(.leading, 72)
+            }
+            
+            // Add individual WalletConnect-compatible wallets
+            ForEach(availableWalletConnectWallets.indices, id: \.self) { index in
+                let walletType = availableWalletConnectWallets[index]
+                Group {
+                    if index > 0 {
+                        Divider()
+                            .padding(.leading, 72)
+                    }
+                    
+                    AddOptionRow(
+                        icon: walletType.systemIconName,
+                        iconType: .system,
+                        title: walletType.displayName,
+                        iconColor: walletType.primaryColor,
+                        isFirst: false,
+                        isLast: index == availableWalletConnectWallets.count - 1
+                    ) {
+                        HapticManager.impact(.light)
+                        selectedWalletType = walletType
+                        DispatchQueue.main.async {
+                            showWalletAuthorization = true
+                        }
+                    }
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(white: 0.15))
+        )
+        .padding(.horizontal, 20)
+    }
+    
+    private var authenticationMethodsSection: some View {
+        VStack(spacing: 0) {
+            // Email
+            AddOptionRow(
+                icon: "envelope.fill",
+                iconType: .system,
+                title: "Email",
+                iconColor: .blue,
+                isFirst: true,
+                isLast: false
+            ) {
+                HapticManager.impact(.light)
+                if isForAuthentication {
+                    handleEmailAuthentication()
+                } else {
+                    showEmailAuth = true
+                }
+            }
+            
+            Divider()
+                .padding(.leading, 72)
+            
+            // Passkey
+            AddOptionRow(
+                icon: "key.fill",
+                iconType: .system,
+                title: "Passkey",
+                iconColor: .green,
+                isFirst: false,
+                isLast: false
+            ) {
+                HapticManager.impact(.light)
+                if isForAuthentication {
+                    handlePasskeyAuthentication()
+                } else {
+                    handlePasskeyLinking()
+                }
+            }
+            
+            Divider()
+                .padding(.leading, 72)
+            
+            // Apple
+            AddOptionRow(
+                icon: "apple.logo",
+                iconType: .system,
+                title: "Apple",
+                iconColor: .white,
+                isFirst: false,
+                isLast: true
+            ) {
+                HapticManager.impact(.light)
+                // Apple Sign In doesn't need a separate sheet
+                handleAppleAuthentication()
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(white: 0.15))
+        )
+        .padding(.horizontal, 20)
+    }
+    
+    private var socialProvidersSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Social")
+                .font(.headline)
+                .foregroundColor(.gray)
+                .padding(.horizontal, 20)
+            
+            socialProvidersContent
+        }
+    }
+    
+    private var socialProvidersContent: some View {
+        let nonAppleProviders = OAuthProviderInfo.providers.filter { $0.id != "apple" }
+        
+        return VStack(spacing: 0) {
+            ForEach(Array(nonAppleProviders.enumerated()), id: \.element.id) { index, provider in
+                Group {
+                    if index > 0 {
+                        Divider()
+                            .padding(.leading, 72)
+                    }
+                    
+                    AddOptionRow(
+                        icon: provider.iconName,
+                        iconType: .asset,
+                        title: provider.displayName,
+                        iconColor: provider.tintColor,
+                        isFirst: index == 0,
+                        isLast: index == nonAppleProviders.count - 1
+                    ) {
+                        HapticManager.impact(.light)
+                        handleOAuthProvider(provider)
+                    }
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(white: 0.15))
+        )
+        .padding(.horizontal, 20)
+    }
+    
+    private var appSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("App")
+                .font(.headline)
+                .foregroundColor(.gray)
+                .padding(.horizontal, 20)
+            
+            VStack(spacing: 0) {
+                // Add App
+                AddOptionRow(
+                    icon: "square.grid.2x2",
+                    iconType: .system,
+                    title: "Add App",
+                    iconColor: .orange,
+                    isFirst: true,
+                    isLast: true
+                ) {
+                    HapticManager.impact(.light)
+                    showAddApp = true
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(white: 0.15))
+            )
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    // MARK: - Sheet Contents
+    
+    @ViewBuilder
+    private var walletAuthorizationSheet: some View {
+        if let walletType = selectedWalletType {
+            if isForAuthentication {
+                WalletConnectionView(
+                    walletType: walletType,
+                    viewModel: authViewModel ?? AuthViewModel(),
+                    onComplete: {
+                        isPresented = false
+                    },
+                    isForAuthentication: true
+                )
+            } else {
+                WalletAuthorizationTray(
+                    walletType: walletType,
+                    onAuthorize: {
+                        showWalletAuthorization = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showWalletConnection = true
+                        }
+                    },
+                    onCancel: {
+                        showWalletAuthorization = false
+                        selectedWalletType = nil
+                    }
+                )
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var walletConnectionSheet: some View {
+        if let walletType = selectedWalletType {
+            WalletConnectionView(
+                walletType: walletType,
+                viewModel: profileViewModel,
+                onComplete: {
+                    isPresented = false
+                }
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var emailAuthSheet: some View {
+        if isForAuthentication {
+            EmailAuthenticationView(isPresented: $showEmailAuth)
+                .onDisappear {
+                    if authManager.isAuthenticated {
+                        isPresented = false
+                    }
+                }
+        } else {
+            EmailLinkingView(isPresented: $showEmailAuth)
+        }
+    }
+    
+    private var passkeyAuthSheet: some View {
+        PasskeyAuthenticationView(isPresented: $showPasskeyAuth) {
+            if authManager.isAuthenticated {
+                isPresented = false
+            }
+        }
+    }
+    
+    private var addAppSheet: some View {
+        AddAppView(viewModel: AppsViewModel())
+            .background(Color.black.opacity(0.001))
+            .background(Material.ultraThinMaterial)
+            .preferredColorScheme(.dark)
+    }
+    
+    private var profileCreationSheet: some View {
+        ProfileCreationTray(isPresented: $showProfileCreation) { profileName in
+            Task {
+                await createProfile(name: profileName)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var oauthFlowSheet: some View {
+        if let provider = selectedOAuthProvider {
+            OAuthFlowView(provider: provider, isForAuthentication: isForAuthentication) { result in
+                Task {
+                    await handleOAuthResult(provider: provider, result: result)
+                }
+            }
+        }
+    }
+    
+    private var farcasterAuthSheet: some View {
+        FarcasterAuthView(isPresented: $showFarcasterAuth) { authResponse in
+            Task { @MainActor in
+                do {
+                    if isForAuthentication {
+                        // Authenticate with Farcaster
+                        try await authManager.authenticateWithFarcaster(
+                            message: authResponse.message,
+                            signature: authResponse.signature,
+                            fid: authResponse.fid
+                        )
+                    } else {
+                        // Link Farcaster account
+                        try await authManager.linkFarcasterAccount(
+                            message: authResponse.message,
+                            signature: authResponse.signature,
+                            fid: authResponse.fid
+                        )
+                    }
+                    isPresented = false
+                    HapticManager.notification(.success)
+                } catch {
+                    print("Farcaster auth error: \(error)")
+                    HapticManager.notification(.error)
+                }
+            }
+        }
+    }
+    
+    private var processingOverlay: some View {
+        Color.black.opacity(0.5)
+            .ignoresSafeArea()
+            .overlay {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.2)
+            }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func onAppearActions() {
+        Task {
+            if !isForAuthentication {
+                await profileViewModel.loadProfile()
+            }
+        }
+        checkAvailableWallets()
+    }
+    
+    private func onAuthenticationChange(_ newValue: Bool) {
+        if isForAuthentication && newValue {
+            isPresented = false
+        }
     }
     
     private func handlePasskeyLinking() {
