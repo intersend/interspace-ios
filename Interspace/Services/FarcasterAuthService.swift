@@ -42,16 +42,43 @@ class FarcasterAuthService: ObservableObject {
     
     /// Create a new authentication channel with the backend
     func createAuthChannel() async throws -> FarcasterAuthChannel {
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.interspace.ios"
+        print("Creating Farcaster auth channel with domain: \(bundleId)")
+        
         let response = try await authAPI.createFarcasterChannel(
-            domain: Bundle.main.bundleIdentifier ?? "interspace.so",
+            domain: bundleId,
             siweUri: "https://interspace.so"
         )
         
-        guard let channel = response.channel,
-              let expiresAt = ISO8601DateFormatter().date(from: channel.expiresAt) else {
-            throw AuthenticationError.unknown("Invalid channel response")
+        guard let channel = response.channel else {
+            print("FarcasterAuthService: No channel in response")
+            throw AuthenticationError.unknown("Invalid channel response - no channel data")
         }
         
+        print("FarcasterAuthService: Got channel with token: \(channel.channelToken)")
+        print("FarcasterAuthService: Channel expires at: \(channel.expiresAt)")
+        
+        // Create formatter that handles milliseconds
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        guard let expiresAt = formatter.date(from: channel.expiresAt) else {
+            // Fallback to standard formatter without fractional seconds
+            let standardFormatter = ISO8601DateFormatter()
+            guard let expiresAt = standardFormatter.date(from: channel.expiresAt) else {
+                print("FarcasterAuthService: Failed to parse date: \(channel.expiresAt)")
+                throw AuthenticationError.unknown("Invalid channel response - date parsing failed")
+            }
+            print("FarcasterAuthService: Parsed date with standard formatter")
+            return createAuthChannel(from: channel, expiresAt: expiresAt)
+        }
+        
+        print("FarcasterAuthService: Parsed date with milliseconds formatter")
+        
+        return createAuthChannel(from: channel, expiresAt: expiresAt)
+    }
+    
+    private func createAuthChannel(from channel: FarcasterChannelResponse.FarcasterChannel, expiresAt: Date) -> FarcasterAuthChannel {
         // Create deep link for Warpcast
         let deepLink = "https://warpcast.com/~/sign-in?channelToken=\(channel.channelToken)"
         
@@ -125,6 +152,15 @@ class FarcasterAuthService: ObservableObject {
     }
     
     // MARK: - Polling
+    
+    /// Poll for completion after channel is created
+    func pollForCompletion() async throws -> FarcasterAuthResponse {
+        guard let channel = authChannel else {
+            throw AuthenticationError.unknown("No auth channel available")
+        }
+        
+        return try await pollForSignature(channelToken: channel.channelToken)
+    }
     
     private func pollForSignature(channelToken: String) async throws -> FarcasterAuthResponse {
         let maxAttempts = 120 // 2 minutes with 1 second intervals

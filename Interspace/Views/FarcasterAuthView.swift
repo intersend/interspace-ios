@@ -25,6 +25,9 @@ struct FarcasterAuthView: View {
                             .font(.body)
                             .foregroundColor(DesignTokens.Colors.textSecondary)
                     }
+                    .onAppear {
+                        print("FarcasterAuthView: Showing loading state")
+                    }
                 } else if let qrCode = farcasterAuth.qrCodeImage {
                     ScrollView {
                         VStack(spacing: 32) {
@@ -139,7 +142,16 @@ struct FarcasterAuthView: View {
     
     private func startAuthentication() async {
         do {
-            let authResponse = try await farcasterAuth.startAuthentication()
+            // First create the auth channel to display QR code
+            _ = try await farcasterAuth.createAuthChannel()
+            
+            // Once channel is created, hide loading and show QR code
+            await MainActor.run {
+                isLoading = false
+            }
+            
+            // Now wait for the user to scan and complete authentication
+            let authResponse = try await farcasterAuth.pollForCompletion()
             
             await MainActor.run {
                 HapticManager.notification(.success)
