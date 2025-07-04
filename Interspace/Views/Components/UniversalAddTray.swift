@@ -530,7 +530,13 @@ struct UniversalAddTray: View {
         // Initiate Apple Sign In
         Task {
             do {
-                try await authManager.authenticateWithApple()
+                if authManager.isAuthenticated {
+                    // Link Apple account to existing profile
+                    try await authManager.linkAppleAccount()
+                } else {
+                    // New authentication
+                    try await authManager.authenticateWithApple()
+                }
                 await MainActor.run {
                     isPresented = false
                 }
@@ -570,11 +576,16 @@ struct UniversalAddTray: View {
                         showOAuthFlow = false
                     }
                 } else {
-                    // Handle account linking
-                    try await authManager.linkAccount(
-                        type: .social,
-                        identifier: "", // Will be determined by backend
-                        provider: provider.id
+                    // Handle account linking using standardized OAuth flow
+                    guard let windowScene = await UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                          let viewController = await windowScene.windows.first?.rootViewController else {
+                        throw AuthenticationError.unknown("Unable to present OAuth flow")
+                    }
+                    
+                    // Use the standardized OAuth flow handler
+                    try await authManager.handleOAuthFlow(
+                        provider: provider.id,
+                        presentingViewController: viewController
                     )
                     
                     await MainActor.run {
@@ -601,18 +612,15 @@ struct UniversalAddTray: View {
     
     private func createProfile(name: String) async {
         // Create the profile using the view model
+        // This will automatically switch to the new profile
         await profileViewModel.createProfile(name: name)
-        
-        // Reload profiles to reflect the change
-        await profileViewModel.loadProfiles()
         
         // Dismiss the add tray after successful creation
         await MainActor.run {
             isPresented = false
         }
         
-        // Show success feedback
-        HapticManager.notification(.success)
+        // Success feedback is already handled in createProfile
     }
     
     private func checkAvailableWallets() {
@@ -1062,11 +1070,6 @@ struct OAuthFlowView: View {
     }
     
     private func initiateOAuthFlow() {
-        guard let oauthProvider = OAuthProviderService.shared.provider(for: provider.id) else {
-            completion(.failure(AuthenticationError.unknown("Provider not configured")))
-            return
-        }
-        
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let viewController = windowScene.windows.first?.rootViewController else {
             completion(.failure(AuthenticationError.unknown("Unable to present OAuth flow")))
@@ -1074,7 +1077,7 @@ struct OAuthFlowView: View {
         }
         
         OAuthProviderService.shared.authenticate(
-            with: oauthProvider,
+            withProviderNamed: provider.id,
             presentingViewController: viewController
         ) { result in
             completion(result)

@@ -59,7 +59,6 @@ struct AuthenticationRequest: Codable {
 // Social authentication data for Google/Apple Sign-In
 struct SocialAuthData: Codable {
     let provider: String
-    let providerId: String
     let email: String
     let displayName: String?
     let avatarUrl: String?
@@ -108,9 +107,18 @@ struct User: Codable, Identifiable {
     let profilesCount: Int
     let linkedAccountsCount: Int
     let activeDevicesCount: Int
-    let socialAccounts: [LegacySocialAccount]
+    let socialAccounts: [UserSocialAccount]
     let createdAt: String
     let updatedAt: String
+}
+
+// Social account model used in User response
+struct UserSocialAccount: Codable {
+    let id: String
+    let provider: String  // Backend returns "provider", not "providerId"
+    let email: String?
+    let displayName: String?
+    let avatarUrl: String?
 }
 
 // MARK: - Wallet Connection Models
@@ -307,12 +315,61 @@ struct AppleUserInfo: Codable {  // Kept name for backward compatibility, but re
 
 // MARK: - V2 API Models
 
+// Custom type to handle mixed metadata values
+enum MetadataValue: Codable {
+    case string(String)
+    case bool(Bool)
+    case null
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let boolValue = try? container.decode(Bool.self) {
+            self = .bool(boolValue)
+        } else if let stringValue = try? container.decode(String.self) {
+            self = .string(stringValue)
+        } else {
+            throw DecodingError.typeMismatch(MetadataValue.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected String, Bool, or null"))
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value):
+            try container.encode(value)
+        case .bool(let value):
+            try container.encode(value)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+    
+    // Convenience accessors
+    var stringValue: String? {
+        switch self {
+        case .string(let value): return value
+        case .bool(let value): return String(value)
+        case .null: return nil
+        }
+    }
+    
+    var boolValue: Bool? {
+        switch self {
+        case .bool(let value): return value
+        case .string(let value): return Bool(value)
+        case .null: return nil
+        }
+    }
+}
+
 struct AccountV2: Codable, Identifiable {
     let id: String
     let type: String?  // Backend uses 'type'
     let strategy: String?  // For compatibility
     let identifier: String
-    let metadata: [String: String]?
+    let metadata: [String: MetadataValue]?  // Now supports mixed types
     let verified: Bool?
     let createdAt: String?
     let updatedAt: String?
@@ -320,6 +377,11 @@ struct AccountV2: Codable, Identifiable {
     // Computed property to get the account type
     var accountType: String {
         return type ?? strategy ?? "unknown"
+    }
+    
+    // Convenience accessor for email verified status
+    var emailVerified: Bool? {
+        return metadata?["emailVerified"]?.boolValue
     }
 }
 
@@ -382,6 +444,11 @@ struct LinkAccountRequestV2: Codable {
     let linkType: String?
     let privacyMode: String?
     let verificationCode: String? // For email linking
+    let message: String? // For wallet/Farcaster SIWE linking
+    let signature: String? // For wallet/Farcaster SIWE linking
+    let walletType: String? // For wallet linking
+    let chainId: Int? // For wallet linking
+    let fid: String? // For Farcaster linking
 }
 
 struct LinkAccountResponseV2: Codable {

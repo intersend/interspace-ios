@@ -134,7 +134,6 @@ class GoogleAuthenticationTests: XCTestCase {
             XCTAssertEqual(socialData.provider, "google")
             XCTAssertEqual(socialData.email, "dev.user@example.com") // Development mode email
             XCTAssertEqual(socialData.displayName, "Development User")
-            XCTAssertNotNil(socialData.providerId)
             
         } else {
             XCTFail("Failed to verify social data mapping")

@@ -95,7 +95,7 @@ struct AccountDetailViewV2: View {
                         
                         // Provider (for social accounts)
                         if account.accountType == "social",
-                           let provider = account.metadata?["provider"] {
+                           let provider = account.metadata?["provider"]?.stringValue {
                             HStack {
                                 Text("Provider")
                                 Spacer()
@@ -175,7 +175,7 @@ struct AccountDetailViewV2: View {
     }
     
     private var socialIcon: Image {
-        let provider = account.metadata?["provider"]?.lowercased()
+        let provider = account.metadata?["provider"]?.stringValue?.lowercased()
         switch provider {
         case "google":
             return Image(systemName: "g.circle.fill")
@@ -204,7 +204,7 @@ struct AccountDetailViewV2: View {
     }
     
     private var socialColor: Color {
-        let provider = account.metadata?["provider"]?.lowercased()
+        let provider = account.metadata?["provider"]?.stringValue?.lowercased()
         switch provider {
         case "google":
             return .red
@@ -224,12 +224,12 @@ struct AccountDetailViewV2: View {
             return "Email Account"
         } else if account.accountType == "wallet" {
             // Extract wallet type from metadata if available
-            if let walletType = account.metadata?["walletType"] as? String {
+            if let walletType = account.metadata?["walletType"]?.stringValue {
                 return walletType.capitalized + " Wallet"
             }
             return "Wallet"
         } else if account.accountType == "social" {
-            return account.metadata?["provider"]?.capitalized ?? "Social Account"
+            return account.metadata?["provider"]?.stringValue?.capitalized ?? "Social Account"
         }
         return account.accountType.capitalized
     }

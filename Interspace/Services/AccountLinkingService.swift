@@ -19,7 +19,18 @@ final class AccountLinkingService: ObservableObject {
     // MARK: - Account Linking Methods
     
     /// Link a new account to the current account
-    func linkAccount(type: AccountType, identifier: String, provider: String? = nil, linkType: String = "direct", privacyMode: String = "linked") async throws {
+    func linkAccount(
+        type: AccountType, 
+        identifier: String, 
+        provider: String? = nil, 
+        linkType: String = "direct", 
+        privacyMode: String = "linked",
+        message: String? = nil,
+        signature: String? = nil,
+        walletType: String? = nil,
+        chainId: Int? = nil,
+        fid: String? = nil
+    ) async throws {
         isLoading = true
         error = nil
         
@@ -30,7 +41,12 @@ final class AccountLinkingService: ObservableObject {
                 targetProvider: provider,
                 linkType: linkType,
                 privacyMode: privacyMode,
-                verificationCode: nil // Only needed for email linking
+                verificationCode: nil, // Only needed for email linking
+                message: message,
+                signature: signature,
+                walletType: walletType,
+                chainId: chainId,
+                fid: fid
             )
             
             let response = try await authAPI.linkAccountsV2(request: request)
@@ -52,16 +68,15 @@ final class AccountLinkingService: ObservableObject {
     }
     
     /// Unlink an account
-    func unlinkAccount(_ accountId: String) async throws {
+    func unlinkAccount(_ accountId: String, profileId: String) async throws {
         // Removed check for last account - flat identity model allows removing any account
         
         isLoading = true
         error = nil
         
         do {
-            // Call unlink endpoint (needs to be added to AuthAPI)
-            // For now, we'll use the profile API endpoint
-            _ = try await ProfileAPI.shared.unlinkAccount(accountId: accountId)
+            // Call unlink endpoint with profileId
+            _ = try await ProfileAPI.shared.unlinkAccount(profileId: profileId, accountId: accountId)
             
             // Refresh identity graph
             await refreshIdentityGraph()
@@ -127,7 +142,12 @@ final class AccountLinkingService: ObservableObject {
                 targetProvider: nil,
                 linkType: "direct",
                 privacyMode: "linked",
-                verificationCode: verificationCode
+                verificationCode: verificationCode,
+                message: nil,
+                signature: nil,
+                walletType: nil,
+                chainId: nil,
+                fid: nil
             )
             
             #if DEBUG
@@ -162,27 +182,60 @@ final class AccountLinkingService: ObservableObject {
         try await linkAccount(
             type: .wallet,
             identifier: address,
-            provider: walletType
+            provider: walletType,
+            message: message,
+            signature: signature,
+            walletType: walletType
         )
     }
     
     // MARK: - Social Linking
     
-    /// Link Google account
-    func linkGoogleAccount(idToken: String) async throws {
+    /// Link Google account using decoded user ID
+    func linkGoogleAccount(userId: String) async throws {
         try await linkAccount(
             type: .social,
-            identifier: idToken,
-            provider: "google"
+            identifier: userId,  // Now expects decoded user ID, not token
+            provider: "google",
+            linkType: "direct",
+            privacyMode: "linked",
+            message: nil,
+            signature: nil,
+            walletType: nil,
+            chainId: nil,
+            fid: nil
         )
     }
     
-    /// Link Apple account
-    func linkAppleAccount(userId: String, email: String?) async throws {
+    /// Link Apple account using decoded user ID
+    func linkAppleAccount(userId: String) async throws {
         try await linkAccount(
             type: .social,
-            identifier: userId,
-            provider: "apple"
+            identifier: userId,  // Expects decoded user ID from JWT
+            provider: "apple",
+            linkType: "direct",
+            privacyMode: "linked",
+            message: nil,
+            signature: nil,
+            walletType: nil,
+            chainId: nil,
+            fid: nil
+        )
+    }
+    
+    /// Link Farcaster account
+    func linkFarcasterAccount(fid: String, message: String, signature: String) async throws {
+        try await linkAccount(
+            type: .social,
+            identifier: fid,
+            provider: "farcaster",
+            linkType: "direct",
+            privacyMode: "linked",
+            message: message,
+            signature: signature,
+            walletType: nil,
+            chainId: nil,
+            fid: fid
         )
     }
     

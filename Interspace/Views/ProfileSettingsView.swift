@@ -561,6 +561,7 @@ struct ProfileSettingsView_Previews: PreviewProvider {
                 appsCount: 8,
                 foldersCount: 2,
                 isDevelopmentWallet: false,
+                needsMpcGeneration: true,
                 clientShare: nil,
                 createdAt: "2024-01-01T00:00:00Z",
                 updatedAt: "2024-01-01T00:00:00Z"

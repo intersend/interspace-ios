@@ -199,6 +199,7 @@ struct UserProfileHeaderView_Previews: PreviewProvider {
                 appsCount: 5,
                 foldersCount: 1,
                 isDevelopmentWallet: true,
+                needsMpcGeneration: false,
                 clientShare: nil,
                 createdAt: "2024-01-01T00:00:00Z",
                 updatedAt: "2024-01-01T00:00:00Z"

@@ -168,9 +168,9 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
     
-    // Check for OAuth redirect URLs
-    if url.scheme == "com.interspace.ios" && url.host == "oauth2redirect" {
-        print("📱 AppDelegate: Handling OAuth redirect URL")
+    // Check for OAuth redirect URLs (both custom scheme variants)
+    if (url.scheme == "com.interspace.ios" || url.scheme == "interspace") && url.host == "oauth2redirect" {
+        print("📱 AppDelegate: Handling OAuth redirect URL: \(url)")
         if OAuthProviderService.shared.handleRedirect(url: url) {
             print("📱 AppDelegate: OAuth redirect handled successfully")
             return true

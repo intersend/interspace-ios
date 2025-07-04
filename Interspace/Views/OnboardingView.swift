@@ -120,12 +120,11 @@ struct OnboardingView: View {
         Task {
             do {
                 // Create the profile
+                // The backend automatically links the auth account to the first profile
                 await viewModel.createProfile(name: trimmedName)
                 
-                // Link the authentication account to the profile
-                if let profile = viewModel.activeProfile {
-                    await linkAuthenticationAccount(to: profile)
-                }
+                // The profile creation already triggers MPC generation if needed
+                // and switches to the new profile
                 
                 // Reload the session to transition to authenticated state
                 await sessionCoordinator.loadUserSession()
@@ -140,50 +139,6 @@ struct OnboardingView: View {
         }
     }
     
-    private func linkAuthenticationAccount(to profile: SmartProfile) async {
-        // Get the current authentication account info
-        guard let account = authManager.currentAccount else { 
-            print("No authentication account found to link")
-            return 
-        }
-        
-        print("Attempting to link authentication account: \(account.accountType) - \(account.identifier)")
-        
-        // Handle different authentication strategies
-        switch account.accountType {
-        case "wallet":
-            // Link the wallet that was used for authentication
-            let walletType: WalletType = {
-                // Try to determine wallet type from metadata
-                if let metadata = account.metadata,
-                   let walletTypeStr = metadata["walletType"],
-                   let type = WalletType(rawValue: walletTypeStr) {
-                    return type
-                }
-                // Default to metamask if not specified
-                return .metamask
-            }()
-            
-            await viewModel.linkAccount(
-                address: account.identifier,
-                walletType: walletType,
-                customName: "Authentication Wallet"
-            )
-            
-        case "email":
-            // Email accounts are automatically linked at the user level
-            // No need to link to individual profiles
-            print("Email account automatically linked at user level")
-            
-        case "google", "apple":
-            // Social accounts are linked at the user level
-            // They appear in socialAccounts, not linkedAccounts
-            print("Social account automatically linked at user level")
-            
-        default:
-            print("Unknown authentication strategy: \(account.accountType)")
-        }
-    }
 }
 
 struct OnboardingView_Previews: PreviewProvider {

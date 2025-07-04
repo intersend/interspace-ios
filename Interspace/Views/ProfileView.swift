@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ProfileView: View {
-    @ObservedObject private var viewModel = ProfileViewModel.shared
+    @StateObject private var viewModel = ProfileViewModel.shared
     @EnvironmentObject var sessionCoordinator: SessionCoordinator
     @EnvironmentObject var authManager: AuthenticationManagerV2
     
@@ -18,8 +18,6 @@ struct ProfileView: View {
     
     // UI states
     @State private var isAddressHidden = false
-    @State private var showDeleteConfirmation = false
-    @State private var showDeleteProfileConfirmation = false
     
     @Namespace private var profileNamespace
     @Environment(\.colorScheme) var colorScheme
@@ -29,8 +27,20 @@ struct ProfileView: View {
             // Profile Header Section
             profileHeaderSection
             
-            // Empty state or account sections
-            if viewModel.linkedAccounts.isEmpty && viewModel.socialAccounts.isEmpty && viewModel.emailAccounts.isEmpty {
+            // Show loading indicator during profile operations
+            if viewModel.isLoading && viewModel.linkedAccounts.isEmpty && viewModel.socialAccounts.isEmpty {
+                Section {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .padding(.vertical, 40)
+                        Spacer()
+                    }
+                }
+                .listRowBackground(Color.clear)
+            } else if viewModel.linkedAccounts.isEmpty && viewModel.socialAccounts.isEmpty {
+                // Only show empty state if not loading
                 emptyStateView
             } else {
                 // Linked Wallets Section
@@ -38,19 +48,11 @@ struct ProfileView: View {
                     linkedWalletsSection
                 }
                 
-                // Email Accounts Section
-                if !viewModel.emailAccounts.isEmpty {
-                    emailAccountsSection
-                }
-                
                 // Social Accounts Section
                 if !viewModel.socialAccounts.isEmpty {
                     socialAccountsSection
                 }
             }
-            
-            // Bottom Actions
-            bottomActionsSection
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -78,7 +80,7 @@ struct ProfileView: View {
             ProfileAboutView()
         }
         .sheet(isPresented: $showSecurity) {
-            ProfileSecurityView(showDeleteConfirmation: $showDeleteConfirmation)
+            ProfileSecurityView()
         }
         .sheet(isPresented: $showNotifications) {
             ProfileNotificationsView()
@@ -90,7 +92,9 @@ struct ProfileView: View {
             ProfileDetailView(isAddressHidden: $isAddressHidden)
         }
         .sheet(isPresented: $showProfileSwitcher) {
-            ProfileSwitcherView(viewModel: viewModel)
+            NavigationStack {
+                ProfileSwitcherView(viewModel: viewModel)
+            }
         }
         .sheet(item: $selectedAccount) { account in
             AccountDetailView(account: account, viewModel: viewModel)
@@ -101,35 +105,27 @@ struct ProfileView: View {
         .sheet(item: $selectedEmailAccount) { account in
             AccountDetailViewV2(account: account, viewModel: viewModel)
         }
-        .alert("Delete Account", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                Task {
-                    await sessionCoordinator.logout()
-                }
-            }
-        } message: {
-            Text("This action cannot be undone. All your data will be permanently deleted.")
-        }
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(viewModel.error?.localizedDescription ?? "An error occurred")
         }
-        .alert("Delete Profile", isPresented: $showDeleteProfileConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                if let profile = viewModel.activeProfile {
-                    Task {
-                        await viewModel.deleteProfile(profile)
-                    }
-                }
-            }
-        } message: {
-            Text("Are you sure you want to delete this profile? This action cannot be undone.")
-        }
         .onAppear {
             Task {
+                print("🔵 ProfileView appeared - loading profile data")
+                await viewModel.loadProfile()
+                
+                // Debug social accounts
+                print("🔵 ProfileView - Social accounts count: \(viewModel.socialAccounts.count)")
+                for account in viewModel.socialAccounts {
+                    print("  - \(account.provider.rawValue): \(account.displayName ?? "N/A")")
+                }
+            }
+        }
+        .onChange(of: sessionCoordinator.activeProfile?.id) { _ in
+            // Reload profile when active profile changes
+            Task {
+                print("🔵 ProfileView - Active profile changed, reloading...")
                 await viewModel.loadProfile()
             }
         }
@@ -145,20 +141,25 @@ struct ProfileView: View {
                 showProfileDetail = true
             }) {
                 HStack(spacing: 16) {
-                    // Profile Icon
-                    if let profile = sessionCoordinator.activeProfile {
+                    // Profile Icon - Use viewModel's activeProfile as fallback
+                    if let profile = sessionCoordinator.activeProfile ?? viewModel.activeProfile {
                         ProfileIconGenerator.generateIcon(for: profile.id, size: 60)
+                    } else {
+                        // Default icon when no profile is available
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
                     }
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        // Profile Name
-                        Text(sessionCoordinator.activeProfile?.name ?? "Profile")
+                        // Profile Name - Use viewModel's activeProfile as fallback
+                        Text(sessionCoordinator.activeProfile?.name ?? viewModel.activeProfile?.name ?? "Profile")
                             .font(.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(.white)
                         
                         // Wallet Address (one line)
-                        if let address = sessionCoordinator.activeProfile?.sessionWalletAddress {
+                        if let address = sessionCoordinator.activeProfile?.sessionWalletAddress ?? viewModel.activeProfile?.sessionWalletAddress {
                             Text(isAddressHidden ? maskedAddress(address) : address)
                                 .font(.system(size: 13, design: .monospaced))
                                 .foregroundColor(.gray)
@@ -199,17 +200,17 @@ struct ProfileView: View {
         .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))
     }
     
-    // MARK: - Linked Wallets Section
+    // MARK: - Linked Accounts Section
     
     private var linkedWalletsSection: some View {
-        Section(header: Text("WALLETS")
+        Section(header: Text("LINKED ACCOUNTS")
             .font(.system(size: 13, weight: .medium))
             .foregroundColor(.gray)) {
             ForEach(viewModel.linkedAccounts) { account in
                 Button(action: {
                     selectedAccount = account
                 }) {
-                    WalletAccountRow(account: account, isAddressHidden: isAddressHidden)
+                    LinkedAccountRow(account: account, isAddressHidden: isAddressHidden)
                 }
                 .buttonStyle(PlainButtonStyle())
             }
@@ -304,41 +305,6 @@ struct ProfileView: View {
         .listRowInsets(EdgeInsets())
     }
     
-    // MARK: - Bottom Actions
-    
-    private var bottomActionsSection: some View {
-        Section {
-            // Delete Profile
-            Button(action: {
-                showDeleteProfileConfirmation = true
-            }) {
-                HStack {
-                    Image(systemName: "trash")
-                        .font(.system(size: 16))
-                    Text("Delete Profile")
-                    Spacer()
-                }
-                .foregroundColor(.red)
-            }
-            
-            // Sign Out
-            Button(action: {
-                Task {
-                    await sessionCoordinator.logout()
-                }
-            }) {
-                HStack {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .font(.system(size: 16))
-                    Text("Sign Out")
-                    Spacer()
-                }
-                .foregroundColor(.red)
-            }
-        }
-        .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))
-    }
-    
     // MARK: - Helper Methods
     
     private func maskedAddress(_ address: String) -> String {
@@ -351,17 +317,49 @@ struct ProfileView: View {
 
 // MARK: - Wallet Account Row
 
-struct WalletAccountRow: View {
+struct LinkedAccountRow: View {
     let account: LinkedAccount
     let isAddressHidden: Bool
     
     var body: some View {
         HStack(spacing: 16) {
-            // Wallet Icon
-            Image(walletIcon)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 32, height: 32)
+            // Account Icon
+            Group {
+                switch account.authStrategy {
+                case "wallet":
+                    Image(walletIcon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 32, height: 32)
+                case "email":
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color.blue.opacity(0.15))
+                        )
+                case "social":
+                    Image(systemName: socialIcon)
+                        .font(.system(size: 20))
+                        .foregroundColor(socialColor)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(socialColor.opacity(0.15))
+                        )
+                default:
+                    Image(systemName: "link")
+                        .font(.system(size: 20))
+                        .foregroundColor(.gray)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color.gray.opacity(0.15))
+                        )
+                }
+            }
             
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
@@ -382,8 +380,8 @@ struct WalletAccountRow: View {
                     }
                 }
                 
-                Text(isAddressHidden ? maskedAddress(account.address) : account.address)
-                    .font(.system(size: 13, design: .monospaced))
+                Text(isAddressHidden && account.authStrategy == "wallet" ? maskedAddress(account.address) : account.displayIdentifier)
+                    .font(.system(size: 13, design: account.authStrategy == "wallet" ? .monospaced : .default))
                     .foregroundColor(.gray)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -399,13 +397,43 @@ struct WalletAccountRow: View {
     }
     
     private var walletIcon: String {
-        switch WalletType(rawValue: account.walletType) {
+        switch WalletType(rawValue: account.walletType ?? "") {
         case .metamask:
             return "metamask"
         case .coinbase:
             return "coinbase"
         default:
             return "wallet.pass"
+        }
+    }
+    
+    private var socialIcon: String {
+        switch account.walletType?.lowercased() {
+        case "apple":
+            return "applelogo"
+        case "google":
+            return "g.circle"
+        case "facebook":
+            return "f.circle"
+        case "twitter", "x":
+            return "x.circle"
+        default:
+            return "person.circle"
+        }
+    }
+    
+    private var socialColor: Color {
+        switch account.walletType?.lowercased() {
+        case "apple":
+            return .white
+        case "google":
+            return .red
+        case "facebook":
+            return .blue
+        case "twitter", "x":
+            return .white
+        default:
+            return .gray
         }
     }
     

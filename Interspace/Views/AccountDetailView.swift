@@ -11,7 +11,7 @@ struct AccountDetailView: View {
     @State private var showCopiedFeedback = false
     
     private var walletType: WalletType {
-        WalletType(rawValue: account.walletType) ?? .unknown
+      WalletType(rawValue: account.walletType ?? "") ?? .unknown
     }
     
     var body: some View {

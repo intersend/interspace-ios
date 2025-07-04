@@ -14,6 +14,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>interspace</string>
+				<string>com.interspace.ios</string>
 			</array>
 		</dict>
 		<dict>
@@ -31,6 +32,8 @@
 	<string>$(GOOGLE_CLIENT_ID)</string>
 	<key>GIDServerClientID</key>
 	<string>$(GOOGLE_SERVER_CLIENT_ID)</string>
+	<key>GITHUB_CLIENT_ID</key>
+	<string>$(GITHUB_CLIENT_ID)</string>
 	<key>INFURA_API_KEY</key>
 	<string>$(INFURA_API_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>

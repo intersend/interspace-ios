@@ -135,6 +135,7 @@
 				ErrorWrapper.swift,
 				InterspaceCache.xcdatamodeld,
 				MPCError.swift,
+				OAuthConfiguration.swift,
 				OAuthProviderIcons.swift,
 				OAuthProviderInfo.swift,
 				SIWEModels.swift,
@@ -156,6 +157,7 @@
 				CacheStorageManager.swift,
 				DataSyncManager.swift,
 				DevelopmentWalletService.swift,
+				FarcasterAuthService.swift,
 				GoogleSignInService.swift,
 				KeychainManager.swift,
 				MetadataFetcher.swift,
@@ -258,6 +260,7 @@
 				Components/WebViewTransition.swift,
 				ContentView.swift,
 				DebugOverlay.swift,
+				FarcasterAuthView.swift,
 				HomeView.swift,
 				LoadingOverlay.swift,
 				Modifiers/DevelopmentModeModifier.swift,
@@ -2123,6 +2126,7 @@
 			buildPhases = (
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
+				78A560302E16DA6A000AF158 /* Fix Archive dSYMs */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 			);
 			buildRules = (
@@ -2239,6 +2243,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		78A560302E16DA6A000AF158 /* Fix Archive dSYMs */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Fix Archive dSYMs";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "   \"${SRCROOT}/scripts/fix-archive-dsym.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		13B07F871A680F5B00A75B9A /* Sources */ = {

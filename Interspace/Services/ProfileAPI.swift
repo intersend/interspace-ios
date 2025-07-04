@@ -209,21 +209,21 @@ final class ProfileAPI {
         return response.data
     }
     
-    /// PUT /accounts/:accountId
-    func updateLinkedAccount(accountId: String, request: UpdateAccountRequest) async throws -> LinkedAccount {
+    /// PATCH /profiles/:profileId/accounts/:accountId
+    func updateLinkedAccount(profileId: String, accountId: String, request: UpdateAccountRequest) async throws -> LinkedAccount {
         let response: LinkedAccountResponse = try await apiService.performRequest(
-            endpoint: "/accounts/\(accountId)",
-            method: .PUT,
+            endpoint: "/profiles/\(profileId)/accounts/\(accountId)",
+            method: .PATCH,
             body: try JSONEncoder().encode(request),
             responseType: LinkedAccountResponse.self
         )
         return response.data
     }
     
-    /// DELETE /accounts/:accountId
-    func unlinkAccount(accountId: String) async throws -> DeleteResponse {
+    /// DELETE /profiles/:profileId/accounts/:accountId
+    func unlinkAccount(profileId: String, accountId: String) async throws -> DeleteResponse {
         return try await apiService.performRequest(
-            endpoint: "/accounts/\(accountId)",
+            endpoint: "/profiles/\(profileId)/accounts/\(accountId)",
             method: .DELETE,
             responseType: DeleteResponse.self
         )

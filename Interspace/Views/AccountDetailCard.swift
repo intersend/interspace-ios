@@ -31,12 +31,12 @@ struct AccountDetailCard: View {
                     // Wallet Type Icon
                     ZStack {
                         Circle()
-                            .fill(walletColor(for: account.walletType).opacity(0.15))
+                            .fill(walletColor(for: account.walletType ?? "").opacity(0.15))
                             .frame(width: 80, height: 80)
                         
-                        Image(systemName: walletIcon(for: account.walletType))
+                        Image(systemName: walletIcon(for: account.walletType ?? ""))
                             .font(.system(size: 36))
-                            .foregroundColor(walletColor(for: account.walletType))
+                            .foregroundColor(walletColor(for: account.walletType ?? ""))
                     }
                     
                     // Account Name
