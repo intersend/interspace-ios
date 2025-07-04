@@ -11,6 +11,7 @@ struct SmartProfile: Codable, Identifiable, Hashable {
     let appsCount: Int
     let foldersCount: Int
     let isDevelopmentWallet: Bool? // Indicates if this profile uses a development wallet
+    let needsMpcGeneration: Bool? // Indicates if MPC wallet needs to be generated
     let clientShare: ClientShare? // Only present for development wallets
     let createdAt: String
     let updatedAt: String
@@ -78,23 +79,46 @@ struct ProfileResponse: Codable {
 struct LinkedAccount: Codable, Identifiable, Hashable {
     let id: String
     let address: String
-    let walletType: String
+    let authStrategy: String // "wallet", "email", "social"
+    let walletType: String?
     let customName: String?
     let isPrimary: Bool
     let createdAt: String
     let updatedAt: String
+    let metadata: String? // JSON metadata for additional info
     
     var displayName: String {
         if let customName = customName, !customName.isEmpty {
             return customName
         }
-        return WalletType(rawValue: walletType)?.displayName ?? walletType.capitalized
+        
+        switch authStrategy {
+        case "wallet":
+            return WalletType(rawValue: walletType ?? "")?.displayName ?? walletType?.capitalized ?? "Wallet"
+        case "email":
+            return "Email"
+        case "social":
+            return walletType?.capitalized ?? "Social"
+        default:
+            return authStrategy.capitalized
+        }
     }
     
     var shortAddress: String {
         let prefix = address.prefix(6)
         let suffix = address.suffix(4)
         return "\(prefix)...\(suffix)"
+    }
+    
+    var displayIdentifier: String {
+        switch authStrategy {
+        case "email":
+            return address // Email addresses are already the identifier
+        case "social":
+            return "@\(address)" // Social accounts might have usernames
+        default:
+            return shortAddress // Wallet addresses are shortened
+        }
     }
 }
 

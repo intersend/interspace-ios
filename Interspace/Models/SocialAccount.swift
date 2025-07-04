@@ -7,8 +7,8 @@ struct SocialAccount: Identifiable, Codable {
     let username: String?
     let displayName: String?
     let avatarUrl: String?
-    let createdAt: Date
-    let updatedAt: Date
+    let createdAt: String  // ISO string format from backend
+    let updatedAt: String  // ISO string format from backend
 }
 
 enum SocialProvider: String, Codable, CaseIterable, Identifiable {

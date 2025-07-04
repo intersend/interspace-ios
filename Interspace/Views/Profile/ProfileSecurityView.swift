@@ -3,7 +3,6 @@ import LocalAuthentication
 
 struct ProfileSecurityView: View {
     @Environment(\.dismiss) var dismiss
-    @Binding var showDeleteConfirmation: Bool
     
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @State private var biometricType: LABiometryType = .none
@@ -68,41 +67,6 @@ struct ProfileSecurityView: View {
                         }
                     }
                     
-                    // Account Management Section
-                    Section(header: Text("DANGER ZONE")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.gray)) {
-                        
-                        // Delete Account Button
-                        Button(action: {
-                            HapticManager.notification(.warning)
-                            dismiss()
-                            // Small delay to allow sheet dismissal
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showDeleteConfirmation = true
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: "trash.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.red)
-                                    .frame(width: 36, height: 36)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Delete Account")
-                                        .font(.body)
-                                        .foregroundColor(.red)
-                                    
-                                    Text("Permanently delete your account and all data")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Spacer()
-                            }
-                        }
-                        .listRowBackground(Color(white: 0.1))
-                    }
                     
                     // Security Tips Section
                     Section {
@@ -217,7 +181,7 @@ struct SecurityTipRow: View {
 
 struct ProfileSecurityView_Previews: PreviewProvider {
     static var previews: some View {
-        ProfileSecurityView(showDeleteConfirmation: .constant(false))
+        ProfileSecurityView()
             .preferredColorScheme(.dark)
     }
 }

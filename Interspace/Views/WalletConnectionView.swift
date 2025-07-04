@@ -9,23 +9,35 @@ protocol WalletConnectionHandler: ObservableObject {
 // Make ProfileViewModel conform to the protocol
 extension ProfileViewModel: WalletConnectionHandler {
     func handleWalletConnection(walletType: WalletType, address: String, signature: String, message: String) async throws {
-        // Profile linking logic
-        let config = WalletConnectionConfig(
-            strategy: .wallet,
-            walletType: walletType.rawValue,
-            email: nil,
-            verificationCode: nil,
-            walletAddress: address,
-            signature: signature,
-            message: message,
-            socialProvider: nil,
-            socialProfile: nil,
-            oauthCode: nil,
-            idToken: nil,
-            accessToken: nil,
-            shopDomain: nil
-        )
-        try await linkWallet(config: config)
+        if AuthenticationManagerV2.shared.isAuthenticated {
+            // Linking flow - use AccountLinkingService for consistency
+            try await AccountLinkingService.shared.linkWalletAccount(
+                address: address,
+                signature: signature,
+                message: message,
+                walletType: walletType.rawValue
+            )
+            // Refresh profile data
+            await refreshProfile()
+        } else {
+            // Authentication flow
+            let config = WalletConnectionConfig(
+                strategy: .wallet,
+                walletType: walletType.rawValue,
+                email: nil,
+                verificationCode: nil,
+                walletAddress: address,
+                signature: signature,
+                message: message,
+                socialProvider: nil,
+                socialProfile: nil,
+                oauthCode: nil,
+                idToken: nil,
+                accessToken: nil,
+                shopDomain: nil
+            )
+            try await AuthenticationManagerV2.shared.authenticate(with: config)
+        }
     }
 }
 
@@ -355,7 +367,7 @@ struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
             }
         }
         .sheet(isPresented: $showProfileCreation) {
-            CreateProfileView { profileName in
+            NativeCreateProfileView { profileName in
                 Task {
                     // After profile creation, complete the authentication
                     await handlePostProfileCreation(profileName: profileName)

@@ -121,6 +121,40 @@ final class SessionCoordinator: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        
+        // Listen for profile deletion notifications
+        NotificationCenter.default.publisher(for: .profileDidDelete)
+            .sink { [weak self] notification in
+                if let profileId = notification.userInfo?["profileId"] as? String {
+                    Task { @MainActor in
+                        print("🔐 SessionCoordinator: Received profile deletion notification for \(profileId)")
+                        await self?.clearProfileFromCache(profileId: profileId)
+                        
+                        // If we have remaining profiles, update the UserDefaults cache
+                        if let remainingProfiles = notification.userInfo?["remainingProfiles"] as? [SmartProfile] {
+                            // Update persistent cache with remaining profiles
+                            await self?.cacheManager.cacheProfiles(remainingProfiles)
+                            
+                            // If the deleted profile was active, only update if there's a new active profile
+                            if self?.activeProfile?.id == profileId {
+                                // Find the new active profile from remaining profiles
+                                if let newActive = remainingProfiles.first(where: { $0.isActive }) {
+                                    // Directly update to new active profile without clearing first
+                                    self?.activeProfile = newActive
+                                    self?.cacheProfile(newActive)
+                                    await self?.cacheManager.cacheActiveProfile(newActive)
+                                } else if remainingProfiles.isEmpty {
+                                    // Only clear if no profiles remain
+                                    self?.activeProfile = nil
+                                    await self?.cacheManager.cacheActiveProfile(nil)
+                                }
+                                // If there are remaining profiles but none active, keep current until switchProfile is called
+                            }
+                        }
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
     
     private func setupSessionSecurity() {
@@ -319,7 +353,7 @@ final class SessionCoordinator: ObservableObject {
                 activeProfile = active
                 cacheProfile(active)
                 // Cache the active profile as SmartProfile
-                cacheManager.cacheActiveProfile(active)
+                await cacheManager.cacheActiveProfile(active)
                 
                 // Cache auth state with token
                 if let token = KeychainManager.shared.getAccessToken() {
@@ -392,6 +426,9 @@ final class SessionCoordinator: ObservableObject {
                 
                 // Cache the newly active profile
                 cacheProfile(profile)
+                
+                // Update ProfileViewModel's active profile directly
+                await ProfileViewModel.shared.activeProfile = profile
                 
                 // Notify other parts of the app
                 NotificationCenter.default.post(
@@ -513,6 +550,14 @@ final class SessionCoordinator: ObservableObject {
     
     private func clearProfileCache(except keepIds: [String] = []) {
         profileCache = profileCache.filter { keepIds.contains($0.key) }
+    }
+    
+    /// Clear a specific profile from cache
+    func clearProfileFromCache(profileId: String) async {
+        await MainActor.run {
+            profileCache.removeValue(forKey: profileId)
+            print("🧹 SessionCoordinator: Cleared profile \(profileId) from cache")
+        }
     }
     
     private func preloadAdjacentProfiles(current: SmartProfile, all: [SmartProfile]) async {
@@ -721,27 +766,32 @@ final class SessionCoordinator: ObservableObject {
             
             // Update cache with fresh data
             cacheManager.cacheUser(freshUser)
-            cacheManager.cacheProfiles(freshProfiles)
+            await cacheManager.cacheProfiles(freshProfiles)
+            
+            // Find the active profile
+            let freshActive = freshProfiles.first(where: { $0.isActive })
+            
+            // Update active profile cache if needed
+            if let active = freshActive,
+               self.activeProfile?.updatedAt != active.updatedAt {
+                await self.cacheManager.cacheActiveProfile(active)
+            }
             
             // Update current data if it has changed
-            await MainActor.run {
-                if self.currentUser?.id != freshUser.id {
-                    // Convert fresh User to UserV2
-                    self.currentUser = UserV2(
-                        id: freshUser.id,
-                        email: freshUser.email,
-                        isGuest: freshUser.isGuest
-                    )
-                }
-                
-                // Find and update active profile if changed
-                if let freshActive = freshProfiles.first(where: { $0.isActive }) {
-                    if self.activeProfile?.updatedAt != freshActive.updatedAt {
-                        self.activeProfile = freshActive
-                        self.cacheProfile(freshActive)
-                        // Update cache with fresh active profile
-                        self.cacheManager.cacheActiveProfile(freshActive)
-                    }
+            if self.currentUser?.id != freshUser.id {
+                // Convert fresh User to UserV2
+                self.currentUser = UserV2(
+                    id: freshUser.id,
+                    email: freshUser.email,
+                    isGuest: freshUser.isGuest
+                )
+            }
+            
+            // Update active profile if changed
+            if let active = freshActive {
+                if self.activeProfile?.updatedAt != active.updatedAt {
+                    self.activeProfile = active
+                    self.cacheProfile(active)
                 }
             }
             
@@ -820,6 +870,7 @@ enum SessionError: LocalizedError {
 
 extension Notification.Name {
     static let profileDidChange = Notification.Name("profileDidChange")
+    static let profileDidDelete = Notification.Name("profileDidDelete")
     static let sessionDidEnd = Notification.Name("sessionDidEnd")
     static let clearWalletConnections = Notification.Name("clearWalletConnections")
     static let clearProfileData = Notification.Name("clearProfileData")

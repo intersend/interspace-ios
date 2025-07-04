@@ -301,7 +301,12 @@ final class AuthenticationManagerV2: ObservableObject {
             targetProvider: provider,
             linkType: "direct",
             privacyMode: "linked",
-            verificationCode: nil // Only needed for email linking
+            verificationCode: nil, // Only needed for email linking
+            message: nil,
+            signature: nil,
+            walletType: nil,
+            chainId: nil,
+            fid: nil
         )
         
         do {
@@ -635,10 +640,6 @@ extension AuthenticationManagerV2 {
         error = nil
         
         do {
-            guard let provider = OAuthProviderService.shared.provider(for: "google") else {
-                throw AuthenticationError.unknown("Google provider not configured")
-            }
-            
             guard let windowScene = await UIApplication.shared.connectedScenes.first as? UIWindowScene,
                   let viewController = await windowScene.windows.first?.rootViewController else {
                 throw AuthenticationError.unknown("Unable to present OAuth flow")
@@ -646,7 +647,7 @@ extension AuthenticationManagerV2 {
             
             let tokens = try await withCheckedThrowingContinuation { continuation in
                 OAuthProviderService.shared.authenticate(
-                    with: provider,
+                    withProviderNamed: "google",
                     presentingViewController: viewController
                 ) { result in
                     continuation.resume(with: result)
@@ -667,6 +668,46 @@ extension AuthenticationManagerV2 {
         } catch {
             await MainActor.run {
                 isLoading = false
+                self.error = error as? AuthenticationError ?? AuthenticationError.unknown(error.localizedDescription)
+            }
+            throw error
+        }
+    }
+    
+    /// Authenticate with Farcaster
+    func authenticateWithFarcaster(message: String, signature: String, fid: String) async throws {
+        await MainActor.run {
+            isLoading = true
+            error = nil
+        }
+        
+        do {
+            // Create authentication request following V2 pattern
+            let request = AuthenticationRequestV2(
+                strategy: "farcaster",
+                identifier: fid,
+                credential: signature,
+                oauthCode: nil,
+                appleAuth: nil,
+                privacyMode: nil,
+                deviceId: UIDevice.current.identifierForVendor?.uuidString,
+                email: nil,
+                verificationCode: nil,
+                walletAddress: nil,
+                signature: signature,
+                message: message,
+                walletType: nil,
+                idToken: nil,
+                accessToken: nil,
+                shopDomain: nil
+            )
+            
+            let response = try await authAPI.authenticateV2(request: request)
+            await processAuthResponse(response)
+            
+        } catch {
+            await MainActor.run {
+                self.isLoading = false
                 self.error = error as? AuthenticationError ?? AuthenticationError.unknown(error.localizedDescription)
             }
             throw error
@@ -719,6 +760,234 @@ extension AuthenticationManagerV2 {
             
             let response = try await authAPI.authenticateV2(request: request)
             await processAuthResponse(response)
+            
+        } catch {
+            await MainActor.run {
+                isLoading = false
+                self.error = error as? AuthenticationError ?? AuthenticationError.unknown(error.localizedDescription)
+            }
+            throw error
+        }
+    }
+    
+    /// Link Apple account to current authenticated user
+    func linkAppleAccount() async throws {
+        guard isAuthenticated else {
+            throw AuthenticationError.notAuthenticated
+        }
+        
+        await MainActor.run {
+            isLoading = true
+            error = nil
+        }
+        
+        do {
+            let appleResult = try await AppleSignInService.shared.signIn()
+            
+            // Decode the Apple ID token to get the user ID (sub claim)
+            guard let appleUserId = decodeAppleToken(appleResult.identityToken) else {
+                throw AuthenticationError.invalidCredentials
+            }
+            
+            // Use AccountLinkingService with the decoded user ID
+            try await AccountLinkingService.shared.linkAccount(
+                type: .social,
+                identifier: appleUserId,
+                provider: "apple"
+            )
+            
+            await MainActor.run {
+                isLoading = false
+            }
+            
+            // Refresh profile data
+            await ProfileViewModel.shared.refreshProfile()
+            
+        } catch {
+            await MainActor.run {
+                isLoading = false
+                self.error = error as? AuthenticationError ?? AuthenticationError.unknown(error.localizedDescription)
+            }
+            throw error
+        }
+    }
+    
+    /// Link Google account to current authenticated user
+    func linkGoogleAccount() async throws {
+        guard isAuthenticated else {
+            throw AuthenticationError.notAuthenticated
+        }
+        
+        await MainActor.run {
+            isLoading = true
+            error = nil
+        }
+        
+        do {
+            // Get OAuth tokens through Google Sign In
+            guard let windowScene = await UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let viewController = await windowScene.windows.first?.rootViewController else {
+                throw AuthenticationError.unknown("Unable to present OAuth flow")
+            }
+            
+            let tokens = try await withCheckedThrowingContinuation { continuation in
+                OAuthProviderService.shared.authenticate(
+                    withProviderNamed: "google",
+                    presentingViewController: viewController
+                ) { result in
+                    continuation.resume(with: result)
+                }
+            }
+            
+            // Decode Google ID token to extract user ID
+            guard let idToken = tokens.idToken,
+                  let googleUserId = decodeJWT(idToken)?["sub"] as? String else {
+                throw AuthenticationError.invalidCredentials
+            }
+            
+            // Use AccountLinkingService with the decoded user ID
+            try await AccountLinkingService.shared.linkAccount(
+                type: .social,
+                identifier: googleUserId,
+                provider: "google"
+            )
+            
+            await MainActor.run {
+                isLoading = false
+            }
+            
+            // Refresh profile data
+            await ProfileViewModel.shared.refreshProfile()
+            
+        } catch {
+            await MainActor.run {
+                isLoading = false
+                self.error = error as? AuthenticationError ?? AuthenticationError.unknown(error.localizedDescription)
+            }
+            throw error
+        }
+    }
+    
+    /// Link Farcaster account to current account
+    func linkFarcasterAccount(message: String, signature: String, fid: String) async throws {
+        guard currentAccount != nil else {
+            throw AuthenticationError.notAuthenticated
+        }
+        
+        await MainActor.run {
+            isLoading = true
+            error = nil
+        }
+        
+        do {
+            // Use AccountLinkingService to link Farcaster account
+            try await AccountLinkingService.shared.linkFarcasterAccount(
+                fid: fid,
+                message: message,
+                signature: signature
+            )
+            
+            // Refresh profiles and linked accounts
+            await ProfileViewModel.shared.refreshProfile()
+            
+            await MainActor.run {
+                isLoading = false
+                error = nil
+            }
+        } catch {
+            await MainActor.run {
+                isLoading = false
+                self.error = error as? AuthenticationError ?? AuthenticationError.unknown(error.localizedDescription)
+            }
+            throw error
+        }
+    }
+    
+    /// Generic JWT decoder for any provider
+    private func decodeJWT(_ token: String) -> [String: Any]? {
+        let segments = token.split(separator: ".")
+        guard segments.count > 1 else { return nil }
+        
+        let base64String = String(segments[1])
+        let padded = base64String.padding(toLength: ((base64String.count + 3) / 4) * 4,
+                                          withPad: "=",
+                                          startingAt: 0)
+        
+        guard let data = Data(base64Encoded: padded),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        
+        return json
+    }
+    
+    /// Decode Apple ID token to extract user ID (sub claim) - kept for backward compatibility
+    private func decodeAppleToken(_ idToken: String) -> String? {
+        return decodeJWT(idToken)?["sub"] as? String
+    }
+    
+    // MARK: - Standardized OAuth Flow Handler
+    
+    /// Generic OAuth flow handler that automatically routes to linking or authentication
+    func handleOAuthFlow(provider: String, presentingViewController: UIViewController) async throws {
+        await MainActor.run {
+            isLoading = true
+            error = nil
+        }
+        
+        do {
+            let tokens = try await withCheckedThrowingContinuation { continuation in
+                OAuthProviderService.shared.authenticate(
+                    withProviderNamed: provider,
+                    presentingViewController: presentingViewController
+                ) { result in
+                    continuation.resume(with: result)
+                }
+            }
+            
+            if isAuthenticated {
+                // Linking flow - extract user ID based on provider
+                let userId: String
+                
+                switch provider.lowercased() {
+                case "google", "apple":
+                    guard let idToken = tokens.idToken,
+                          let decodedUserId = decodeJWT(idToken)?["sub"] as? String else {
+                        throw AuthenticationError.invalidCredentials
+                    }
+                    userId = decodedUserId
+                    
+                default:
+                    // For other providers, use access token as identifier for now
+                    // This should be updated when proper OAuth implementation is added
+                    userId = tokens.accessToken
+                }
+                
+                // Use AccountLinkingService for consistent linking
+                try await AccountLinkingService.shared.linkAccount(
+                    type: .social,
+                    identifier: userId,
+                    provider: provider
+                )
+                
+                await MainActor.run {
+                    isLoading = false
+                }
+                
+                // Refresh profile data
+                await ProfileViewModel.shared.refreshProfile()
+                
+            } else {
+                // Authentication flow - convert OAuthTokens to OAuthTokenResponse
+                let tokenResponse = OAuthTokenResponse(
+                    accessToken: tokens.accessToken,
+                    refreshToken: tokens.refreshToken,
+                    idToken: tokens.idToken,
+                    expiresIn: tokens.expiresIn,
+                    provider: tokens.provider
+                )
+                try await authenticateWithOAuth(provider: provider, tokens: tokenResponse)
+            }
             
         } catch {
             await MainActor.run {

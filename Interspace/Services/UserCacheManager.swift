@@ -70,7 +70,26 @@ class UserCacheManager: ObservableObject {
     
     // MARK: - Profile Data Caching
     
-    /// Cache profiles data
+    /// Cache profiles data asynchronously with completion
+    func cacheProfiles(_ profiles: [Profile]) async {
+        await withCheckedContinuation { continuation in
+            cacheQueue.async(flags: .barrier) {
+                do {
+                    let encoder = JSONEncoder()
+                    let data = try encoder.encode(profiles)
+                    self.userDefaults.set(data, forKey: self.profilesCacheKey)
+                    self.userDefaults.synchronize()
+                    print("💾 Cached \(profiles.count) profiles")
+                    continuation.resume()
+                } catch {
+                    print("❌ Failed to cache profiles: \(error)")
+                    continuation.resume()
+                }
+            }
+        }
+    }
+    
+    /// Cache profiles data synchronously (for backward compatibility)
     func cacheProfiles(_ profiles: [Profile]) {
         cacheQueue.async(flags: .barrier) {
             do {
@@ -105,7 +124,31 @@ class UserCacheManager: ObservableObject {
         }
     }
     
-    /// Cache active profile
+    /// Cache active profile asynchronously
+    func cacheActiveProfile(_ profile: Profile?) async {
+        await withCheckedContinuation { continuation in
+            cacheQueue.async(flags: .barrier) {
+                if let profile = profile {
+                    do {
+                        let encoder = JSONEncoder()
+                        let data = try encoder.encode(profile)
+                        self.userDefaults.set(data, forKey: self.activeProfileCacheKey)
+                        self.userDefaults.synchronize()
+                        print("💾 Cached active profile: \(profile.name)")
+                    } catch {
+                        print("❌ Failed to cache active profile: \(error)")
+                    }
+                } else {
+                    self.userDefaults.removeObject(forKey: self.activeProfileCacheKey)
+                    self.userDefaults.synchronize()
+                    print("💾 Cleared active profile cache")
+                }
+                continuation.resume()
+            }
+        }
+    }
+    
+    /// Cache active profile synchronously (for backward compatibility)
     func cacheActiveProfile(_ profile: Profile?) {
         cacheQueue.async(flags: .barrier) {
             if let profile = profile {

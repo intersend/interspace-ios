@@ -1,6 +1,40 @@
 import Foundation
 import UIKit
 
+// MARK: - Farcaster Response Models
+
+struct FarcasterChannelResponse: Codable {
+    let success: Bool
+    let channel: FarcasterChannel?
+    let error: String?
+    
+    struct FarcasterChannel: Codable {
+        let channelToken: String
+        let url: String
+        let nonce: String
+        let domain: String
+        let siweUri: String
+        let expiresAt: String
+    }
+}
+
+struct FarcasterChannelStatusResponse: Codable {
+    let success: Bool
+    let status: String
+    let authData: FarcasterAuthData?
+    let error: String?
+    
+    struct FarcasterAuthData: Codable {
+        let signature: String
+        let message: String
+        let fid: String
+        let username: String?
+        let displayName: String?
+        let bio: String?
+        let pfpUrl: String?
+    }
+}
+
 // MARK: - Authentication API Service
 
 final class AuthAPI {
@@ -140,6 +174,33 @@ final class AuthAPI {
             endpoint: "/siwe/nonce",
             method: .GET,
             responseType: SIWENonceResponse.self,
+            requiresAuth: false
+        )
+    }
+    
+    // MARK: - Farcaster Methods
+    
+    /// POST /api/v2/auth/farcaster/channel
+    func createFarcasterChannel(domain: String, siweUri: String) async throws -> FarcasterChannelResponse {
+        let body = [
+            "domain": domain,
+            "siweUri": siweUri
+        ]
+        return try await apiService.performRequest(
+            endpoint: "/auth/farcaster/channel",
+            method: .POST,
+            body: try JSONSerialization.data(withJSONObject: body),
+            responseType: FarcasterChannelResponse.self,
+            requiresAuth: false
+        )
+    }
+    
+    /// GET /api/v2/auth/farcaster/channel/:channelToken
+    func checkFarcasterChannel(channelToken: String) async throws -> FarcasterChannelStatusResponse {
+        return try await apiService.performRequest(
+            endpoint: "/auth/farcaster/channel/\(channelToken)",
+            method: .GET,
+            responseType: FarcasterChannelStatusResponse.self,
             requiresAuth: false
         )
     }

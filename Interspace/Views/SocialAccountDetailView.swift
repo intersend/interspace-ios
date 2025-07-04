@@ -87,7 +87,7 @@ struct SocialAccountDetailView: View {
                     HStack {
                         Text("Connected")
                         Spacer()
-                        Text(account.createdAt, style: .date)
+                        Text(formatDate(account.createdAt))
                             .foregroundColor(DesignTokens.Colors.textSecondary)
                     }
                 }
@@ -129,5 +129,18 @@ struct SocialAccountDetailView: View {
                 Text("Are you sure you want to disconnect this social account?")
             }
         }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func formatDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: dateString) else { return dateString }
+        
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateStyle = .medium
+        displayFormatter.timeStyle = .none
+        
+        return displayFormatter.string(from: date)
     }
 }

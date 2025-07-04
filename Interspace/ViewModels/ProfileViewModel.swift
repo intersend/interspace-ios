@@ -6,7 +6,14 @@ class ProfileViewModel: ObservableObject {
     static let shared = ProfileViewModel()
     
     // Private init to ensure singleton usage
-    private init() {}
+    private init() {
+        setupNotificationObservers()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
     @Published var profiles: [SmartProfile] = []
     @Published var activeProfile: SmartProfile?
     @Published var linkedAccounts: [LinkedAccount] = []
@@ -43,6 +50,9 @@ class ProfileViewModel: ObservableObject {
                 self.activeProfile = fetchedProfiles.first { $0.isActive }
                 isLoading = false
             }
+            
+            // Update cache with fresh data
+            await updateCachedProfiles(fetchedProfiles)
         } catch {
             await MainActor.run {
                 self.showError(error)
@@ -74,6 +84,12 @@ class ProfileViewModel: ObservableObject {
             // Load additional data for active profile
             if let activeProfile = active {
                 await loadProfileDetails(profileId: activeProfile.id)
+                
+                // Check if MPC generation is needed for this profile
+                if activeProfile.needsMpcGeneration == true && MPCWalletServiceHTTP.isEnabled {
+                    print("🔐 ProfileViewModel: Profile needs MPC generation, triggering...")
+                    await generateMPCWallet()
+                }
             }
             
         } catch {
@@ -118,15 +134,25 @@ class ProfileViewModel: ObservableObject {
         do {
             let fetchedAccounts = try await profileAPI.getLinkedAccounts(profileId: profileId)
             
+            // Filter out the session wallet from linked accounts
+            let sessionWalletAddress = activeProfile?.sessionWalletAddress ?? ""
+            let filteredAccounts = fetchedAccounts.filter { account in
+                // Compare addresses case-insensitively (Ethereum addresses)
+                account.address.lowercased() != sessionWalletAddress.lowercased()
+            }
+            
             // Debug logging
-            print("🟢 ProfileViewModel.loadLinkedAccounts - Fetched \(fetchedAccounts.count) accounts:")
-            for account in fetchedAccounts {
+            print("🟢 ProfileViewModel.loadLinkedAccounts - Fetched \(fetchedAccounts.count) accounts, filtered to \(filteredAccounts.count):")
+            for account in filteredAccounts {
                 print("  - ID: \(account.id), Address: \(account.address)")
+            }
+            if fetchedAccounts.count != filteredAccounts.count {
+                print("  - Filtered out session wallet: \(sessionWalletAddress)")
             }
             
             await MainActor.run {
-                // Always update the linkedAccounts array, even if empty
-                self.linkedAccounts = fetchedAccounts
+                // Always update the linkedAccounts array with filtered accounts
+                self.linkedAccounts = filteredAccounts
             }
         } catch {
             print("Error loading linked accounts: \(error)")
@@ -140,41 +166,40 @@ class ProfileViewModel: ObservableObject {
     private func loadSocialAccounts() async {
         do {
             let fetchedSocialAccounts = try await userAPI.getSocialAccounts()
+            
+            // Debug logging for Apple accounts
+            print("🍎 ProfileViewModel.loadSocialAccounts - Fetched \(fetchedSocialAccounts.count) social accounts:")
+            for account in fetchedSocialAccounts {
+                print("  - Provider: \(account.provider.rawValue), DisplayName: \(account.displayName ?? "N/A")")
+                if account.provider == .apple {
+                    print("  ✅ Apple account found: \(account.displayName ?? account.username ?? "Unknown")")
+                }
+            }
+            
+            let appleAccounts = fetchedSocialAccounts.filter { $0.provider == .apple }
+            if appleAccounts.isEmpty {
+                print("  ⚠️ No Apple accounts found in the response")
+            }
+            
             await MainActor.run {
                 self.socialAccounts = fetchedSocialAccounts
             }
         } catch {
-            print("Error loading social accounts: \(error)")
+            print("❌ Error loading social accounts: \(error)")
         }
     }
     
     private func loadEmailAccounts() async {
-        // Get identity graph from AccountLinkingService
-        let linkingService = AccountLinkingService.shared
+        // Email accounts should be shown if they're linked to this specific profile
+        // They would come through the linked accounts API, not from the identity graph
         
-        // Only proceed if authenticated
-        guard AuthenticationManagerV2.shared.isAuthenticated else {
-            print("ProfileViewModel: Not authenticated, skipping email accounts load")
-            await MainActor.run {
-                self.emailAccounts = []
-            }
-            return
-        }
-        
-        // Refresh identity graph
-        await linkingService.refreshIdentityGraph()
-        
-        // Filter email accounts from the linked accounts
-        // linkedAccounts contains AccountV2 objects from identity graph
-        let emailAccounts = linkingService.linkedAccounts.filter { account in
-            account.accountType == "email"
-        }
-        
+        // For now, clear email accounts since they're included in linkedAccounts
+        // In the future, we might want to separate them for better UI organization
         await MainActor.run {
-            self.emailAccounts = emailAccounts
+            self.emailAccounts = []
         }
         
-        print("ProfileViewModel: Loaded \(emailAccounts.count) email accounts")
+        print("ProfileViewModel: Email accounts are included in linkedAccounts")
     }
     
     func refreshProfile() async {
@@ -184,25 +209,42 @@ class ProfileViewModel: ObservableObject {
     func switchProfile(_ profile: SmartProfile) async {
         isLoading = true
         
-        // Clear existing accounts data before switching
-        await MainActor.run {
-            self.linkedAccounts = []
-            self.socialAccounts = []
-            self.emailAccounts = []
-        }
-        
         do {
-            // Activate the selected profile
-            let _ = try await profileAPI.activateProfile(profileId: profile.id)
+            // Update active profile immediately to prevent null state
+            await MainActor.run {
+                self.activeProfile = profile
+            }
+            
+            // Use SessionCoordinator for the actual switch to ensure state sync
+            try await SessionCoordinator.shared.switchProfile(profile)
+            
+            // Clear and reload profile data after successful switch
+            await MainActor.run {
+                self.linkedAccounts = []
+                self.socialAccounts = []
+                self.emailAccounts = []
+                self.mpcWalletInfo = nil
+            }
             
             // Reload all profile data to reflect the change
             await loadProfile()
             
+            // Force reload social accounts after profile switch
+            await loadSocialAccounts()
+            
             await MainActor.run {
                 // Show success feedback
+                print("✅ ProfileViewModel: Successfully switched to profile: \(profile.name)")
             }
             
         } catch {
+            // Revert to previous profile on error if available
+            if let previousProfile = SessionCoordinator.shared.activeProfile {
+                await MainActor.run {
+                    self.activeProfile = previousProfile
+                }
+            }
+            
             await MainActor.run {
                 self.showError(error)
                 isLoading = false
@@ -238,16 +280,18 @@ class ProfileViewModel: ObservableObject {
                 )
             }
             
-            // Reload profile data to include the new profile
-            await loadProfile()
+            // Automatically switch to the newly created profile using SessionCoordinator
+            // This ensures proper state synchronization across the app
+            try await SessionCoordinator.shared.switchProfile(newProfile)
+            
+            // Set the active profile locally to ensure it's available for MPC generation
+            await MainActor.run {
+                self.activeProfile = newProfile
+            }
             
             // Generate MPC wallet for the new profile if not in development mode
             if !isDevelopmentMode && MPCWalletServiceHTTP.isEnabled {
                 print("✅ MPC wallet generation enabled for profile: \(newProfile.id)")
-                // Set the new profile as active temporarily to generate wallet
-                await MainActor.run {
-                    self.activeProfile = newProfile
-                }
                 
                 // Generate MPC wallet
                 await generateMPCWallet()
@@ -257,6 +301,8 @@ class ProfileViewModel: ObservableObject {
             
             await MainActor.run {
                 // Show success feedback
+                print("✅ ProfileViewModel: Successfully created and switched to profile: \(newProfile.name)")
+                isLoading = false
             }
             
         } catch {
@@ -268,29 +314,104 @@ class ProfileViewModel: ObservableObject {
     }
     
     func deleteProfile(_ profile: SmartProfile) async {
-        // Check if trying to delete active profile
-        guard !profile.isActive else {
-            await MainActor.run {
-                self.error = ProfileError.cannotDeleteActiveProfile
-                self.showError = true
-            }
-            return
-        }
-        
         isLoading = true
         
         do {
+            // Check if this is the last profile before deletion
+            let isLastProfile = profiles.count <= 1
+            let wasActive = profile.isActive
+            
+            // Store other profiles for switching
+            let remainingProfiles = profiles.filter { $0.id != profile.id }
+            
+            // If deleting active profile, prepare the next profile BEFORE deletion
+            var nextProfile: SmartProfile? = nil
+            if wasActive && !remainingProfiles.isEmpty {
+                // Find the most recently used profile based on updatedAt timestamp
+                nextProfile = remainingProfiles
+                    .sorted { profile1, profile2 in
+                        let dateFormatter = ISO8601DateFormatter()
+                        if let date1 = dateFormatter.date(from: profile1.updatedAt),
+                           let date2 = dateFormatter.date(from: profile2.updatedAt) {
+                            return date1 > date2
+                        }
+                        return profile1.updatedAt > profile2.updatedAt
+                    }
+                    .first ?? remainingProfiles.first!
+                print("🔄 ProfileViewModel: Pre-selected next profile: \(nextProfile?.name ?? "none")")
+            }
+            
+            // Delete the profile
             let _ = try await profileAPI.deleteProfile(profileId: profile.id)
             
             await MainActor.run {
                 // Remove from local profiles array
                 self.profiles.removeAll { $0.id == profile.id }
+                
+                // If we deleted the active profile, DON'T clear it yet if we have a next profile
+                if self.activeProfile?.id == profile.id {
+                    if nextProfile == nil {
+                        // Only clear if no next profile available
+                        self.activeProfile = nil
+                        self.linkedAccounts = []
+                        self.socialAccounts = []
+                        self.emailAccounts = []
+                        self.mpcWalletInfo = nil
+                    }
+                    // Otherwise keep the old profile data visible during transition
+                }
+                
                 // Show success feedback
                 HapticManager.notification(.success)
             }
             
-            // Reload profile data to ensure consistency
-            await loadProfiles()
+            // Clear profile from all caches
+            await clearProfileFromAllCaches(profile)
+            
+            // Update cached profiles list - this is now fully synchronous
+            await updateCachedProfiles(remainingProfiles)
+            
+            // Small delay to ensure UserDefaults synchronization completes
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
+            // Post notification for profile deletion after cache is updated
+            NotificationCenter.default.post(
+                name: .profileDidDelete,
+                object: nil,
+                userInfo: ["profileId": profile.id, "remainingProfiles": remainingProfiles]
+            )
+            
+            // Handle post-deletion logic
+            if isLastProfile {
+                // This was the last profile, sign out
+                print("🔴 ProfileViewModel: Last profile deleted, signing out...")
+                await SessionCoordinator.shared.logout()
+            } else if wasActive && nextProfile != nil {
+                // Switch to the pre-selected profile smoothly
+                print("🔄 ProfileViewModel: Switching to profile: \(nextProfile!.name) after deletion...")
+                
+                // First update local state to the new profile
+                await MainActor.run {
+                    self.activeProfile = nextProfile
+                }
+                
+                // Then perform the actual switch
+                try await SessionCoordinator.shared.switchProfile(nextProfile!)
+                
+                // Load the new profile's data
+                await loadProfileDetails(profileId: nextProfile!.id)
+                
+                // Now clear the old profile data
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            } else {
+                // Non-active profile deleted, just reload
+                await loadProfiles()
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            }
             
         } catch {
             await MainActor.run {
@@ -358,6 +479,14 @@ class ProfileViewModel: ObservableObject {
             )
             
             let newAccount = try await profileAPI.linkAccount(profileId: activeProfile.id, request: request)
+            
+            // Don't add session wallet to linked accounts
+            guard newAccount.address.lowercased() != activeProfile.sessionWalletAddress.lowercased() else {
+                await MainActor.run {
+                    isLoading = false
+                }
+                return
+            }
             
             await MainActor.run {
                 self.linkedAccounts.append(newAccount)
@@ -443,6 +572,14 @@ class ProfileViewModel: ObservableObject {
             
             let newAccount = try await profileAPI.linkAccount(profileId: activeProfile.id, request: request)
             
+            // Don't add session wallet to linked accounts
+            guard newAccount.address.lowercased() != activeProfile.sessionWalletAddress.lowercased() else {
+                await MainActor.run {
+                    isLoading = false
+                }
+                return
+            }
+            
             await MainActor.run {
                 self.linkedAccounts.append(newAccount)
                 isLoading = false
@@ -458,16 +595,25 @@ class ProfileViewModel: ObservableObject {
     }
     
     func unlinkAccount(_ account: LinkedAccount) async {
+        guard let profileId = activeProfile?.id else {
+            await MainActor.run {
+                self.error = NSError(domain: "ProfileViewModel", code: 0, userInfo: [NSLocalizedDescriptionKey: "No active profile found"])
+                self.showError = true
+            }
+            return
+        }
+        
         isLoading = true
         
         // Debug logging
         print("🔴 ProfileViewModel.unlinkAccount - Account to delete:")
+        print("  - Profile ID: \(profileId)")
         print("  - LinkedAccount ID: \(account.id)")
         print("  - Address: \(account.address)")
         print("  - Wallet Type: \(account.walletType)")
         
         do {
-            let _ = try await profileAPI.unlinkAccount(accountId: account.id)
+            let _ = try await profileAPI.unlinkAccount(profileId: profileId, accountId: account.id)
             
             await MainActor.run {
                 self.linkedAccounts.removeAll { $0.id == account.id }
@@ -484,11 +630,20 @@ class ProfileViewModel: ObservableObject {
     }
     
     func updateAccount(_ account: LinkedAccount, customName: String?, isPrimary: Bool?) async {
+        guard let profileId = activeProfile?.id else {
+            await MainActor.run {
+                self.error = NSError(domain: "ProfileViewModel", code: 0, userInfo: [NSLocalizedDescriptionKey: "No active profile found"])
+                self.showError = true
+            }
+            return
+        }
+        
         isLoading = true
         
         do {
             let request = UpdateAccountRequest(customName: customName, isPrimary: isPrimary)
             let updatedAccount = try await profileAPI.updateLinkedAccount(
+                profileId: profileId,
                 accountId: account.id,
                 request: request
             )
@@ -773,6 +928,38 @@ class ProfileViewModel: ObservableObject {
         mpcOperationError = nil
     }
     
+    // MARK: - Notification Observers
+    
+    private func setupNotificationObservers() {
+        // Listen for profile changes from SessionCoordinator
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleProfileChange(_:)),
+            name: .profileDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func handleProfileChange(_ notification: Notification) {
+        // Clear all data when profile changes
+        Task {
+            await MainActor.run {
+                // Clear all account data immediately
+                self.linkedAccounts = []
+                self.socialAccounts = []
+                self.emailAccounts = []
+                self.mpcWalletInfo = nil
+            }
+            
+            // Reload profile data for the new profile
+            if let newProfile = notification.userInfo?["profile"] as? SmartProfile {
+                print("🔄 ProfileViewModel: Profile changed to \(newProfile.name), reloading data...")
+                self.activeProfile = newProfile
+                await loadProfileDetails(profileId: newProfile.id)
+            }
+        }
+    }
+    
     // MARK: - Developer Mode
     
     func handleVersionTap() {
@@ -809,6 +996,37 @@ class ProfileViewModel: ObservableObject {
     func dismissError() {
         error = nil
         showError = false
+    }
+    
+    // MARK: - Cache Management
+    
+    /// Clear profile from all caches
+    private func clearProfileFromAllCaches(_ profile: SmartProfile) async {
+        // Clear from UserCacheManager
+        if profile.isActive {
+            await UserCacheManager.shared.cacheActiveProfile(nil)
+        }
+        
+        // Clear from SessionCoordinator's profile cache
+        await SessionCoordinator.shared.clearProfileFromCache(profileId: profile.id)
+        
+        print("🧹 ProfileViewModel: Cleared profile \(profile.name) from all caches")
+    }
+    
+    /// Update cached profiles list
+    private func updateCachedProfiles(_ profiles: [SmartProfile]) async {
+        // Update UserCacheManager with new profiles list - wait for completion
+        await UserCacheManager.shared.cacheProfiles(profiles)
+        
+        // If there's an active profile in the remaining profiles, cache it
+        if let activeProfile = profiles.first(where: { $0.isActive }) {
+            await UserCacheManager.shared.cacheActiveProfile(activeProfile)
+        } else {
+            // Clear active profile cache if no active profile exists
+            await UserCacheManager.shared.cacheActiveProfile(nil)
+        }
+        
+        print("🔄 ProfileViewModel: Updated cached profiles list with \(profiles.count) profiles")
     }
     
     // MARK: - V2 Account Management
@@ -862,12 +1080,12 @@ class ProfileViewModel: ObservableObject {
 // MARK: - Profile Errors
 
 enum ProfileError: LocalizedError {
-    case cannotDeleteActiveProfile
+    case none // Empty enum for future use
     
     var errorDescription: String? {
         switch self {
-        case .cannotDeleteActiveProfile:
-            return "Cannot delete the active profile. Please switch to another profile first."
+        case .none:
+            return nil
         }
     }
 }

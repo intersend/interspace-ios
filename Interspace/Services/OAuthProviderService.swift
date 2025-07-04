@@ -2,157 +2,51 @@ import Foundation
 import AppAuth
 import AuthenticationServices
 
-// MARK: - OAuth Provider Protocol
-protocol OAuthProvider {
-    var providerName: String { get }
-    var authorizationEndpoint: URL { get }
-    var tokenEndpoint: URL { get }
-    var clientId: String { get }
-    var redirectUri: URL { get }
-    var scopes: [String] { get }
-    var additionalParameters: [String: String]? { get }
-}
-
-// MARK: - OAuth Provider Configurations
-struct GoogleOAuthProvider: OAuthProvider {
-    let providerName = "google"
-    let authorizationEndpoint = URL(string: "https://accounts.google.com/o/oauth2/v2/auth")!
-    let tokenEndpoint = URL(string: "https://oauth2.googleapis.com/token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/google")!
-    let scopes = ["openid", "email", "profile"]
-    let additionalParameters: [String: String]? = nil
-}
-
-struct DiscordOAuthProvider: OAuthProvider {
-    let providerName = "discord"
-    let authorizationEndpoint = URL(string: "https://discord.com/api/oauth2/authorize")!
-    let tokenEndpoint = URL(string: "https://discord.com/api/oauth2/token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "DISCORD_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/discord")!
-    let scopes = ["identify", "email"]
-    let additionalParameters: [String: String]? = nil
-}
-
-struct SpotifyOAuthProvider: OAuthProvider {
-    let providerName = "spotify"
-    let authorizationEndpoint = URL(string: "https://accounts.spotify.com/authorize")!
-    let tokenEndpoint = URL(string: "https://accounts.spotify.com/api/token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "SPOTIFY_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/spotify")!
-    let scopes = ["user-read-email", "user-read-private"]
-    let additionalParameters: [String: String]? = nil
-}
-
-struct GitHubOAuthProvider: OAuthProvider {
-    let providerName = "github"
-    let authorizationEndpoint = URL(string: "https://github.com/login/oauth/authorize")!
-    let tokenEndpoint = URL(string: "https://github.com/login/oauth/access_token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "GITHUB_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/github")!
-    let scopes = ["read:user", "user:email"]
-    let additionalParameters: [String: String]? = nil
-}
-
-struct FacebookOAuthProvider: OAuthProvider {
-    let providerName = "facebook"
-    let authorizationEndpoint = URL(string: "https://www.facebook.com/v18.0/dialog/oauth")!
-    let tokenEndpoint = URL(string: "https://graph.facebook.com/v18.0/oauth/access_token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "FACEBOOK_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/facebook")!
-    let scopes = ["email", "public_profile"]
-    let additionalParameters: [String: String]? = ["display": "touch"]
-}
-
-struct ShopifyOAuthProvider: OAuthProvider {
-    let providerName = "shopify"
-    var authorizationEndpoint: URL {
-        // Shopify requires shop domain, this will be set dynamically
-        URL(string: "https://\(shopDomain)/admin/oauth/authorize")!
-    }
-    var tokenEndpoint: URL {
-        URL(string: "https://\(shopDomain)/admin/oauth/access_token")!
-    }
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "SHOPIFY_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/shopify")!
-    let scopes = ["read_customers", "read_orders"]
-    let additionalParameters: [String: String]? = nil
-    
-    private var shopDomain: String {
-        // This would be set by user input or configuration
-        UserDefaults.standard.string(forKey: "shopify_shop_domain") ?? "shop.myshopify.com"
-    }
-}
-
-struct TwitterOAuthProvider: OAuthProvider {
-    let providerName = "twitter"
-    let authorizationEndpoint = URL(string: "https://twitter.com/i/oauth2/authorize")!
-    let tokenEndpoint = URL(string: "https://api.twitter.com/2/oauth2/token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "TWITTER_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/twitter")!
-    let scopes = ["users.read", "tweet.read"]
-    let additionalParameters: [String: String]? = ["code_challenge_method": "S256"]
-}
-
-struct TikTokOAuthProvider: OAuthProvider {
-    let providerName = "tiktok"
-    let authorizationEndpoint = URL(string: "https://www.tiktok.com/v2/auth/authorize")!
-    let tokenEndpoint = URL(string: "https://open.tiktokapis.com/v2/oauth/token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "TIKTOK_CLIENT_KEY") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/tiktok")!
-    let scopes = ["user.info.basic", "user.info.profile"]
-    let additionalParameters: [String: String]? = nil
-}
-
-struct EpicGamesOAuthProvider: OAuthProvider {
-    let providerName = "epicgames"
-    let authorizationEndpoint = URL(string: "https://www.epicgames.com/id/authorize")!
-    let tokenEndpoint = URL(string: "https://api.epicgames.dev/epic/oauth/v2/token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "EPIC_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/epicgames")!
-    let scopes = ["openid", "profile", "email"]
-    let additionalParameters: [String: String]? = nil
-}
-
-struct AppleOAuthProvider: OAuthProvider {
-    let providerName = "apple"
-    let authorizationEndpoint = URL(string: "https://appleid.apple.com/auth/authorize")!
-    let tokenEndpoint = URL(string: "https://appleid.apple.com/auth/token")!
-    let clientId = Bundle.main.object(forInfoDictionaryKey: "APPLE_CLIENT_ID") as? String ?? ""
-    let redirectUri = URL(string: "com.interspace.ios:/oauth2redirect/apple")!
-    let scopes = ["name", "email"]
-    let additionalParameters: [String: String]? = ["response_mode": "form_post"]
-}
-
 // MARK: - OAuth Service
 class OAuthProviderService: NSObject {
     static let shared = OAuthProviderService()
     
     private var currentAuthorizationFlow: OIDExternalUserAgentSession?
     
-    // Get provider by name
-    func provider(for name: String) -> OAuthProvider? {
-        switch name.lowercased() {
-        case "apple": return AppleOAuthProvider()
-        case "google": return GoogleOAuthProvider()
-        case "discord": return DiscordOAuthProvider()
-        case "spotify": return SpotifyOAuthProvider()
-        case "github": return GitHubOAuthProvider()
-        case "facebook": return FacebookOAuthProvider()
-        case "shopify": return ShopifyOAuthProvider()
-        case "twitter", "x": return TwitterOAuthProvider()
-        case "tiktok": return TikTokOAuthProvider()
-        case "epicgames", "epic": return EpicGamesOAuthProvider()
-        default: return nil
+    // Get provider configuration by name
+    func providerConfig(for name: String, shopDomain: String? = nil) -> OAuthConfiguration? {
+        guard var config = OAuthProviderRegistry.provider(for: name) else {
+            return nil
         }
+        
+        // Handle dynamic providers like Shopify
+        if name.lowercased() == "shopify" {
+            config = config.withDynamicUrls(shopDomain: shopDomain)
+        }
+        
+        return config
     }
+    
+    // Store completion handler for backend redirect flow
+    private var pendingCompletion: ((Result<OAuthTokens, Error>) -> Void)?
+    private var pendingProvider: String?
     
     // Authenticate with provider
     func authenticate(
-        with provider: OAuthProvider,
+        withProviderNamed providerName: String,
+        shopDomain: String? = nil,
         presentingViewController: UIViewController,
         completion: @escaping (Result<OAuthTokens, Error>) -> Void
     ) {
+        guard let provider = providerConfig(for: providerName, shopDomain: shopDomain) else {
+            completion(.failure(OAuthProviderError.invalidConfiguration(provider: providerName)))
+            return
+        }
+        
+        print("🔐 OAuth: Starting authentication for \(providerName)")
+        print("🔐 OAuth: Client ID: \(provider.clientId)")
+        print("🔐 OAuth: Redirect URI: \(provider.redirectUri)")
+        print("🔐 OAuth: Scopes: \(provider.scopes)")
+        
+        // Store completion for backend redirect flow
+        self.pendingCompletion = completion
+        self.pendingProvider = providerName
+        
         let configuration = OIDServiceConfiguration(
             authorizationEndpoint: provider.authorizationEndpoint,
             tokenEndpoint: provider.tokenEndpoint
@@ -186,12 +80,20 @@ class OAuthProviderService: NSObject {
                     provider: provider.providerName
                 )
                 completion(.success(tokens))
+                self?.pendingCompletion = nil
+                self?.pendingProvider = nil
             } else if let error = error {
+                print("🔐 OAuth: Authentication failed with error: \(error)")
                 // Use error handler for provider-specific error handling
                 let oauthError = OAuthErrorHandler.handle(error, for: provider.providerName)
                 completion(.failure(oauthError))
+                self?.pendingCompletion = nil
+                self?.pendingProvider = nil
             } else {
+                print("🔐 OAuth: Authentication failed with no error")
                 completion(.failure(OAuthProviderError.authorizationFailed(provider: provider.providerName, underlying: nil)))
+                self?.pendingCompletion = nil
+                self?.pendingProvider = nil
             }
             
             self?.currentAuthorizationFlow = nil
@@ -200,11 +102,64 @@ class OAuthProviderService: NSObject {
     
     // Handle redirect URL
     func handleRedirect(url: URL) -> Bool {
+        print("🔐 OAuth: Handling redirect URL: \(url)")
+        
+        // Check if this is a backend redirect with access token
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let queryItems = components.queryItems {
+            
+            // Check for error first
+            if let error = queryItems.first(where: { $0.name == "error" })?.value {
+                let errorDescription = queryItems.first(where: { $0.name == "error_description" })?.value ?? error
+                print("🔐 OAuth: Redirect contains error: \(errorDescription)")
+                
+                if let completion = pendingCompletion, let provider = pendingProvider {
+                    let oauthError = OAuthProviderError.authorizationFailed(
+                        provider: provider,
+                        underlying: NSError(domain: "OAuthError", code: -1, userInfo: [
+                            NSLocalizedDescriptionKey: errorDescription
+                        ])
+                    )
+                    completion(.failure(oauthError))
+                    pendingCompletion = nil
+                    pendingProvider = nil
+                    currentAuthorizationFlow = nil
+                    return true
+                }
+            }
+            
+            // Check for access token (backend already exchanged code)
+            if let accessToken = queryItems.first(where: { $0.name == "access_token" })?.value,
+               let provider = url.pathComponents.last {
+                
+                print("🔐 OAuth: Found access token in redirect for \(provider)")
+                
+                if let completion = pendingCompletion {
+                    let tokens = OAuthTokens(
+                        accessToken: accessToken,
+                        refreshToken: nil,
+                        idToken: nil,
+                        expiresIn: nil,
+                        provider: provider
+                    )
+                    completion(.success(tokens))
+                    pendingCompletion = nil
+                    pendingProvider = nil
+                    currentAuthorizationFlow = nil
+                    return true
+                }
+            }
+        }
+        
+        // Standard OAuth flow (for providers that don't use backend callback)
         if let authFlow = currentAuthorizationFlow,
            authFlow.resumeExternalUserAgentFlow(with: url) {
+            print("🔐 OAuth: Successfully resumed auth flow")
             currentAuthorizationFlow = nil
             return true
         }
+        
+        print("🔐 OAuth: Failed to resume auth flow - no current flow")
         return false
     }
 }

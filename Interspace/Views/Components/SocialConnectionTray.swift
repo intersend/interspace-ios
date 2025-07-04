@@ -7,6 +7,7 @@ struct SocialConnectionTray: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var showFarcasterAuth = false
     
     var body: some View {
         NavigationStack {
@@ -137,10 +138,23 @@ struct SocialConnectionTray: View {
                                     title: "Spotify",
                                     subtitle: "Connect with Spotify",
                                     isFirst: false,
-                                    isLast: true
+                                    isLast: false
                                 ) {
                                     handleOAuthProvider("spotify")
                                 }
+                                
+                                Divider()
+                                    .padding(.leading, 72)
+                                
+                                // Farcaster - SIWE implementation
+                                SocialOptionButton(
+                                    provider: .farcaster,
+                                    title: "Farcaster",
+                                    subtitle: "Sign in with Warpcast",
+                                    isFirst: false,
+                                    isLast: true,
+                                    action: handleFarcasterSignIn
+                                )
                             }
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
@@ -179,6 +193,13 @@ struct SocialConnectionTray: View {
                 Text(errorMessage)
             }
         }
+        .sheet(isPresented: $showFarcasterAuth) {
+            FarcasterAuthView(isPresented: $showFarcasterAuth) { authResponse in
+                Task {
+                    await handleFarcasterAuthResponse(authResponse)
+                }
+            }
+        }
     }
     
     // MARK: - Social Sign In Methods
@@ -187,7 +208,14 @@ struct SocialConnectionTray: View {
         isLoading = true
         Task {
             do {
-                try await authManager.authenticateWithGoogle()
+                if authManager.isAuthenticated {
+                    // Link Google account to existing profile using the proper method that handles token decoding
+                    try await authManager.linkGoogleAccount()
+                    print("✅ Google account linked to current profile")
+                } else {
+                    // New authentication
+                    try await authManager.authenticateWithGoogle()
+                }
                 await MainActor.run {
                     isLoading = false
                     HapticManager.notification(.success)
@@ -211,7 +239,13 @@ struct SocialConnectionTray: View {
         isLoading = true
         Task {
             do {
-                try await authManager.authenticateWithPasskey()
+                if authManager.isAuthenticated {
+                    // Passkey linking not supported when already authenticated
+                    throw AuthenticationError.unknown("Passkey cannot be linked to existing accounts. Please sign out first.")
+                } else {
+                    // New authentication with passkey
+                    try await authManager.authenticateWithPasskey()
+                }
                 await MainActor.run {
                     isLoading = false
                     HapticManager.notification(.success)
@@ -229,13 +263,6 @@ struct SocialConnectionTray: View {
     }
     
     private func handleOAuthProvider(_ providerName: String) {
-        // Use the OAuthProviderService to get provider configuration
-        guard let provider = OAuthProviderService.shared.provider(for: providerName) else {
-            errorMessage = "Provider not configured"
-            showError = true
-            return
-        }
-        
         isLoading = true
         
         Task {
@@ -248,24 +275,32 @@ struct SocialConnectionTray: View {
                 
                 let tokens = try await withCheckedThrowingContinuation { continuation in
                     OAuthProviderService.shared.authenticate(
-                        with: provider,
+                        withProviderNamed: providerName,
                         presentingViewController: viewController
                     ) { result in
                         continuation.resume(with: result)
                     }
                 }
                 
-                // Use the tokens to authenticate
-                try await authManager.authenticateWithOAuth(
-                    provider: providerName,
-                    tokens: OAuthTokenResponse(
-                        accessToken: tokens.accessToken,
-                        refreshToken: tokens.refreshToken,
-                        idToken: tokens.idToken,
-                        expiresIn: tokens.expiresIn,
-                        provider: tokens.provider
+                // Check if we're already authenticated - if so, link instead of authenticate
+                if authManager.isAuthenticated {
+                    // Link to current profile
+                    // Note: OAuth linking would need to be implemented in AccountLinkingService
+                    // For now, show error message
+                    throw AuthenticationError.unknown("OAuth account linking not yet implemented. Please sign out first.")
+                } else {
+                    // New authentication
+                    try await authManager.authenticateWithOAuth(
+                        provider: providerName,
+                        tokens: OAuthTokenResponse(
+                            accessToken: tokens.accessToken,
+                            refreshToken: tokens.refreshToken,
+                            idToken: tokens.idToken,
+                            expiresIn: tokens.expiresIn,
+                            provider: tokens.provider
+                        )
                     )
-                )
+                }
                 
                 await MainActor.run {
                     isLoading = false
@@ -279,6 +314,46 @@ struct SocialConnectionTray: View {
                     showError = true
                     HapticManager.notification(.error)
                 }
+            }
+        }
+    }
+    
+    private func handleFarcasterSignIn() {
+        showFarcasterAuth = true
+    }
+    
+    private func handleFarcasterAuthResponse(_ authResponse: FarcasterAuthService.FarcasterAuthResponse) async {
+        isLoading = true
+        
+        do {
+            if authManager.isAuthenticated {
+                // Link Farcaster account to existing profile
+                try await authManager.linkFarcasterAccount(
+                    message: authResponse.message,
+                    signature: authResponse.signature,
+                    fid: authResponse.fid
+                )
+                print("✅ Farcaster account linked to current profile")
+            } else {
+                // New authentication
+                try await authManager.authenticateWithFarcaster(
+                    message: authResponse.message,
+                    signature: authResponse.signature,
+                    fid: authResponse.fid
+                )
+            }
+            
+            await MainActor.run {
+                isLoading = false
+                HapticManager.notification(.success)
+                isPresented = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoading = false
+                errorMessage = error.localizedDescription
+                showError = true
+                HapticManager.notification(.error)
             }
         }
     }
@@ -444,7 +519,15 @@ struct AppleSignInRow: View {
                         shopDomain: nil
                     )
                     
-                    try await AuthenticationManagerV2.shared.authenticate(with: config)
+                    // Check if we're already authenticated - if so, link instead of authenticate
+                    if AuthenticationManagerV2.shared.isAuthenticated {
+                        // Link to current profile using the proper method that handles token decoding
+                        try await AuthenticationManagerV2.shared.linkAppleAccount()
+                        print("✅ Apple account linked to current profile")
+                    } else {
+                        // New authentication
+                        try await AuthenticationManagerV2.shared.authenticate(with: config)
+                    }
                     HapticManager.notification(.success)
                     
                 case .failure(let error):

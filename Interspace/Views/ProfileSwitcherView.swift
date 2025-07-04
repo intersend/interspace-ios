@@ -10,169 +10,137 @@ struct ProfileSwitcherView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     
-    @Namespace private var animation
+    // Sorted profiles with active profile first
+    private var sortedProfiles: [SmartProfile] {
+        viewModel.profiles.sorted { profile1, profile2 in
+            // Active profile always comes first
+            if profile1.isActive { return true }
+            if profile2.isActive { return false }
+            
+            // Then sort by last updated date (most recent first)
+            let dateFormatter = ISO8601DateFormatter()
+            if let date1 = dateFormatter.date(from: profile1.updatedAt),
+               let date2 = dateFormatter.date(from: profile2.updatedAt) {
+                return date1 > date2
+            }
+            
+            // Fallback to string comparison if date parsing fails
+            return profile1.updatedAt > profile2.updatedAt
+        }
+    }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // iOS 26 Liquid Glass background
-                Color.black
-                    .ignoresSafeArea()
-                
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        // Current Profile Header
-                        currentProfileHeader
-                            .padding(.top, 20)
-                            .padding(.horizontal, 20)
-                        
-                        // Other Profiles Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("OTHER PROFILES")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.gray)
-                                .padding(.horizontal, 20)
-                            
-                            VStack(spacing: 12) {
-                                ForEach(viewModel.profiles.filter { !$0.isActive }) { profile in
-                                    ProfileSwitcherRow(
-                                        profile: profile,
-                                        isSwitching: isSwitching && selectedProfile?.id == profile.id,
-                                        namespace: animation
-                                    ) {
-                                        switchToProfile(profile)
-                                    }
-                                }
-                                
-                                // Create New Profile Button
-                                CreateNewProfileButton {
-                                    showCreateProfile = true
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                        }
-                        .padding(.top, 32)
-                        
-                        // Bottom Padding
-                        Color.clear.frame(height: 40)
-                    }
+        List {
+            // Active Profile Section
+            if let activeProfile = sessionCoordinator.activeProfile {
+                Section {
+                    NativeActiveProfileRow(profile: activeProfile)
+                } header: {
+                    Text("CURRENT PROFILE")
                 }
             }
-            .navigationTitle("Switch Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(.gray)
-                            .frame(width: 30, height: 30)
-                            .background(
-                                Circle()
-                                    .fill(Color(white: 0.15))
+            
+            // Other Profiles Section
+            let otherProfiles = sortedProfiles.filter { !$0.isActive }
+            if !otherProfiles.isEmpty {
+                Section {
+                    ForEach(otherProfiles) { profile in
+                        Button {
+                            if !isSwitching {
+                                switchToProfile(profile)
+                            }
+                        } label: {
+                            NativeProfileRow(
+                                profile: profile,
+                                isSwitching: isSwitching && selectedProfile?.id == profile.id
                             )
+                        }
+                        .disabled(isSwitching)
+                    }
+                } header: {
+                    Text("OTHER PROFILES")
+                }
+            }
+            
+            // Actions Section
+            Section {
+                Button {
+                    showCreateProfile = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.tint)
+                        
+                        Text("Create New Profile")
+                            .foregroundStyle(Color.primary)
                     }
                 }
             }
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .preferredColorScheme(.dark)
+        .listStyle(.insetGrouped)
+        .navigationTitle("Profiles")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Profiles")
+                    .font(.headline)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
+                }
+                .fontWeight(.semibold)
+            }
+        }
         .sheet(isPresented: $showCreateProfile) {
-            CreateProfileView { name in
-                Task {
-                    await viewModel.createProfile(name: name)
-                    showCreateProfile = false
+            NavigationStack {
+                NativeCreateProfileView { name in
+                    Task {
+                        await viewModel.createProfile(name: name)
+                        showCreateProfile = false
+                        dismiss()
+                    }
                 }
             }
         }
         .task {
             await viewModel.loadProfiles()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .profileDidDelete)) { notification in
+            Task {
+                print("🔄 ProfileSwitcherView: Received profile deletion notification, refreshing...")
+                
+                // If we have the remaining profiles in the notification, use them directly
+                if let remainingProfiles = notification.userInfo?["remainingProfiles"] as? [SmartProfile] {
+                    await MainActor.run {
+                        viewModel.profiles = remainingProfiles
+                        // Update active profile if needed
+                        if let active = remainingProfiles.first(where: { $0.isActive }) {
+                            viewModel.activeProfile = active
+                        }
+                        
+                        // If no profiles remain or if the deleted profile was shown in this view, dismiss
+                        if remainingProfiles.isEmpty {
+                            dismiss()
+                        }
+                    }
+                } else {
+                    // Fallback to loading from API (bypasses cache)
+                    await viewModel.loadProfiles()
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .profileDidChange)) { notification in
+            // Dismiss the profile switcher when a profile change happens
+            // This ensures smooth transition after profile deletion
+            print("🔄 ProfileSwitcherView: Profile changed, dismissing...")
+            dismiss()
+        }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
-        }
-    }
-    
-    // MARK: - Current Profile Header
-    
-    private var currentProfileHeader: some View {
-        VStack(spacing: 16) {
-            Text("CURRENT PROFILE")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.gray)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            if let activeProfile = sessionCoordinator.activeProfile {
-                HStack(spacing: 16) {
-                    // Profile Icon
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.2))
-                            .frame(width: 72, height: 72)
-                        ProfileIconGenerator.generateIcon(for: activeProfile.id, size: 72)
-                    }
-                    .overlay(
-                        Circle()
-                            .stroke(Color.blue, lineWidth: 2)
-                    )
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        // Profile Name
-                        HStack {
-                            Text(activeProfile.name)
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                            
-                            if activeProfile.isDevelopmentWallet == true {
-                                Text("DEV")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.black)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.yellow)
-                                    )
-                            }
-                        }
-                        
-                        // Stats
-                        HStack(spacing: 12) {
-                            Label("\(activeProfile.linkedAccountsCount)", systemImage: "wallet.pass")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            
-                            Label("\(activeProfile.appsCount)", systemImage: "app.badge")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        
-                        // Active Badge
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 8, height: 8)
-                            Text("Active")
-                                .font(.caption2)
-                                .foregroundColor(.green)
-                        }
-                    }
-                    
-                    Spacer()
-                }
-                .padding(20)
-                .glassEffect(.regular, in: .rect(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                )
-            }
         }
     }
     
@@ -221,252 +189,254 @@ struct ProfileSwitcherView: View {
     }
 }
 
-// MARK: - Profile Switcher Row
+// MARK: - Native Active Profile Row
 
-struct ProfileSwitcherRow: View {
+struct NativeActiveProfileRow: View {
     let profile: SmartProfile
-    let isSwitching: Bool
-    let namespace: Namespace.ID
-    let action: () -> Void
-    
-    @State private var isPressed = false
     
     var body: some View {
-        HStack(spacing: 16) {
-            // Profile Icon
-            ZStack {
-                Circle()
-                    .fill(Color(white: 0.15))
-                    .frame(width: 60, height: 60)
-                ProfileIconGenerator.generateIcon(for: profile.id, size: 60)
+        HStack(spacing: 15) {
+            // Profile Icon with Checkmark
+            ZStack(alignment: .bottomTrailing) {
+                ProfileIconGenerator.generateIcon(for: profile.id, size: 44)
+                    .clipShape(Circle())
+                
+                // Active checkmark badge
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white, Color.accentColor)
+                    .background(
+                        Circle()
+                            .fill(Color(uiColor: .systemBackground))
+                            .frame(width: 20, height: 20)
+                    )
+                    .offset(x: 4, y: 4)
             }
-            .overlay(
-                Circle()
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-            )
+            .frame(width: 44, height: 44)
             
-            VStack(alignment: .leading, spacing: 4) {
-                // Profile Name
-                HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
                     Text(profile.name)
                         .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.primary)
                     
                     if profile.isDevelopmentWallet == true {
                         Text("DEV")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.black)
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.black)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(
-                                Capsule()
-                                    .fill(Color.yellow)
-                            )
+                            .background(Color.yellow, in: Capsule())
                     }
                 }
                 
-                // Stats
-                HStack(spacing: 8) {
-                    Label("\(profile.linkedAccountsCount)", systemImage: "wallet.pass")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                HStack(spacing: 15) {
+                    Label {
+                        Text("\(profile.linkedAccountsCount) wallets")
+                    } icon: {
+                        Image(systemName: "wallet.pass")
+                    }
                     
-                    Label("\(profile.appsCount)", systemImage: "app.badge")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    Label {
+                        Text("\(profile.appsCount) apps")
+                    } icon: {
+                        Image(systemName: "square.stack.3d.up")
+                    }
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Native Profile Row
+
+struct NativeProfileRow: View {
+    let profile: SmartProfile
+    let isSwitching: Bool
+    
+    var body: some View {
+        HStack(spacing: 15) {
+            // Profile Icon
+            ProfileIconGenerator.generateIcon(for: profile.id, size: 44)
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.separator.opacity(0.2), lineWidth: 0.5)
+                )
+            
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(profile.name)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                    
+                    if profile.isDevelopmentWallet == true {
+                        Text("DEV")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.yellow, in: Capsule())
+                    }
+                }
+                
+                HStack(spacing: 15) {
+                    if let lastUpdated = ISO8601DateFormatter().date(from: profile.updatedAt) {
+                        Text(lastUpdatedText(lastUpdated))
+                            .font(.footnote)
+                            .foregroundStyle(.tertiary)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "wallet.pass")
+                        Text("\(profile.linkedAccountsCount)")
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.stack.3d.up")
+                        Text("\(profile.appsCount)")
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
             }
             
             Spacer()
             
-            // Loading/Chevron
             if isSwitching {
                 ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     .scaleEffect(0.8)
-            } else {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundColor(.gray)
+                    .tint(.secondary)
             }
         }
-        .padding(16)
-        .contentShape(Rectangle()) // Add content shape to ensure tap area
-        .onTapGesture {
-            print("🔄 ProfileSwitcherRow: Tap detected for profile: \(profile.name)")
-            if !isSwitching {
-                print("🔄 ProfileSwitcherRow: Calling action...")
-                action()
-            } else {
-                print("🔄 ProfileSwitcherRow: Already switching, ignoring tap")
-            }
-        }
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
-        .scaleEffect(isPressed ? 0.98 : 1.0)
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = pressing
-            }
-        }, perform: {})
-        .disabled(isSwitching)
-        .opacity(isSwitching ? 0.7 : 1.0)
+        .padding(.vertical, 4)
+        .opacity(isSwitching ? 0.6 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isSwitching)
     }
-}
-
-// MARK: - Create New Profile Button
-
-struct CreateNewProfileButton: View {
-    let action: () -> Void
-    @State private var isPressed = false
     
-    var body: some View {
-        HStack(spacing: 16) {
-            // Plus Icon
-            Image(systemName: "plus.circle.fill")
-                .font(.system(size: 40))
-                .foregroundColor(.blue)
-                .frame(width: 60, height: 60)
-                .background(
-                    Circle()
-                        .fill(Color.blue.opacity(0.1))
-                )
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Create New Profile")
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundColor(.blue)
-                
-                Text("Add a new profile for different use cases")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14))
-                .foregroundColor(.blue)
-        }
-        .padding(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(style: StrokeStyle(lineWidth: 2, dash: [8, 4]))
-                .foregroundColor(.blue.opacity(0.5))
-        )
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.blue.opacity(0.05))
-        )
-        .scaleEffect(isPressed ? 0.98 : 1.0)
-        .onTapGesture {
-            action()
-        }
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = pressing
-            }
-        }, perform: {})
+    private func lastUpdatedText(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 
-// MARK: - Create Profile View
+// MARK: - Native Create Profile View
 
-struct CreateProfileView: View {
+struct NativeCreateProfileView: View {
     let onComplete: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var profileName = ""
-    @FocusState private var isFocused: Bool
+    @FocusState private var isNameFieldFocused: Bool
+    
+    private var isValidName: Bool {
+        !profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.black
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 24) {
-                    // Icon
-                    Image(systemName: "person.crop.circle.badge.plus")
-                        .font(.system(size: 64))
-                        .foregroundColor(.blue)
-                        .padding(.top, 40)
-                    
-                    // Title
-                    VStack(spacing: 8) {
-                        Text("Create New Profile")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                        
-                        Text("Separate your activities with different profiles")
-                            .font(.body)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
+        Form {
+            Section {
+                TextField("Profile Name", text: $profileName)
+                    .focused($isNameFieldFocused)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        if isValidName {
+                            onComplete(profileName.trimmingCharacters(in: .whitespacesAndNewlines))
+                        }
                     }
-                    
-                    // Input Field
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("PROFILE NAME")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.gray)
-                        
-                        TextField("e.g., Trading, Gaming, Personal", text: $profileName)
-                            .font(.body)
-                            .foregroundColor(.white)
-                            .textFieldStyle(.plain)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(white: 0.1))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(isFocused ? Color.blue : Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                            .focused($isFocused)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    
-                    Spacer()
-                    
-                    // Create Button
-                    Button(action: {
-                        onComplete(profileName)
-                        dismiss()
-                    }) {
-                        Text("Create Profile")
-                            .font(.body.weight(.semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.blue)
-                            .cornerRadius(12)
-                    }
-                    .disabled(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .opacity(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1.0)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-                }
+            } header: {
+                Text("NAME")
+            } footer: {
+                Text("Choose a descriptive name for your profile, like \"Work\", \"Gaming\", or \"Personal\".")
             }
-            .navigationTitle("New Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.blue)
+            
+            Section {
+                VStack(alignment: .leading, spacing: 16) {
+                    ProfileFeatureRow(
+                        icon: "person.2.fill",
+                        title: "Separate Identities",
+                        description: "Keep different aspects of your digital life organized"
+                    )
+                    
+                    ProfileFeatureRow(
+                        icon: "lock.shield.fill",
+                        title: "Enhanced Privacy",
+                        description: "Isolate activities between profiles"
+                    )
+                    
+                    ProfileFeatureRow(
+                        icon: "apps.iphone",
+                        title: "App Management",
+                        description: "Different apps and settings for each profile"
+                    )
                 }
+                .padding(.vertical, 8)
+            } header: {
+                Text("WHAT ARE PROFILES?")
             }
         }
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
-        .preferredColorScheme(.dark)
+        .navigationTitle("New Profile")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    dismiss()
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Create") {
+                    if isValidName {
+                        onComplete(profileName.trimmingCharacters(in: .whitespacesAndNewlines))
+                    }
+                }
+                .fontWeight(.semibold)
+                .disabled(!isValidName)
+            }
+        }
         .onAppear {
-            isFocused = true
+            // Delay focus to ensure keyboard appears smoothly
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                isNameFieldFocused = true
+            }
+        }
+    }
+}
+
+// MARK: - Feature Row
+
+private struct ProfileFeatureRow: View {
+    let icon: String
+    let title: String
+    let description: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 28)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
         }
     }
 }

@@ -105,7 +105,7 @@ struct WalletView: View {
             ProfileAboutView()
         }
         .sheet(isPresented: $showSecurity) {
-            ProfileSecurityView(showDeleteConfirmation: .constant(false))
+            ProfileSecurityView()
         }
         .sheet(isPresented: $showNotifications) {
             ProfileNotificationsView()
