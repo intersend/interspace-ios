@@ -227,38 +227,55 @@ class FarcasterAuthService: ObservableObject {
     func openWarpcast() {
         guard let channel = authChannel else { return }
         
-        // Try native deep links first
+        // Construct proper deep links with all required parameters
+        let encodedNonce = channel.nonce.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channel.nonce
+        let encodedSiweUri = channel.siweUri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channel.siweUri
+        let encodedDomain = channel.domain.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channel.domain
+        
+        // Try native deep links with proper format
         let deepLinkFormats = [
-            // Try the URL from backend first (might be a proper deep link)
-            channel.url,
-            // Standard deep link formats
-            "warpcast://sign-in?channelToken=\(channel.channelToken)",
-            "farcaster://sign-in?channelToken=\(channel.channelToken)",
+            // Farcaster protocol with full parameters (recommended format)
+            "farcaster://connect?channelToken=\(channel.channelToken)&nonce=\(encodedNonce)&siweUri=\(encodedSiweUri)&domain=\(encodedDomain)",
+            // Warpcast specific format
+            "warpcast://~/sign-in?channelToken=\(channel.channelToken)",
             // Alternative formats that might work
-            "warpcast://auth?channelToken=\(channel.channelToken)",
-            "farcaster://auth?channelToken=\(channel.channelToken)",
-            // Try with the full channel URL as parameter
-            "warpcast://sign-in?url=\(channel.url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channel.url)",
-            "farcaster://sign-in?url=\(channel.url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channel.url)"
+            "farcaster://signed-key-request?token=\(channel.channelToken)",
+            "warpcast://sign-in?channelToken=\(channel.channelToken)",
+            // Simplified versions
+            "farcaster://connect?channelToken=\(channel.channelToken)",
+            "warpcast://connect?channelToken=\(channel.channelToken)"
         ]
+        
+        print("Attempting to open Warpcast with channel token: \(channel.channelToken)")
         
         // Try each deep link format
         for deepLinkString in deepLinkFormats {
-            if let url = URL(string: deepLinkString),
-               UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url, options: [:]) { success in
-                    if success {
-                        print("Successfully opened Warpcast with deep link: \(deepLinkString)")
+            if let url = URL(string: deepLinkString) {
+                // First check if we can open this URL scheme
+                if UIApplication.shared.canOpenURL(url) {
+                    print("Can open URL: \(deepLinkString)")
+                    UIApplication.shared.open(url, options: [:]) { success in
+                        if success {
+                            print("Successfully opened Warpcast with deep link: \(deepLinkString)")
+                        } else {
+                            print("Failed to open URL despite canOpenURL returning true: \(deepLinkString)")
+                        }
                     }
+                    return // Exit after first successful attempt
+                } else {
+                    print("Cannot open URL scheme: \(deepLinkString)")
                 }
-                return // Exit after first successful attempt
+            } else {
+                print("Failed to create URL from: \(deepLinkString)")
             }
         }
         
         // Fallback to web URL if no deep links work
-        print("No deep links worked, falling back to web URL")
+        print("No deep links worked, falling back to web URL: \(channel.deepLink)")
         if let url = URL(string: channel.deepLink) {
-            UIApplication.shared.open(url)
+            UIApplication.shared.open(url, options: [:]) { success in
+                print("Web URL open result: \(success)")
+            }
         }
     }
     
