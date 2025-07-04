@@ -55,6 +55,8 @@
 		<string>tokenpocket</string>
 		<string>spot</string>
 		<string>omni</string>
+		<string>warpcast</string>
+		<string>farcaster</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>

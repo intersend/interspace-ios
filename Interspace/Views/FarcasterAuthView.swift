@@ -8,6 +8,8 @@ struct FarcasterAuthView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isLoading = true
+    @State private var hasOpenedWarpcast = false
+    @Environment(\.scenePhase) var scenePhase
     
     var body: some View {
         NavigationStack {
@@ -33,7 +35,7 @@ struct FarcasterAuthView: View {
                         VStack(spacing: 32) {
                             // Header
                             VStack(spacing: 12) {
-                                Image(systemName: "qrcode")
+                                Image(systemName: farcasterAuth.isWarpcastInstalled ? "arrow.up.forward.app" : "qrcode")
                                     .font(.system(size: 48))
                                     .foregroundColor(DesignTokens.Colors.farcaster)
                                 
@@ -42,12 +44,39 @@ struct FarcasterAuthView: View {
                                     .fontWeight(.bold)
                                     .foregroundColor(DesignTokens.Colors.textPrimary)
                                 
-                                Text("Scan with Warpcast or tap the button below")
+                                Text(farcasterAuth.isWarpcastInstalled 
+                                    ? "Tap the button below to open Warpcast"
+                                    : "Scan with Warpcast or tap the button below")
                                     .font(.body)
                                     .foregroundColor(DesignTokens.Colors.textSecondary)
                                     .multilineTextAlignment(.center)
                             }
                             .padding(.top, 40)
+                            
+                            // Show Open Warpcast button first if app is installed
+                            if farcasterAuth.isWarpcastInstalled {
+                                // Open Warpcast Button (prominent when app is installed)
+                                Button(action: {
+                                    hasOpenedWarpcast = true
+                                    farcasterAuth.openWarpcast()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.up.forward.app")
+                                        Text("Open Warpcast")
+                                    }
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 56)
+                                    .background(DesignTokens.Colors.farcaster)
+                                    .cornerRadius(16)
+                                }
+                                .padding(.horizontal, 20)
+                                
+                                Text("or scan the QR code below")
+                                    .font(.caption)
+                                    .foregroundColor(DesignTokens.Colors.textTertiary)
+                            }
                             
                             // QR Code
                             ZStack {
@@ -61,24 +90,28 @@ struct FarcasterAuthView: View {
                                     .scaledToFit()
                                     .padding(20)
                             }
-                            .frame(width: 300, height: 300)
+                            .frame(width: farcasterAuth.isWarpcastInstalled ? 250 : 300, 
+                                   height: farcasterAuth.isWarpcastInstalled ? 250 : 300)
                             
-                            // Open Warpcast Button
-                            Button(action: {
-                                farcasterAuth.openWarpcast()
-                            }) {
-                                HStack {
-                                    Image(systemName: "arrow.up.forward.app")
-                                    Text("Open Warpcast")
+                            // Show Open Warpcast button below QR if app is not installed
+                            if !farcasterAuth.isWarpcastInstalled {
+                                Button(action: {
+                                    hasOpenedWarpcast = true
+                                    farcasterAuth.openWarpcast()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.up.forward.app")
+                                        Text("Open Warpcast")
+                                    }
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 56)
+                                    .background(DesignTokens.Colors.farcaster)
+                                    .cornerRadius(16)
                                 }
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 56)
-                                .background(DesignTokens.Colors.farcaster)
-                                .cornerRadius(16)
+                                .padding(.horizontal, 20)
                             }
-                            .padding(.horizontal, 20)
                             
                             // Instructions
                             VStack(alignment: .leading, spacing: 16) {
@@ -138,6 +171,13 @@ struct FarcasterAuthView: View {
         .task {
             await startAuthentication()
         }
+        .onChange(of: scenePhase) { newPhase in
+            // When app comes back to foreground after opening Warpcast
+            if newPhase == .active && hasOpenedWarpcast && farcasterAuth.isAuthenticating {
+                // Show a subtle animation or feedback that we're still waiting
+                HapticManager.impact(.light)
+            }
+        }
     }
     
     private func startAuthentication() async {
@@ -148,6 +188,14 @@ struct FarcasterAuthView: View {
             // Once channel is created, hide loading and show QR code
             await MainActor.run {
                 isLoading = false
+                
+                // Automatically open Warpcast if installed
+                if farcasterAuth.isWarpcastInstalled {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        hasOpenedWarpcast = true
+                        farcasterAuth.openWarpcast()
+                    }
+                }
             }
             
             // Now wait for the user to scan and complete authentication
