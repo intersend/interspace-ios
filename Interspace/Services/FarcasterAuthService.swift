@@ -85,8 +85,11 @@ class FarcasterAuthService: ObservableObject {
     }
     
     private func createAuthChannel(from channel: FarcasterChannelResponse.FarcasterChannel, expiresAt: Date) -> FarcasterAuthChannel {
-        // Create deep link for Warpcast - use the web URL for QR code
-        let deepLink = "https://warpcast.com/~/sign-in?channelToken=\(channel.channelToken)"
+        // Create deep link for Warpcast - use the web URL for QR code with all required parameters
+        let encodedNonce = channel.nonce.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channel.nonce
+        let encodedSiweUri = channel.siweUri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channel.siweUri
+        let encodedDomain = channel.domain.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? channel.domain
+        let deepLink = "https://warpcast.com/~/sign-in-with-farcaster?channelToken=\(channel.channelToken)&nonce=\(encodedNonce)&siweUri=\(encodedSiweUri)&domain=\(encodedDomain)"
         
         let authChannel = FarcasterAuthChannel(
             channelToken: channel.channelToken,
@@ -234,16 +237,14 @@ class FarcasterAuthService: ObservableObject {
         
         // Try native deep links with proper format
         let deepLinkFormats = [
-            // Farcaster protocol with full parameters (recommended format)
+            // Farcaster protocol with full parameters (THIS IS THE CORRECT FORMAT)
             "farcaster://connect?channelToken=\(channel.channelToken)&nonce=\(encodedNonce)&siweUri=\(encodedSiweUri)&domain=\(encodedDomain)",
-            // Warpcast specific format
-            "warpcast://~/sign-in?channelToken=\(channel.channelToken)",
+            // Warpcast specific formats with all parameters
+            "warpcast://~/sign-in-with-farcaster?channelToken=\(channel.channelToken)&nonce=\(encodedNonce)&siweUri=\(encodedSiweUri)&domain=\(encodedDomain)",
+            "warpcast://sign-in-with-farcaster?channelToken=\(channel.channelToken)&nonce=\(encodedNonce)&siweUri=\(encodedSiweUri)&domain=\(encodedDomain)",
             // Alternative formats that might work
             "farcaster://signed-key-request?token=\(channel.channelToken)",
-            "warpcast://sign-in?channelToken=\(channel.channelToken)",
-            // Simplified versions
-            "farcaster://connect?channelToken=\(channel.channelToken)",
-            "warpcast://connect?channelToken=\(channel.channelToken)"
+            "warpcast://~/sign-in?channelToken=\(channel.channelToken)"
         ]
         
         print("Attempting to open Warpcast with channel token: \(channel.channelToken)")
