@@ -197,6 +197,50 @@ extension Double {
     }
 }
 
+// MARK: - Wallet Design System
+struct WalletDesignSystem {
+    // MARK: - Formatting Functions
+    static func formatCurrency(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencySymbol = "$"
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 0
+        
+        if amount >= 1_000_000 {
+            formatter.maximumFractionDigits = 1
+            let millions = amount / 1_000_000
+            return "$\(formatter.string(from: NSNumber(value: millions)) ?? "0")M"
+        } else if amount >= 10_000 {
+            formatter.maximumFractionDigits = 0
+            return formatter.string(from: NSNumber(value: amount)) ?? "$0"
+        }
+        
+        return formatter.string(from: NSNumber(value: amount)) ?? "$0"
+    }
+    
+    static func formatTokenAmount(_ amount: Double, decimals: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = min(decimals, 6)
+        formatter.minimumFractionDigits = 0
+        
+        if amount >= 1_000_000 {
+            formatter.maximumFractionDigits = 2
+            let millions = amount / 1_000_000
+            return "\(formatter.string(from: NSNumber(value: millions)) ?? "0")M"
+        } else if amount >= 1_000 {
+            formatter.maximumFractionDigits = 2
+            let thousands = amount / 1_000
+            return "\(formatter.string(from: NSNumber(value: thousands)) ?? "0")K"
+        } else if amount < 0.0001 && amount > 0 {
+            return "<0.0001"
+        }
+        
+        return formatter.string(from: NSNumber(value: amount)) ?? "0"
+    }
+}
+
 // MARK: - SF Symbols
 struct WalletSymbols {
     static let send = "arrow.up.circle.fill"

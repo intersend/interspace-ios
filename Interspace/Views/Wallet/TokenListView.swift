@@ -176,7 +176,7 @@ struct EnhancedTokenCell: View {
             Button(action: onTap) {
                 HStack(spacing: WalletDesign.Spacing.regular) {
                     // Token Icon
-                    TokenIcon(symbol: token.symbol)
+                    TokenIconView(symbol: token.symbol)
                     
                     // Token Info
                     VStack(alignment: .leading, spacing: 4) {
@@ -303,8 +303,8 @@ struct EnhancedTokenCell: View {
     }
 }
 
-// MARK: - Token Icon
-struct TokenIcon: View {
+// MARK: - Token Icon View
+struct TokenIconView: View {
     let symbol: String
     @State private var imageLoaded = false
     

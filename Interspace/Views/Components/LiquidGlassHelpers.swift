@@ -170,7 +170,17 @@ struct AppSelectionView: View {
                             .foregroundColor(DesignTokens.Colors.textSecondary)
                         
                         TextField("https://example.com", text: $url)
-                            .textFieldStyle(LiquidGlassTextFieldStyle())
+                            .textFieldStyle(.plain)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Material.ultraThinMaterial)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                                    )
+                            )
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
                             .onChange(of: url) { newValue in

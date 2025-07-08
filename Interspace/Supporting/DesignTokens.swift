@@ -51,6 +51,12 @@ struct DesignTokens {
         static let borderFocus = Color.accentColor
         static let borderGlass = Color.white.opacity(0.1)
         
+        // MARK: - Brand Colors  
+        struct Brand {
+            static let primary = Color.accentColor
+            static let secondary = Color(red: 0.0, green: 0.64, blue: 1.0)
+        }
+        
         // MARK: - Fill Colors
         static let fillTertiary = Color.white.opacity(0.05)
         
@@ -113,6 +119,14 @@ struct DesignTokens {
     
     // MARK: - Spacing (iOS 18 Standards)
     struct Spacing {
+        // Legacy spacing names for compatibility
+        static let tight: CGFloat = 8
+        static let regular: CGFloat = 16
+        static let loose: CGFloat = 24
+        static let section: CGFloat = 32
+        static let screen: CGFloat = 20
+        
+        // New spacing names
         static let xs: CGFloat = 4
         static let sm: CGFloat = 8
         static let md: CGFloat = 16
@@ -148,6 +162,11 @@ struct DesignTokens {
     
     // MARK: - Corner Radius (iOS 18 Standards)
     struct CornerRadius {
+        // Legacy corner radius names for compatibility
+        static let small: CGFloat = 8
+        static let medium: CGFloat = 12
+        
+        // New corner radius names
         static let xs: CGFloat = 4
         static let sm: CGFloat = 8
         static let md: CGFloat = 12
@@ -380,22 +399,37 @@ struct Shadow {
 
 // MARK: - Haptic Feedback Helper
 struct HapticManager {
-    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
+    static let shared = HapticManager()
+    
+    func impact(style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
         guard !UIAccessibility.isReduceMotionEnabled else { return }
         let impactFeedback = UIImpactFeedbackGenerator(style: style)
         impactFeedback.impactOccurred()
     }
     
-    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+    func notification(type: UINotificationFeedbackGenerator.FeedbackType) {
         guard !UIAccessibility.isReduceMotionEnabled else { return }
         let notificationFeedback = UINotificationFeedbackGenerator()
         notificationFeedback.notificationOccurred(type)
     }
     
-    static func selection() {
+    func selection() {
         guard !UIAccessibility.isReduceMotionEnabled else { return }
         let selectionFeedback = UISelectionFeedbackGenerator()
         selectionFeedback.selectionChanged()
+    }
+    
+    // Keep static methods for backwards compatibility
+    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
+        shared.impact(style: style)
+    }
+    
+    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        shared.notification(type: type)
+    }
+    
+    static func selection() {
+        shared.selection()
     }
 }
 
@@ -490,7 +524,17 @@ struct LiquidGlassTextFieldModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .textFieldStyle(LiquidGlassTextFieldStyle())
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Material.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                    )
+            )
             .frame(height: height)
     }
     

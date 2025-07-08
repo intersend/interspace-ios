@@ -162,14 +162,12 @@ struct WalletConnectionTray: View {
         }
         .sheet(item: $selectedWallet) { walletType in
             WalletConnectionView(
-                walletType: walletType,
-                viewModel: profileViewModel,
-                onComplete: {
+                isLinking: !isForAuthentication,
+                onSuccess: { result in
                     showWalletConnection = false
                     selectedWallet = nil
                     isPresented = false
-                },
-                isForAuthentication: isForAuthentication
+                }
             )
         }
     }
