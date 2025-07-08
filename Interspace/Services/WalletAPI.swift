@@ -176,38 +176,10 @@ struct GasTokenPreferenceRequest: Codable {
     let chainPreferences: [String: String] // chainId -> tokenAddress mapping
 }
 
-struct CreateIntentRequest: Codable {
-    let type: String
-    let from: IntentEndpoint?
-    let to: IntentEndpoint?
-    let gasToken: GasTokenSource?
-    
-    struct IntentEndpoint: Codable {
-        let token: String?
-        let chainId: Int?
-        let amount: String?
-        let address: String?
-    }
-    
-    struct GasTokenSource: Codable {
-        let standardizedTokenId: String
-        let tokenSources: [TokenSource]
-        
-        struct TokenSource: Codable {
-            let chainId: Int
-            let address: String
-        }
-    }
-}
+// All request/response models are defined in WalletModels.swift
 
 struct SubmitOperationsRequest: Codable {
     let signedOperations: [SignedOperation]
-}
-
-struct SignedOperation: Codable {
-    let index: Int
-    let signature: String
-    let signedData: String
 }
 
 struct GrantAllowanceRequest: Codable {

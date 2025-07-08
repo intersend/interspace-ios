@@ -4,9 +4,34 @@ import LocalAuthentication
 // MARK: - MPCTransactionApprovalView
 
 struct MPCTransactionApprovalView: View {
+    @Binding var isPresented: Bool
     let transaction: MPCTransaction
     let onApprove: () async throws -> Void
     let onReject: () -> Void
+    
+    // Original initializer for backward compatibility
+    init(transaction: MPCTransaction, 
+         onApprove: @escaping () async throws -> Void,
+         onReject: @escaping () -> Void) {
+        self._isPresented = .constant(true)
+        self.transaction = transaction
+        self.onApprove = onApprove
+        self.onReject = onReject
+    }
+    
+    // New initializer for SendTokenSheet usage
+    init(isPresented: Binding<Bool>,
+         transaction: MPCTransaction,
+         onApprove: @escaping () async -> Void) {
+        self._isPresented = isPresented
+        self.transaction = transaction
+        self.onApprove = {
+            try await onApprove()
+        }
+        self.onReject = {
+            isPresented.wrappedValue = false
+        }
+    }
     
     @State private var isProcessing = false
     @State private var showError = false
@@ -242,7 +267,7 @@ struct MPCTransactionApprovalView: View {
                 .foregroundColor(.white)
             
             VStack(spacing: 12) {
-                MPCDetailRow(title: "Network", value: transaction.network)
+                MPCDetailRow(title: "Network", value: transaction.network ?? "-")
                 
                 if let gasEstimate = transaction.gasEstimate {
                     MPCDetailRow(title: "Estimated Gas", value: gasEstimate)
@@ -381,49 +406,6 @@ private struct MPCDetailRow: View {
     }
 }
 
-// MARK: - Transaction Model
-
-struct MPCTransaction {
-    let id: String
-    let type: TransactionType
-    let amount: String?
-    let token: String?
-    let recipient: String?
-    let network: String
-    let gasEstimate: String?
-    let nonce: Int?
-    let data: String?
-    let messageToSign: Data
-    
-    enum TransactionType {
-        case send
-        case swap
-        case approve
-        case signMessage
-        case contractInteraction
-        
-        var displayName: String {
-            switch self {
-            case .send: return "Send Transaction"
-            case .swap: return "Token Swap"
-            case .approve: return "Token Approval"
-            case .signMessage: return "Sign Message"
-            case .contractInteraction: return "Contract Interaction"
-            }
-        }
-        
-        var icon: String {
-            switch self {
-            case .send: return "paperplane.fill"
-            case .swap: return "arrow.triangle.2.circlepath"
-            case .approve: return "checkmark.shield.fill"
-            case .signMessage: return "signature"
-            case .contractInteraction: return "doc.text.fill"
-            }
-        }
-    }
-}
-
 // MARK: - Preview
 
 struct MPCTransactionApprovalView_Previews: PreviewProvider {
@@ -432,14 +414,13 @@ struct MPCTransactionApprovalView_Previews: PreviewProvider {
             transaction: MPCTransaction(
                 id: "1",
                 type: .send,
-                amount: "0.5",
-                token: "ETH",
-                recipient: "0x1234...5678",
-                network: "Ethereum Mainnet",
-                gasEstimate: "0.002 ETH",
-                nonce: 42,
-                data: nil,
-                messageToSign: Data()
+                status: .pending,
+                from: "0xabcd...efgh",
+                to: "0x1234...5678",
+                value: "0.5",
+                tokenSymbol: "ETH",
+                chainId: 1,
+                unsignedData: "0x"
             ),
             onApprove: { },
             onReject: { }

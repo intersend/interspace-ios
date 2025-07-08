@@ -250,18 +250,18 @@ final class WalletViewModel: ObservableObject {
         if let apiError = error as? APIError {
             switch apiError {
             case .unauthorized:
-                self.error = .unauthorized
+                self.error = WalletViewError.unauthorized
             case .apiError(let message):
-                self.error = .serverError(message)
+                self.error = WalletViewError.serverError(message)
             case .requestFailed(let underlyingError):
-                self.error = .networkError(underlyingError.localizedDescription)
+                self.error = WalletViewError.networkError(underlyingError.localizedDescription)
             case .noData:
-                self.error = .noBalance
+                self.error = WalletViewError.noBalance
             default:
-                self.error = .unknown(error.localizedDescription)
+                self.error = WalletViewError.unknown(error.localizedDescription)
             }
         } else {
-            self.error = .unknown(error.localizedDescription)
+            self.error = WalletViewError.unknown(error.localizedDescription)
         }
         showError = true
     }

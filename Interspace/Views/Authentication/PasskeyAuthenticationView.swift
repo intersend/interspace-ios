@@ -57,7 +57,17 @@ struct PasskeyAuthenticationView: View {
                                 .foregroundColor(.gray)
                             
                             TextField("your@email.com", text: $email)
-                                .textFieldStyle(LiquidGlassTextFieldStyle())
+                                .textFieldStyle(.plain)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Material.ultraThinMaterial)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                                        )
+                                )
                                 .focused($isEmailFocused)
                                 .textContentType(.emailAddress)
                                 .keyboardType(.emailAddress)
