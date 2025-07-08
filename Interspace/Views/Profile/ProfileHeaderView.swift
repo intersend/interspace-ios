@@ -51,35 +51,12 @@ struct UserProfileHeaderView: View {
                     DevelopmentModeIndicator(size: .small)
                 }
                 
-                // Full Wallet Address
+                // Full Wallet Address with Apple Style Copy Button
                 if let address = activeProfile?.sessionWalletAddress {
-                    HStack(spacing: 8) {
-                        Text(addressHidden ? hideAddress(address) : address)
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .animation(.easeInOut(duration: 0.2), value: addressHidden)
-                        
-                        // Action Buttons
-                        HStack(spacing: 12) {
-                            // Hide/Show Button
-                            Button(action: toggleAddressVisibility) {
-                                Image(systemName: addressHidden ? "eye.slash" : "eye")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.secondary)
-                                    .symbolRenderingMode(.hierarchical)
-                            }
-                            
-                            // Copy Button
-                            Button(action: copyAddress) {
-                                Image(systemName: addressCopied ? "checkmark" : "doc.on.doc")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(addressCopied ? .green : .secondary)
-                                    .symbolRenderingMode(.hierarchical)
-                            }
-                        }
-                    }
+                    SingleLineAddressView(
+                        address: address,
+                        maxWidth: UIScreen.main.bounds.width - 180
+                    )
                 }
             }
             
@@ -209,3 +186,4 @@ struct UserProfileHeaderView_Previews: PreviewProvider {
         .background(Color.systemGroupedBackground)
     }
 }
+

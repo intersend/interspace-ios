@@ -230,11 +230,15 @@ final class SessionCoordinator: ObservableObject {
                 // Set active profile
                 if let activeProfile = smartProfiles.first(where: { $0.isActive }) {
                     self.activeProfile = activeProfile
-                    self.sessionState = .authenticated
+                    // Check if biometric lock is enabled
+                    let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
+                    self.sessionState = biometricLockEnabled ? .locked : .authenticated
                     self.cacheProfile(activeProfile)
                 } else if let firstProfile = smartProfiles.first {
                     self.activeProfile = firstProfile
-                    self.sessionState = .authenticated
+                    // Check if biometric lock is enabled
+                    let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
+                    self.sessionState = biometricLockEnabled ? .locked : .authenticated
                     self.cacheProfile(firstProfile)
                 } else if profiles.isEmpty {
                     self.sessionState = .needsProfile
@@ -288,7 +292,9 @@ final class SessionCoordinator: ObservableObject {
                 
                 // Update session state based on cached data
                 if !cachedProfiles.isEmpty && activeProfile != nil {
-                    sessionState = .authenticated
+                    // Check if biometric lock is enabled
+                    let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
+                    sessionState = biometricLockEnabled ? .locked : .authenticated
                 } else if cachedProfiles.isEmpty {
                     sessionState = .needsProfile
                 }
@@ -362,7 +368,9 @@ final class SessionCoordinator: ObservableObject {
                 
                 // Preload adjacent profiles for faster switching
                 await preloadAdjacentProfiles(current: active, all: profiles)
-                sessionState = .authenticated
+                // Check if biometric lock is enabled
+                let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
+                sessionState = biometricLockEnabled ? .locked : .authenticated
             } else {
                 // User has profiles but none are active - activate the first one
                 print("⚠️ SessionCoordinator: No active profile found, activating first profile")
@@ -591,8 +599,11 @@ final class SessionCoordinator: ObservableObject {
         // Reset security timer
         resetSessionTimer()
         
-        // Require biometric verification if session was locked
-        if sessionState == .locked {
+        // Check if biometric lock is enabled
+        let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
+        
+        // Require biometric verification if session was locked or biometric lock is enabled
+        if sessionState == .locked || biometricLockEnabled {
             Task {
                 await verifyBiometricAccess()
             }
@@ -605,9 +616,19 @@ final class SessionCoordinator: ObservableObject {
     }
     
     func verifyBiometricAccess() async {
-        // Implement biometric verification
-        // For now, just unlock
-        sessionState = .authenticated
+        // Check if biometric lock is enabled
+        let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
+        
+        if biometricLockEnabled {
+            // Show authentication lock view - this will be handled by ContentView
+            // The AuthenticationLockView will handle the actual biometric authentication
+            // and call back to set sessionState = .authenticated on success
+            // For now, we keep the session locked
+            sessionState = .locked
+        } else {
+            // No biometric lock enabled, just unlock
+            sessionState = .authenticated
+        }
     }
     
     // MARK: - Profile Management

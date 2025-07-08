@@ -264,19 +264,54 @@ struct UnauthenticatedView: View {
                 Spacer()
                 
                 // Centered content with Apple-native styling
-                VStack(spacing: 60) {
-                    // App identity
-                    VStack(spacing: 20) {
-                        // Infinity symbol
-                        Text("∞")
-                            .font(.system(size: 90, weight: .ultraLight, design: .rounded))
-                            .foregroundColor(DesignTokens.Colors.textPrimary)
+                VStack(spacing: 48) {
+                    // App identity - Apple Health/Wallet inspired
+                    VStack(spacing: 24) {
+                        // Modern icon design
+                        ZStack {
+                            // Gradient background circle
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.blue.opacity(0.8),
+                                            Color.purple.opacity(0.8)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 120, height: 120)
+                                .blur(radius: 20)
+                                .opacity(0.5)
+                            
+                            // Glass effect circle
+                            Circle()
+                                .fill(Material.ultraThinMaterial)
+                                .frame(width: 100, height: 100)
+                            
+                            // Wallet icon with gradient
+                            Image(systemName: "wallet.pass.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color.blue, Color.purple],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
                         
-                        // App name
-                        Text("Interspace")
-                            .font(.system(.largeTitle, design: .rounded))
-                            .fontWeight(.medium)
-                            .foregroundColor(DesignTokens.Colors.textPrimary)
+                        // App name and tagline
+                        VStack(spacing: 8) {
+                            Text("Interspace")
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Text("Your gateway to Web3")
+                                .font(.system(size: 17, weight: .regular))
+                                .foregroundColor(.gray)
+                        }
                     }
                     
                     // Single Connect button - Apple native style
@@ -284,17 +319,29 @@ struct UnauthenticatedView: View {
                         HapticManager.impact(.medium)
                         showUniversalAddTray = true
                     }) {
-                        Text("Connect")
-                            .font(.system(size: 17, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 320)
-                            .frame(height: 56) // iOS 18 standard height
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(DesignTokens.Colors.primary)
-                            )
+                        HStack {
+                            Text("Get Started")
+                                .font(.system(size: 17, weight: .semibold))
+                            
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: 320)
+                        .frame(height: 56)
+                        .background(
+                            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.blue, Color.purple],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                        )
+                        .shadow(color: Color.blue.opacity(0.3), radius: 20, x: 0, y: 10)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(ScaleButtonStyle(scale: 0.98))
                 }
                 .padding(.horizontal, 20)
                 

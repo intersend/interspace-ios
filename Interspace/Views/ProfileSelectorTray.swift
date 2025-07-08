@@ -10,42 +10,12 @@ struct ProfileSelectorTray: View {
     @State private var newProfileName = ""
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Liquid glass background
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        dismiss()
-                    }
-                
-                VStack(spacing: 0) {
-                    // Handle bar
-                    Capsule()
-                        .fill(Color.systemGray3)
-                        .frame(width: 36, height: 5)
-                        .padding(.top, 8)
-                        .padding(.bottom, 16)
-                    
-                    // Title
-                    HStack {
-                        Text("Switch Profile")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.label)
-                        
-                        Spacer()
-                        
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.systemGray3)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-                    
-                    // Profiles Grid
-                    ScrollView {
+        StandardTray(
+            title: "Switch Profile",
+            titleDisplayMode: .large,
+            onDismiss: { dismiss() }
+        ) {
+            ScrollView {
                         LazyVGrid(columns: [
                             GridItem(.flexible()),
                             GridItem(.flexible())
@@ -68,29 +38,9 @@ struct ProfileSelectorTray: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.7)
-                .background(
-                    RoundedRectangle(cornerRadius: 28)
-                        .fill(.regularMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 28)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
-                )
-                .padding(.horizontal, 10)
-                .padding(.bottom, 10)
-                .transition(.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .bottom).combined(with: .opacity)
-                ))
             }
-            .presentationDetents([.height(UIScreen.main.bounds.height * 0.7)])
-            .presentationDragIndicator(.hidden)
-            .interactiveDismissDisabled(false)
         }
+        .standardTrayStyle(presentationDetents: [.height(UIScreen.main.bounds.height * 0.7)])
         .alert("Create New Profile", isPresented: $showCreateProfile) {
             TextField("Profile Name", text: $newProfileName)
             Button("Cancel", role: .cancel) {

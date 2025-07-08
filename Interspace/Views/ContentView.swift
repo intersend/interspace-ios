@@ -45,7 +45,7 @@ struct ContentView: View {
                         .transition(.opacity)
                         
                 case .locked:
-                    LockedView()
+                    AuthenticationLockView()
                         .transition(.opacity)
                 }
             }
@@ -154,44 +154,6 @@ struct ErrorView: View {
                     }
                     .primaryButton()
                 }
-            }
-            .padding(DesignTokens.Spacing.lg)
-        }
-    }
-}
-
-// MARK: - Locked View
-
-struct LockedView: View {
-    @ObservedObject private var sessionCoordinator = SessionCoordinator.shared
-    
-    var body: some View {
-        ZStack {
-            DesignTokens.Colors.backgroundPrimary
-                .ignoresSafeArea()
-            
-            VStack(spacing: DesignTokens.Spacing.lg) {
-                Image(systemName: "lock.circle.fill")
-                    .font(.system(size: 64))
-                    .foregroundColor(DesignTokens.Colors.primary)
-                
-                VStack(spacing: DesignTokens.Spacing.sm) {
-                    Text("Session Locked")
-                        .font(DesignTokens.Typography.headlineSmall)
-                        .foregroundColor(DesignTokens.Colors.textPrimary)
-                    
-                    Text("Your session has been locked for security")
-                        .font(DesignTokens.Typography.bodyMedium)
-                        .foregroundColor(DesignTokens.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                
-                Button("Unlock with Face ID") {
-                    Task {
-                        await sessionCoordinator.verifyBiometricAccess()
-                    }
-                }
-                .primaryButton()
             }
             .padding(DesignTokens.Spacing.lg)
         }

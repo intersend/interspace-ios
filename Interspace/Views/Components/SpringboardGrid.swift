@@ -35,7 +35,7 @@ struct SpringboardGrid: View {
     private let topMargin: CGFloat = 20
     private let bottomMargin: CGFloat = 30
     
-    @State private var currentPage: Int? = 0
+    @State private var currentPage: Int = 0
     @State private var draggedItem: DraggedItem?
     @State private var dropTarget: DropTarget?
     @GestureState private var dragOffset: CGSize = .zero
@@ -63,35 +63,34 @@ struct SpringboardGrid: View {
                 VStack(spacing: 0) {
                 // No toolbar needed - tap outside to dismiss
                 
-                // Paged grid view
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 0) {
-                        ForEach(0..<numberOfPages, id: \.self) { page in
-                            SpringboardPage(
-                                items: itemsForPage(page),
-                                columns: columns,
-                                iconSize: iconSize,
-                                horizontalSpacing: horizontalSpacing,
-                                verticalSpacing: verticalSpacing,
-                                sideMargin: sideMargin,
-                                topMargin: topMargin,
-                                isEditMode: $isEditMode,
-                                draggedItem: $draggedItem,
-                                dropTarget: $dropTarget,
-                                screenWidth: screenWidth,
-                                onAppTap: onAppTap,
-                                onFolderTap: onFolderTap,
-                                onAddApp: onAddApp,
-                                onDragStart: handleDragStart,
-                                onDragEnd: handleDragEnd,
-                                onDropTargetChange: handleDropTargetChange,
-                                viewModel: viewModel
-                            )
-                            .frame(width: screenWidth)
-                        }
+                // Paged grid view using TabView for native paging
+                TabView(selection: $currentPage) {
+                    ForEach(0..<numberOfPages, id: \.self) { page in
+                        SpringboardPage(
+                            items: itemsForPage(page),
+                            columns: columns,
+                            iconSize: iconSize,
+                            horizontalSpacing: horizontalSpacing,
+                            verticalSpacing: verticalSpacing,
+                            sideMargin: sideMargin,
+                            topMargin: topMargin,
+                            isEditMode: $isEditMode,
+                            draggedItem: $draggedItem,
+                            dropTarget: $dropTarget,
+                            screenWidth: screenWidth,
+                            onAppTap: onAppTap,
+                            onFolderTap: onFolderTap,
+                            onAddApp: onAddApp,
+                            onDragStart: handleDragStart,
+                            onDragEnd: handleDragEnd,
+                            onDropTargetChange: handleDropTargetChange,
+                            viewModel: viewModel
+                        )
+                        .tag(page)
                     }
                 }
-                .scrollDisabled(isEditMode && draggedItem != nil)
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .disabled(isEditMode && draggedItem != nil)
                 
                 Spacer()
                 
@@ -99,7 +98,7 @@ struct SpringboardGrid: View {
                 if numberOfPages > 1 {
                     SpringboardPageIndicator(
                         numberOfPages: numberOfPages,
-                        currentPage: currentPage ?? 0
+                        currentPage: currentPage
                     )
                     .padding(.bottom, bottomMargin)
                 }
