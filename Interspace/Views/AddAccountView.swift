@@ -146,10 +146,35 @@ struct AddAccountView: View {
         }
         .sheet(item: $selectedWalletType) { walletType in
             WalletConnectionView(
-                walletType: walletType,
-                viewModel: viewModel,
-                onComplete: {
-                    dismiss()
+                isLinking: true,
+                onSuccess: { result in
+                    // Handle successful wallet connection
+                    Task {
+                        // Create WalletConnectionConfig from the result
+                        let config = WalletConnectionConfig(
+                            strategy: .wallet,
+                            walletType: result.walletType.rawValue,
+                            email: nil,
+                            verificationCode: nil,
+                            walletAddress: result.address,
+                            signature: result.signature,
+                            message: result.message,
+                            socialProvider: nil,
+                            socialProfile: nil,
+                            oauthCode: nil,
+                            idToken: nil,
+                            accessToken: nil,
+                            shopDomain: nil
+                        )
+                        
+                        do {
+                            try await viewModel.linkWallet(config: config)
+                            dismiss()
+                        } catch {
+                            print("Failed to link wallet: \(error)")
+                            // Handle error appropriately
+                        }
+                    }
                 }
             )
         }

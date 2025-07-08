@@ -121,7 +121,17 @@ struct AccountDetailView: View {
                         Spacer()
                         if isEditingName {
                             TextField("Account Name", text: $customName)
-                                .textFieldStyle(LiquidGlassTextFieldStyle())
+                                .textFieldStyle(.plain)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Material.ultraThinMaterial)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                                        )
+                                )
                                 .multilineTextAlignment(.trailing)
                         } else {
                             Text(account.customName ?? "Default")

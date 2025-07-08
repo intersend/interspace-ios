@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Liquid Glass Design System for iOS 26
 
 // MARK: - Glass Material
-struct LiquidGlassMaterial: ViewModifier {
+struct SimpleLiquidGlassMaterial: ViewModifier {
     let intensity: Double
     let tint: Color
     
@@ -60,7 +60,7 @@ struct LiquidGlassMaterial: ViewModifier {
 }
 
 // MARK: - Liquid Button Style
-struct LiquidGlassButtonStyle: ButtonStyle {
+struct SimpleLiquidGlassButtonStyle: ButtonStyle {
     let isProminent: Bool
     let tint: Color
     
@@ -127,7 +127,7 @@ struct LiquidGlassCard<Content: View>: View {
     var body: some View {
         content
             .padding(padding)
-            .modifier(LiquidGlassMaterial())
+            .modifier(SimpleLiquidGlassMaterial())
             .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
 }

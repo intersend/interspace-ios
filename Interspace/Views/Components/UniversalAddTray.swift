@@ -660,12 +660,10 @@ struct UniversalAddTray: View {
         if let walletType = selectedWalletType {
             if isForAuthentication {
                 WalletConnectionView(
-                    walletType: walletType,
-                    viewModel: authViewModel ?? AuthViewModel(),
-                    onComplete: {
+                    isLinking: false,
+                    onSuccess: { result in
                         isPresented = false
-                    },
-                    isForAuthentication: true
+                    }
                 )
             } else {
                 WalletAuthorizationTray(
@@ -689,9 +687,8 @@ struct UniversalAddTray: View {
     private var walletConnectionSheet: some View {
         if let walletType = selectedWalletType {
             WalletConnectionView(
-                walletType: walletType,
-                viewModel: profileViewModel,
-                onComplete: {
+                isLinking: true,
+                onSuccess: { result in
                     isPresented = false
                 }
             )

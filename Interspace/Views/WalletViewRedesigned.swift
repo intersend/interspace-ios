@@ -5,6 +5,7 @@ struct WalletViewRedesigned: View {
     @State private var showTransactionHistory = false
     @State private var showSendSheet = false
     @State private var showReceiveSheet = false
+    @State private var showSwapSheet = false
     @State private var selectedToken: UnifiedBalance.TokenBalance?
     @State private var showUniversalAddTray = false
     @State private var showAbout = false
@@ -35,7 +36,7 @@ struct WalletViewRedesigned: View {
                                 showReceiveSheet = true
                             },
                             onSwap: {
-                                // Swap functionality
+                                showSwapSheet = true
                             }
                         )
                     } else if viewModel.isLoading {
@@ -107,10 +108,15 @@ struct WalletViewRedesigned: View {
             TransactionHistoryView()
         }
         .sheet(isPresented: $showSendSheet) {
-            SendTokenSheet(selectedToken: selectedToken)
+            SendTokenSheet()
+                .environmentObject(viewModel)
         }
         .sheet(isPresented: $showReceiveSheet) {
-            ReceiveSheet()
+            ReceiveTokenSheet()
+        }
+        .sheet(isPresented: $showSwapSheet) {
+            SwapTokenSheet()
+                .environmentObject(viewModel)
         }
         .sheet(isPresented: $showAbout) {
             ProfileAboutView()

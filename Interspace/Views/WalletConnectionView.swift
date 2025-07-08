@@ -1,802 +1,347 @@
 import SwiftUI
-import AVFoundation
+import Combine
 
-// Protocol for wallet connection handling
-protocol WalletConnectionHandler: ObservableObject {
-    func handleWalletConnection(walletType: WalletType, address: String, signature: String, message: String) async throws
-}
-
-// Make ProfileViewModel conform to the protocol
-extension ProfileViewModel: WalletConnectionHandler {
-    func handleWalletConnection(walletType: WalletType, address: String, signature: String, message: String) async throws {
-        if AuthenticationManagerV2.shared.isAuthenticated {
-            // Linking flow - use AccountLinkingService for consistency
-            try await AccountLinkingService.shared.linkWalletAccount(
-                address: address,
-                signature: signature,
-                message: message,
-                walletType: walletType.rawValue
-            )
-            // Refresh profile data
-            await refreshProfile()
-        } else {
-            // Authentication flow
-            let config = WalletConnectionConfig(
-                strategy: .wallet,
-                walletType: walletType.rawValue,
-                email: nil,
-                verificationCode: nil,
-                walletAddress: address,
-                signature: signature,
-                message: message,
-                socialProvider: nil,
-                socialProfile: nil,
-                oauthCode: nil,
-                idToken: nil,
-                accessToken: nil,
-                shopDomain: nil
-            )
-            try await AuthenticationManagerV2.shared.authenticate(with: config)
-        }
-    }
-}
-
-// Make AuthViewModel conform to the protocol
-extension AuthViewModel: WalletConnectionHandler {
-    func handleWalletConnection(walletType: WalletType, address: String, signature: String, message: String) async throws {
-        // Authentication logic
-        let config = WalletConnectionConfig(
-            strategy: .wallet,
-            walletType: walletType.rawValue,
-            email: nil,
-            verificationCode: nil,
-            walletAddress: address,
-            signature: signature,
-            message: message,
-            socialProvider: nil,
-            socialProfile: nil,
-            oauthCode: nil,
-            idToken: nil,
-            accessToken: nil,
-            shopDomain: nil
-        )
-        try await authManager.authenticate(with: config)
-    }
-}
-
-struct WalletConnectionView<ViewModel: WalletConnectionHandler>: View {
-    let walletType: WalletType
-    @ObservedObject var viewModel: ViewModel
-    let onComplete: () -> Void
-    var isForAuthentication: Bool = false
-    
-    @Environment(\.dismiss) private var dismiss
-    @State private var isConnecting = false
-    @State private var connectionError: String?
-    @State private var connectedAddress: String?
-    @State private var customName: String = ""
-    @State private var walletSignature: String?
-    @State private var walletMessage: String?
-    @State private var showProfileCreation = false
-    @State private var needsProfileCreation = false
-    @State private var connectionState: ConnectionState = .idle
-    @State private var hasStartedConnection = false
-    @State private var connectionStartTime: Date?
-    @State private var showRetryButton = false
-    @State private var timeoutTimer: Timer?
-    @State private var showQRScanner = false
-    @State private var showWalletConnectOptions = false
-    
+/// Enhanced wallet connection view with Apple-like smoothness
+struct WalletConnectionView: View {
     @StateObject private var walletService = WalletService.shared
-    @StateObject private var authManager = AuthenticationManagerV2.shared
-    @StateObject private var sessionCoordinator = SessionCoordinator.shared
+    @StateObject private var connectionManager = WalletConnectionManager.shared
+    @State private var selectedWallet: WalletType?
+    @State private var showingProgress = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    @State private var retryCount = 0
+    @Environment(\.dismiss) var dismiss
     
-    enum ConnectionState: Equatable {
-        case idle
-        case connecting
-        case waitingForUser  // New state for when waiting for user action in wallet
-        case signing
-        case linking
-        case success
-        case error(String)
-        case timeout  // New state for timeout
+    let onSuccess: (WalletConnectionResult) -> Void
+    let isLinking: Bool
+    
+    init(isLinking: Bool = false, onSuccess: @escaping (WalletConnectionResult) -> Void) {
+        self.isLinking = isLinking
+        self.onSuccess = onSuccess
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
+                // Background
                 DesignTokens.Colors.backgroundPrimary
                     .ignoresSafeArea()
                 
-                VStack(spacing: 24) {
-                    // Wallet Icon
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(walletType.primaryColor.opacity(0.15))
-                            .frame(width: 80, height: 80)
-                        
-                        Image(systemName: walletType.systemIconName)
-                            .font(.system(size: 40, weight: .medium))
-                            .foregroundColor(walletType.primaryColor)
-                    }
-                    .padding(.top, 40)
-                    
-                    // Title
-                    VStack(spacing: 8) {
-                        Text("Connect \(walletType.displayName)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(DesignTokens.Colors.textPrimary)
-                        
-                        Text("Authorize Interspace to connect to your wallet")
-                            .font(.body)
-                            .foregroundColor(DesignTokens.Colors.textSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.horizontal, 40)
-                    
-                    Spacer()
-                    
-                    // Dynamic content based on state
-                    switch connectionState {
-                    case .idle:
-                        // Connect Button
-                        Button(action: connectWallet) {
-                            HStack {
-                                Image(systemName: walletType.systemIconName)
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundColor(.white)
-                                
-                                Text("Connect \(walletType.displayName)")
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(walletType.primaryColor)
-                            .cornerRadius(12)
-                        }
-                        .padding(.horizontal, 40)
-                        
-                    case .connecting:
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: walletType.primaryColor))
-                                .scaleEffect(1.2)
-                            
-                            Text("Opening \(walletType.displayName)...")
-                                .font(.body)
-                                .foregroundColor(DesignTokens.Colors.textSecondary)
-                            
-                            Text("This will open the \(walletType.displayName) app")
-                                .font(.caption)
-                                .foregroundColor(DesignTokens.Colors.textTertiary)
-                        }
-                        
-                    case .waitingForUser:
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: walletType.primaryColor))
-                                .scaleEffect(1.2)
-                            
-                            Text("Waiting for confirmation...")
-                                .font(.body)
-                                .foregroundColor(DesignTokens.Colors.textSecondary)
-                            
-                            Text("Please confirm in \(walletType.displayName)")
-                                .font(.caption)
-                                .foregroundColor(DesignTokens.Colors.textTertiary)
-                            
-                            if showRetryButton {
-                                VStack(spacing: 12) {
-                                    Text("Taking longer than usual...")
-                                        .font(.caption)
-                                        .foregroundColor(.orange)
-                                    
-                                    Button(action: retryConnection) {
-                                        Text("Try Again")
-                                            .font(.body)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(DesignTokens.Colors.primary)
-                                    }
-                                }
-                                .padding(.top, 8)
-                                .transition(.opacity)
-                            }
-                        }
-                        .padding(.vertical, 40)
-                        
-                    case .signing:
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: walletType.primaryColor))
-                                .scaleEffect(1.2)
-                            
-                            Text("Please sign the message in \(walletType.displayName)")
-                                .font(.body)
-                                .foregroundColor(DesignTokens.Colors.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 20)
-                        }
-                        .padding(.vertical, 40)
-                        
-                    case .linking:
-                        VStack(spacing: 20) {
-                            // Linking animation
-                            Image(systemName: "link.circle.fill")
-                                .font(.system(size: 60))
-                                .foregroundColor(walletType.primaryColor)
-                                .scaleEffect(connectionState == .linking ? 1.1 : 1.0)
-                                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: connectionState == .linking)
-                            
-                            Text(isForAuthentication ? "Setting up your account..." : "Adding to your profile...")
-                                .font(.body)
-                                .foregroundColor(DesignTokens.Colors.textSecondary)
-                            
-                            if let address = connectedAddress {
-                                Text(address)
-                                    .font(.system(size: 13, design: .monospaced))
-                                    .foregroundColor(DesignTokens.Colors.textTertiary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                    .padding(.horizontal, 40)
-                            }
-                        }
-                        .padding(.vertical, 40)
-                        
-                    case .success:
-                        VStack(spacing: 20) {
-                            // Success Icon
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 80))
-                                .foregroundColor(.green)
-                            
-                            Text("Success!")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(DesignTokens.Colors.textPrimary)
-                            
-                            Text(isForAuthentication ? "Your wallet is connected" : "Wallet added to profile")
-                                .font(.body)
-                                .foregroundColor(DesignTokens.Colors.textSecondary)
-                        }
-                        .padding(.vertical, 40)
-                        .onAppear {
-                            // Auto-dismiss after showing success
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                onComplete()
-                            }
-                        }
-                        
-                    case .error(let error):
-                        VStack(spacing: 20) {
-                            // Error Icon
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 60))
-                                .foregroundColor(.red)
-                            
-                            // Error Message
-                            VStack(spacing: 8) {
-                                Text("Connection Failed")
-                                    .font(.headline)
-                                    .foregroundColor(DesignTokens.Colors.textPrimary)
-                                
-                                Text(error)
-                                    .font(.subheadline)
-                                    .foregroundColor(DesignTokens.Colors.textSecondary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 40)
-                            }
-                            
-                            // Action Buttons
-                            HStack(spacing: 12) {
-                                Button(action: { dismiss() }) {
-                                    Text("Cancel")
-                                        .font(.body)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(DesignTokens.Colors.textSecondary)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(DesignTokens.Colors.borderPrimary, lineWidth: 1)
-                                        )
-                                }
-                                
-                                Button(action: retryConnection) {
-                                    Text("Try Again")
-                                        .font(.body)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
-                                        .background(walletType.primaryColor)
-                                        .cornerRadius(12)
-                                }
-                            }
-                            .padding(.horizontal, 40)
-                        }
-                        
-                    case .timeout:
-                        VStack(spacing: 20) {
-                            // Timeout Icon
-                            Image(systemName: "clock.badge.exclamationmark.fill")
-                                .font(.system(size: 60))
-                                .foregroundColor(.orange)
-                            
-                            // Timeout Message
-                            VStack(spacing: 8) {
-                                Text("Connection Timed Out")
-                                    .font(.headline)
-                                    .foregroundColor(DesignTokens.Colors.textPrimary)
-                                
-                                Text("The connection is taking too long. Please try again.")
-                                    .font(.subheadline)
-                                    .foregroundColor(DesignTokens.Colors.textSecondary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 40)
-                            }
-                            
-                            // Retry Button
-                            Button(action: retryConnection) {
-                                Text("Try Again")
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(walletType.primaryColor)
-                                    .cornerRadius(12)
-                            }
-                            .padding(.horizontal, 40)
-                        }
-                    }
-                    
-                    Spacer()
+                // Main content
+                if showingProgress, let wallet = selectedWallet {
+                    ConnectionProgressView(
+                        walletType: wallet,
+                        onCancel: cancelConnection,
+                        onRetry: retryConnection
+                    )
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
+                } else {
+                    walletSelectionView
+                        .transition(.opacity)
                 }
             }
+            .navigationTitle(isLinking ? "Link Wallet" : "Connect Wallet")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(DesignTokens.Colors.primary)
                 }
             }
         }
-        .sheet(isPresented: $showProfileCreation) {
-            NativeCreateProfileView { profileName in
-                Task {
-                    // After profile creation, complete the authentication
-                    await handlePostProfileCreation(profileName: profileName)
-                }
+        .alert("Connection Error", isPresented: $showingError) {
+            Button("Try Again", action: retryConnection)
+            Button("Cancel", role: .cancel) {
+                cancelConnection()
             }
+        } message: {
+            Text(errorMessage)
         }
-        .onDisappear {
-            // Clean up timer
-            timeoutTimer?.invalidate()
+        .onReceive(connectionManager.$connectionState) { state in
+            handleConnectionStateChange(state)
         }
-        .sheet(isPresented: $showQRScanner) {
-            QRCodeScannerView { uri in
-                Task {
-                    await handleWalletConnectURI(uri)
+    }
+    
+    // MARK: - Wallet Selection View
+    
+    @ViewBuilder
+    private var walletSelectionView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Header
+                VStack(spacing: 8) {
+                    Image(systemName: "wallet.pass")
+                        .font(.system(size: 48))
+                        .foregroundColor(DesignTokens.Colors.primary)
+                    
+                    Text(isLinking ? "Choose a wallet to link" : "Choose a wallet to connect")
+                        .font(.title3)
+                        .foregroundColor(DesignTokens.Colors.textSecondary)
                 }
-            }
-        }
-        .sheet(isPresented: $showWalletConnectOptions) {
-            WalletConnectOptionsView(isPresented: $showWalletConnectOptions) { walletScheme in
-                Task {
-                    // If walletScheme is nil, show QR scanner
-                    if walletScheme == nil {
-                        await MainActor.run {
-                            showQRScanner = true
+                .padding(.top, 20)
+                .padding(.bottom, 10)
+                
+                // Popular wallets section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("POPULAR")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(DesignTokens.Colors.textTertiary)
+                        .padding(.horizontal)
+                    
+                    VStack(spacing: 0) {
+                        ForEach(popularWallets, id: \.self) { wallet in
+                            WalletRowView(
+                                wallet: wallet,
+                                isInstalled: walletService.isWalletAvailable(wallet),
+                                onTap: { selectWallet(wallet) }
+                            )
+                            
+                            if wallet != popularWallets.last {
+                                Divider()
+                                    .padding(.leading, 76)
+                            }
                         }
-                    } else {
-                        // Handle deep link connection
-                        await handleWalletConnectDeepLink()
                     }
+                    .background(DesignTokens.Colors.backgroundSecondary)
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
+                
+                // All wallets section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("ALL WALLETS")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(DesignTokens.Colors.textTertiary)
+                        .padding(.horizontal)
+                    
+                    VStack(spacing: 0) {
+                        ForEach(otherWallets, id: \.self) { wallet in
+                            WalletRowView(
+                                wallet: wallet,
+                                isInstalled: walletService.isWalletAvailable(wallet),
+                                onTap: { selectWallet(wallet) }
+                            )
+                            
+                            if wallet != otherWallets.last {
+                                Divider()
+                                    .padding(.leading, 76)
+                            }
+                        }
+                    }
+                    .background(DesignTokens.Colors.backgroundSecondary)
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
+                
+                // Footer hint
+                Text("Tap any wallet to connect")
+                    .font(.caption)
+                    .foregroundColor(DesignTokens.Colors.textTertiary)
+                    .padding(.top, 20)
+                    .padding(.bottom, 40)
+            }
+        }
+    }
+    
+    // MARK: - Helper Properties
+    
+    private var popularWallets: [WalletType] {
+        [.metamask, .coinbase, .rainbow, .trust]
+    }
+    
+    private var otherWallets: [WalletType] {
+        [.argent, .phantom, .zerion, .oneInch, .imToken, .walletConnect]
+            .filter { walletService.isWalletAvailable($0) || WalletConfiguration.configuration(for: $0).universalLinkDomain != nil }
+    }
+    
+    // MARK: - Actions
+    
+    private func selectWallet(_ wallet: WalletType) {
+        // Haptic feedback
+        HapticManager.selection()
+        
+        selectedWallet = wallet
+        withAnimation(.spring()) {
+            showingProgress = true
+        }
+        
+        // Start connection
+        Task {
+            do {
+                let result = try await walletService.connectWallet(wallet)
+                await MainActor.run {
+                    onSuccess(result)
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    handleConnectionError(error)
                 }
             }
         }
     }
     
-    private func connectWallet() {
-        // Prevent multiple connection attempts
-        guard !hasStartedConnection && !isConnecting else {
-            print("💳 WalletConnectionView: Connection already in progress, ignoring")
-            return
-        }
+    private func cancelConnection() {
+        HapticManager.impact(.light)
         
-        hasStartedConnection = true
-        isConnecting = true
-        connectionError = nil
-        connectionState = .connecting
-        connectionStartTime = Date()
-        showRetryButton = false
+        connectionManager.cancelConnection()
         
-        // Start timeout monitoring
-        startTimeoutMonitoring()
-        
-        // Debug MetaMask state before connecting
-        if walletType == .metamask {
-            WalletService.shared.debugMetaMaskState()
-        }
-        
-        Task {
-            do {
-                // Small delay to show the "Opening wallet" state
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                
-                // Step 1: Connect and get signature
-                await MainActor.run {
-                    connectionState = .waitingForUser
-                }
-                
-                let result: WalletConnectionResult
-                
-                if walletType == .walletConnect {
-                    // For WalletConnect, show wallet options
-                    print("🔍 DEBUG: WalletConnect selected, showing options sheet")
-                    await MainActor.run {
-                        showWalletConnectOptions = true
-                        connectionState = .idle // Reset state while showing options
-                        isConnecting = false
-                        hasStartedConnection = false
-                    }
-                    return // Exit early, connection will continue from wallet selection
-                } else {
-                    result = try await walletService.connectWallet(walletType)
-                }
-                
-                await MainActor.run {
-                    connectedAddress = result.address
-                    walletSignature = result.signature
-                    walletMessage = result.message
-                    HapticManager.notification(.success)
-                }
-                
-                // Step 2: Automatically proceed with linking/auth
-                await MainActor.run {
-                    connectionState = .linking
-                }
-                
-                if isForAuthentication {
-                    // Authentication flow
-                    try await performAuthentication()
-                } else {
-                    // Profile linking flow - directly link without additional UI
-                    try await performLinking()
-                }
-                
-                // Success!
-                await MainActor.run {
-                    connectionState = .success
-                    isConnecting = false
-                }
-                
-            } catch let error as WalletError {
-                await MainActor.run {
-                    connectionError = error.localizedDescription
-                    connectionState = .error(error.localizedDescription)
-                    isConnecting = false
-                    hasStartedConnection = false // Reset for retry
-                    HapticManager.notification(.error)
-                }
-            } catch {
-                // Stop timeout monitoring
-                timeoutTimer?.invalidate()
-                
-                await MainActor.run {
-                    // Check if it's a user cancellation
-                    if let walletError = error as? WalletError, case .userCancelled = walletError {
-                        connectionError = "Connection cancelled"
-                        connectionState = .error("Connection cancelled. Please try again when ready.")
-                    } else if error.localizedDescription.contains("timed out") {
-                        connectionState = .timeout
-                    } else {
-                        connectionError = error.localizedDescription
-                        connectionState = .error(error.localizedDescription)
-                    }
-                    
-                    isConnecting = false
-                    hasStartedConnection = false // Reset for retry
-                    HapticManager.notification(.error)
-                }
-            }
+        withAnimation(.spring()) {
+            showingProgress = false
+            selectedWallet = nil
         }
     }
     
     private func retryConnection() {
-        // Force reset wallet service state if needed
-        if walletService.isConnectionInProgress {
-            walletService.forceResetConnection()
-        }
+        guard let wallet = selectedWallet else { return }
         
-        // Reset UI state
-        hasStartedConnection = false
-        isConnecting = false
-        connectionError = nil
-        connectionState = .idle
-        showRetryButton = false
+        retryCount += 1
+        HapticManager.impact(.light)
         
-        // Add small delay then retry
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            connectWallet()
-        }
-    }
-    
-    private func startTimeoutMonitoring() {
-        // Cancel any existing timer
-        timeoutTimer?.invalidate()
+        // Reset error state
+        showingError = false
+        errorMessage = ""
         
-        // Show retry button after 15 seconds
-        timeoutTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { _ in
-            if connectionState == .waitingForUser {
-                withAnimation {
-                    showRetryButton = true
-                }
-            }
-        }
-    }
-    
-    private func performLinking() async throws {
-        guard let signature = walletSignature,
-              let message = walletMessage,
-              let address = connectedAddress else {
-            throw WalletError.signatureFailed("Missing signature or message")
-        }
+        // Retry with exponential backoff
+        let delay = min(Double(retryCount) * 0.5, 3.0)
         
-        // Use the protocol method for wallet connection
-        try await viewModel.handleWalletConnection(
-            walletType: walletType,
-            address: address,
-            signature: signature,
-            message: message
-        )
-    }
-    
-    private func performAuthentication() async throws {
-        guard let address = connectedAddress,
-              let signature = walletSignature,
-              let message = walletMessage else {
-            throw WalletError.signatureFailed("Missing signature or message")
-        }
-        
-        do {
-            // Use the protocol method for wallet connection
-            try await viewModel.handleWalletConnection(
-                walletType: walletType,
-                address: address,
-                signature: signature,
-                message: message
-            )
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             
-        } catch let error as AuthenticationError {
-            // If authentication fails, it might be a new wallet
-            if error.localizedDescription.contains("not found") || 
-               error.localizedDescription.contains("no account") ||
-               error.localizedDescription.contains("no profile") {
-                print("🔐 New wallet detected, needs profile creation")
+            do {
+                let result = try await walletService.connectWallet(wallet)
                 await MainActor.run {
-                    needsProfileCreation = true
-                    showProfileCreation = true
-                    connectionState = .idle // Reset state for profile creation
+                    onSuccess(result)
+                    dismiss()
                 }
-                throw error // Re-throw to stop the success state
-            } else {
-                // Other authentication errors
-                throw error
-            }
-        }
-    }
-    
-    private func handlePostProfileCreation(profileName: String) async {
-        guard let address = connectedAddress,
-              let signature = walletSignature,
-              let message = walletMessage else { return }
-        
-        await MainActor.run {
-            connectionState = .linking
-        }
-        
-        do {
-            // Create the authentication config
-            let config = WalletConnectionConfig(
-                strategy: .wallet,
-                walletType: walletType.rawValue,
-                email: nil,
-                verificationCode: nil,
-                walletAddress: address,
-                signature: signature,
-                message: message,
-                socialProvider: nil,
-                socialProfile: nil,
-                oauthCode: nil,
-                idToken: nil,
-                accessToken: nil,
-                shopDomain: nil
-            )
-            
-            // Authenticate with the wallet
-            try await authManager.authenticate(with: config)
-            
-            // Create the profile
-            await sessionCoordinator.createInitialProfile(name: profileName)
-            
-            await MainActor.run {
-                connectionState = .success
-                dismiss()
-                // Navigation to Apps view will be handled by ContentView
-            }
-        } catch {
-            print("Error during post-profile creation: \(error)")
-            await MainActor.run {
-                connectionError = "Failed to complete setup: \(error.localizedDescription)"
-                connectionState = .error(error.localizedDescription)
-            }
-        }
-    }
-    
-    private func handleWalletConnectDeepLink() async {
-        showWalletConnectOptions = false
-        
-        // Reset connection state
-        await MainActor.run {
-            hasStartedConnection = true
-            isConnecting = true
-            connectionError = nil
-            connectionState = .connecting
-            connectionStartTime = Date()
-            showRetryButton = false
-        }
-        
-        // Start timeout monitoring
-        startTimeoutMonitoring()
-        
-        do {
-            // Small delay to show the "Connecting" state
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            
-            await MainActor.run {
-                connectionState = .waitingForUser
-            }
-            
-            // Connect using deep linking approach
-            let result = try await walletService.handleWalletConnected()
-            
-            await MainActor.run {
-                connectedAddress = result.address
-                walletSignature = result.signature
-                walletMessage = result.message
-                HapticManager.notification(.success)
-            }
-            
-            // Proceed with linking/auth
-            await MainActor.run {
-                connectionState = .linking
-            }
-            
-            if isForAuthentication {
-                try await performAuthentication()
-            } else {
-                try await performLinking()
-            }
-            
-            // Success!
-            await MainActor.run {
-                connectionState = .success
-                isConnecting = false
-            }
-            
-        } catch let error as WalletError {
-            await MainActor.run {
-                connectionError = error.localizedDescription
-                connectionState = .error(error.localizedDescription)
-                isConnecting = false
-                hasStartedConnection = false // Reset for retry
-                
-                if error.localizedDescription.contains("User rejected") {
-                    HapticManager.notification(.error)
-                } else if error.localizedDescription.contains("time") || 
-                          error.localizedDescription.contains("pending") {
-                    // Show timeout UI
-                    connectionState = .timeout
+            } catch {
+                await MainActor.run {
+                    handleConnectionError(error)
                 }
             }
-        } catch {
-            await MainActor.run {
-                connectionError = error.localizedDescription
-                connectionState = .error(error.localizedDescription)
-                isConnecting = false
-                hasStartedConnection = false // Reset for retry
-                HapticManager.notification(.error)
-            }
         }
     }
     
-    private func handleWalletConnectURI(_ uri: String) async {
-        showQRScanner = false
-        
-        // Reset connection state
-        await MainActor.run {
-            hasStartedConnection = true
-            isConnecting = true
-            connectionError = nil
-            connectionState = .connecting
-            connectionStartTime = Date()
-            showRetryButton = false
+    private func handleConnectionStateChange(_ state: WalletConnectionManager.ConnectionState) {
+        switch state {
+        case .connected(_, _):
+            // Success handled in selectWallet
+            break
+            
+        case .failed(let error):
+            handleConnectionError(error)
+            
+        case .timeout:
+            errorMessage = "Connection timed out. Make sure the wallet app is open and try again."
+            showingError = true
+            
+        default:
+            break
         }
+    }
+    
+    private func handleConnectionError(_ error: Error) {
+        let walletError = error as? WalletError ?? WalletError.connectionFailed(error.localizedDescription)
         
-        // Start timeout monitoring
-        startTimeoutMonitoring()
-        
-        do {
-            // Small delay to show the "Connecting" state
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            
-            await MainActor.run {
-                connectionState = .waitingForUser
+        switch walletError {
+        case .userCancelled:
+            // User cancelled, just go back to selection
+            withAnimation(.spring()) {
+                showingProgress = false
             }
             
-            // Connect using WalletConnect URI
-            let result = try await walletService.connectWithWalletConnectURI(uri)
+        case .qrCodeScanRequired:
+            // This is handled by the WalletConnect flow
+            break
             
-            await MainActor.run {
-                connectedAddress = result.address
-                walletSignature = result.signature
-                walletMessage = result.message
-                HapticManager.notification(.success)
-            }
+        default:
+            errorMessage = walletError.localizedDescription
+            showingError = true
             
-            // Proceed with linking/auth
-            await MainActor.run {
-                connectionState = .linking
-            }
-            
-            if isForAuthentication {
-                try await performAuthentication()
-            } else {
-                try await performLinking()
-            }
-            
-            // Success!
-            await MainActor.run {
-                connectionState = .success
-                isConnecting = false
-            }
-            
-        } catch let error as WalletError {
-            await MainActor.run {
-                connectionError = error.localizedDescription
-                connectionState = .error(error.localizedDescription)
-                isConnecting = false
-                hasStartedConnection = false
-                HapticManager.notification(.error)
-            }
-        } catch {
-            await MainActor.run {
-                connectionError = error.localizedDescription
-                connectionState = .error(error.localizedDescription)
-                isConnecting = false
-                hasStartedConnection = false
-                HapticManager.notification(.error)
+            if retryCount >= 3 {
+                // After 3 retries, go back to selection
+                withAnimation(.spring()) {
+                    showingProgress = false
+                    selectedWallet = nil
+                    retryCount = 0
+                }
             }
         }
     }
 }
 
+// MARK: - Wallet Row View
+
+struct WalletRowView: View {
+    let wallet: WalletType
+    let isInstalled: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 16) {
+                // Wallet icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(wallet.primaryColor.opacity(0.1))
+                        .frame(width: 48, height: 48)
+                    
+                    if let icon = UIImage(named: wallet.icon) {
+                        Image(uiImage: icon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 32, height: 32)
+                    } else {
+                        Image(systemName: wallet.systemIconName)
+                            .font(.system(size: 24))
+                            .foregroundColor(wallet.primaryColor)
+                    }
+                }
+                
+                // Wallet info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(wallet.displayName)
+                        .font(.body)
+                        .foregroundColor(DesignTokens.Colors.textPrimary)
+                    
+                    if !isInstalled {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.caption2)
+                            Text("Tap to install")
+                                .font(.caption)
+                        }
+                        .foregroundColor(DesignTokens.Colors.textTertiary)
+                    }
+                }
+                
+                Spacer()
+                
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(DesignTokens.Colors.textTertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
 
 // MARK: - Preview
 
 struct WalletConnectionView_Previews: PreviewProvider {
     static var previews: some View {
-        WalletConnectionView(
-            walletType: .metamask,
-            viewModel: ProfileViewModel.shared,
-            onComplete: {}
-        )
-        .preferredColorScheme(.dark)
+        WalletConnectionView { result in
+            print("Connected: \(result.address)")
+        }
     }
 }

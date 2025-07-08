@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LoadingOverlay: View {
     @State private var isAnimating = false
+    var message: String = "Loading..."
     var allowsInteraction: Bool = false
     
     var body: some View {
@@ -31,7 +32,7 @@ struct LoadingOverlay: View {
                         )
                 }
                 
-                Text("Loading...")
+                Text(message)
                     .font(DesignTokens.Typography.bodyMedium)
                     .foregroundColor(DesignTokens.Colors.textSecondary)
             }
