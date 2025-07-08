@@ -21,6 +21,9 @@ final class WalletConnectService: ObservableObject {
     private var currentAddress: String?
     private var signingCompletion: ((Result<String, Error>) -> Void)?
     
+    // Connection management
+    private let connectionManager = WalletConnectionManager.shared
+    
     // Project configuration
     private let projectId: String
     private let relayHost = "relay.walletconnect.com"
@@ -288,6 +291,11 @@ final class WalletConnectService: ObservableObject {
         // Store current address for verification
         currentAddress = address
         
+        // Notify connection manager that we're signing
+        await MainActor.run {
+            connectionManager.handleWalletConnectEvent(.signingMessage)
+        }
+        
         // Create personal_sign request
         guard let blockchain = Blockchain("eip155:1") else { // Ethereum mainnet
             throw WalletConnectError.invalidResponse
@@ -392,6 +400,9 @@ final class WalletConnectService: ObservableObject {
         
         // Store but don't auto-approve
         self.pendingProposal = proposal
+        
+        // Notify connection manager
+        connectionManager.handleWalletConnectEvent(.sessionProposed)
     }
     
     private func approveSessionAsWallet(_ proposal: Session.Proposal) async {
@@ -580,6 +591,9 @@ final class WalletConnectService: ObservableObject {
         }
         
         print("✅ WalletConnectService: Session established for SIWE auth, wallet: \(self.currentAddress ?? "unknown")")
+        
+        // Notify connection manager
+        connectionManager.handleWalletConnectEvent(.sessionSettled)
     }
     
     @MainActor
@@ -682,8 +696,15 @@ final class WalletConnectService: ObservableObject {
             // Try to extract the signature string from the response
             if let signature = try? anyCodable.get(String.self) {
                 print("✅ WalletConnectService: Got signature: \(signature)")
+                
+                // Notify connection manager that we're verifying
+                connectionManager.handleWalletConnectEvent(.verifyingSignature)
+                
                 self.signingCompletion?(.success(signature))
                 self.signingCompletion = nil
+                
+                // Notify connection manager that connection is complete
+                connectionManager.handleWalletConnectEvent(.connectionComplete)
             } else {
                 print("❌ WalletConnectService: Could not extract signature from response")
                 self.signingCompletion?(.failure(WalletConnectError.invalidResponse))
@@ -693,6 +714,12 @@ final class WalletConnectService: ObservableObject {
         case .error(let jsonRPCError):
             // Handle error response
             print("❌ WalletConnectService: Request failed with error: \(jsonRPCError.message)")
+            
+            // Check if user rejected
+            if jsonRPCError.code == 4001 || jsonRPCError.message.lowercased().contains("reject") {
+                connectionManager.handleWalletConnectEvent(.sessionRejected)
+            }
+            
             self.signingCompletion?(.failure(WalletConnectError.signingFailed(jsonRPCError.message)))
             self.signingCompletion = nil
         }

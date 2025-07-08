@@ -334,6 +334,34 @@ final class WalletService: ObservableObject {
         // Initialize SDKs if needed (this is fast if already initialized)
         await initializeSDKsIfNeeded()
         
+        // Haptic feedback for connection start
+        await MainActor.run {
+            HapticManager.impact(.light)
+        }
+        
+        // Perform preflight checks
+        let preflightResult = await PreflightCheckManager.shared.performChecks(for: walletType)
+        
+        if !preflightResult.passed {
+            print("❌ WalletService: Preflight checks failed")
+            await MainActor.run {
+                HapticManager.notification(.error)
+            }
+            
+            if let blockingIssue = preflightResult.issues.first(where: { $0.severity == .blocking }) {
+                let walletError = WalletError.connectionFailed(blockingIssue.resolution ?? blockingIssue.message)
+                await MainActor.run {
+                    self.error = walletError
+                }
+                throw walletError
+            }
+        }
+        
+        // Show warnings if any
+        if let warning = preflightResult.issues.first(where: { $0.severity == .warning }) {
+            print("⚠️ WalletService: Preflight warning: \(warning.message)")
+        }
+        
         // Check if a connection is already in progress
         if isConnectionInProgress {
             // Check if it's a stuck connection
@@ -341,7 +369,7 @@ final class WalletService: ObservableObject {
                 let elapsed = Date().timeIntervalSince(startTime)
                 if elapsed > 10 { // If stuck for more than 10 seconds, allow retry
                     print("💰 WalletService: Previous connection appears stuck (\(elapsed)s), allowing retry")
-                    resetConnectionState(error: nil)
+                    resetConnectionState(error: nil as WalletError?)
                 } else {
                     print("💰 WalletService: Connection already in progress, please wait")
                     throw WalletError.connectionFailed("Connection in progress. Please wait...")
@@ -370,6 +398,8 @@ final class WalletService: ObservableObject {
         await MainActor.run {
             connectionStatus = .connecting
             error = nil
+            // Haptic feedback for state change
+            HapticManager.impact(.medium)
         }
         
         // Start connection timeout
@@ -401,10 +431,12 @@ final class WalletService: ObservableObject {
                 connectionStatus = .connected
                 connectedWallet = walletType
                 walletAddress = result.address
+                // Success haptic
+                HapticManager.notification(.success)
             }
             
             // Clear connection state on success
-            resetConnectionState(error: nil)
+            resetConnectionState(error: nil as WalletError?)
             
             return result
         } catch let walletError as WalletError {
@@ -416,6 +448,8 @@ final class WalletService: ObservableObject {
                 connectedWallet = nil
                 walletAddress = nil
                 error = walletError
+                // Error haptic
+                HapticManager.notification(.error)
             }
             throw walletError
         } catch {
@@ -429,6 +463,8 @@ final class WalletService: ObservableObject {
                 connectedWallet = nil
                 walletAddress = nil
                 self.error = walletError
+                // Error haptic
+                HapticManager.notification(.error)
             }
             throw walletError
         }
@@ -494,11 +530,11 @@ final class WalletService: ObservableObject {
             // Check if user cancelled
             let errorMessage = error.localizedDescription.lowercased()
             if errorMessage.contains("user denied") || errorMessage.contains("cancelled") || errorMessage.contains("rejected") {
-                resetConnectionState(error: nil)
+                resetConnectionState(error: nil as WalletError?)
                 throw WalletError.userCancelled
             }
             
-            resetConnectionState(error: nil)
+            resetConnectionState(error: nil as WalletError?)
             throw WalletError.connectionFailed(error.localizedDescription)
         }
         
@@ -1088,36 +1124,15 @@ final class WalletService: ObservableObject {
             return canOpenCoinbaseWallet()
         case .walletConnect:
             return true // Always available as it uses QR codes
-        case .rainbow:
-            return canOpenWallet(scheme: "rainbow://")
-        case .trust:
-            return canOpenWallet(scheme: "trust://")
-        case .argent:
-            return canOpenWallet(scheme: "argent://")
-        case .gnosisSafe:
-            return canOpenWallet(scheme: "gnosissafe://")
-        case .family:
-            return canOpenWallet(scheme: "family://")
-        case .phantom:
-            return canOpenWallet(scheme: "phantom://")
-        case .oneInch:
-            return canOpenWallet(scheme: "oneinch://")
-        case .zerion:
-            return canOpenWallet(scheme: "zerion://")
-        case .imToken:
-            return canOpenWallet(scheme: "imtoken://")
-        case .tokenPocket:
-            return canOpenWallet(scheme: "tokenpocket://")
-        case .spot:
-            return canOpenWallet(scheme: "spot://")
-        case .omni:
-            return canOpenWallet(scheme: "omni://")
         case .google, .apple:
             return true // Social authentication is always available
         case .mpc:
             return true // MPC wallets are always available
         case .safe, .ledger, .trezor, .unknown:
             return false // Not yet supported
+        default:
+            // Use the new WalletDeepLinkGenerator for all WalletConnect-based wallets
+            return WalletDeepLinkGenerator.shared.isWalletInstalled(walletType)
         }
     }
     
@@ -1209,7 +1224,7 @@ final class WalletService: ObservableObject {
     
     func forceResetConnection() {
         print("💰 WalletService: Force resetting connection")
-        resetConnectionState(error: nil)
+        resetConnectionState(error: nil as WalletError?)
         
         // Also clear any MetaMask state
         if let sdk = metamaskSDK {
@@ -1228,113 +1243,41 @@ final class WalletService: ObservableObject {
         print("📱 WalletService: Opening wallet app with deep link for \(walletType.displayName)")
         print("📱 WalletService: URI: \(uri)")
         
-        // Get the URL scheme for the wallet
-        let scheme: String
-        switch walletType {
-        case .metamask:
-            scheme = "metamask"
-        case .rainbow:
-            scheme = "rainbow"
-        case .trust:
-            scheme = "trust"
-        case .argent:
-            scheme = "argent"
-        case .gnosisSafe:
-            scheme = "gnosissafe"
-        case .family:
-            scheme = "family"
-        case .phantom:
-            scheme = "phantom"
-        case .oneInch:
-            scheme = "oneinch"
-        case .zerion:
-            scheme = "zerion"
-        case .imToken:
-            scheme = "imtoken"
-        case .tokenPocket:
-            scheme = "tokenpocket"
-        case .spot:
-            scheme = "spot"
-        case .omni:
-            scheme = "omni"
-        case .walletConnect:
-            // For generic WalletConnect, try to open the first available wallet
+        // Use the new WalletDeepLinkGenerator
+        let deepLinkGenerator = WalletDeepLinkGenerator.shared
+        let deepLinkResult = deepLinkGenerator.generateDeepLinks(for: walletType, uri: uri)
+        
+        // Handle generic WalletConnect type
+        if walletType == .walletConnect {
             let walletApps = getAvailableWalletApps()
-            if let firstApp = walletApps.first {
-                scheme = firstApp.scheme
-            } else {
+            if walletApps.isEmpty {
                 print("❌ WalletService: No compatible wallet apps found")
                 showNoWalletInstalledAlert()
                 return
             }
-        default:
-            print("❌ WalletService: No deep link scheme for \(walletType.displayName)")
+            // For generic WalletConnect, we already have logic in getAvailableWalletApps
+            // Just use the first available wallet
+        }
+        
+        // Check if wallet supports WalletConnect
+        if !WalletConfiguration.supportsWalletConnect(walletType) {
+            print("❌ WalletService: \(walletType.displayName) does not support WalletConnect")
+            showWalletOpenFailedAlert(walletType: walletType)
             return
         }
         
-        // Create the deep link URL based on wallet type
-        let deepLink: String
-        
-        // Special handling for Phantom wallet
-        if walletType == .phantom {
-            // Phantom uses a different deep link format
-            // First, ensure the URI is properly formatted
-            let encodedUri = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
-            deepLink = "phantom://wc?uri=\(encodedUri)"
-            print("📱 WalletService: Using Phantom-specific deep link format")
-        } else {
-            // Standard WalletConnect deep link format for other wallets
-            // Properly encode the URI
-            let encodedUri = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
-            deepLink = "\(scheme)://wc?uri=\(encodedUri)"
-        }
-        
-        print("📱 WalletService: Deep link: \(deepLink)")
-        print("📱 WalletService: Encoded URI: \(uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "encoding failed")")
-        
-        if let url = URL(string: deepLink) {
-            // Check if we can open the URL first
-            if UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url, options: [:]) { success in
-                    print("📱 WalletService: Opened \(walletType.displayName): \(success)")
-                    if !success {
-                        // Try alternative formats if the standard one fails
-                        if walletType == .phantom {
-                            // Try Phantom's universal link format
-                            self.tryPhantomUniversalLink(uri: uri)
-                        } else {
-                            self.showWalletOpenFailedAlert(walletType: walletType)
-                        }
-                    }
-                }
+        // Open wallet using the deep link generator
+        deepLinkGenerator.openWallet(with: deepLinkResult) { success in
+            if success {
+                print("📱 WalletService: Successfully opened \(walletType.displayName)")
             } else {
-                print("❌ WalletService: Cannot open \(walletType.displayName) - app not installed")
-                showWalletNotInstalledAlert(walletType: walletType)
+                print("❌ WalletService: Failed to open \(walletType.displayName)")
+                // The generator already handles fallback to App Store
             }
-        } else {
-            print("❌ WalletService: Invalid deep link URL")
-            showWalletOpenFailedAlert(walletType: walletType)
         }
     }
     
-    /// Try Phantom's universal link format as fallback
-    @MainActor
-    private func tryPhantomUniversalLink(uri: String) {
-        print("📱 WalletService: Trying Phantom universal link format")
-        
-        // Phantom also supports universal links
-        let encodedUri = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
-        let universalLink = "https://phantom.app/ul/v1/connect?uri=\(encodedUri)"
-        
-        if let url = URL(string: universalLink) {
-            UIApplication.shared.open(url, options: [:]) { success in
-                print("📱 WalletService: Opened Phantom via universal link: \(success)")
-                if !success {
-                    self.showWalletOpenFailedAlert(walletType: .phantom)
-                }
-            }
-        }
-    }
+    // Note: tryPhantomUniversalLink is now handled by WalletDeepLinkGenerator
     
     /// Show alert when wallet app is not installed
     @MainActor
@@ -1538,63 +1481,8 @@ struct WalletConnectionResult {
     let walletType: WalletType
 }
 
-enum WalletError: LocalizedError, Identifiable {
-    case sdkNotInitialized
-    case connectionFailed(String)
-    case signatureFailed(String)
-    case noAccountsFound
-    case userCancelled
-    case unsupportedWallet(String)
-    case networkError(String)
-    case qrCodeScanRequired
-    case showQRCode(String)
-    
-    var id: String {
-        switch self {
-        case .sdkNotInitialized:
-            return "sdkNotInitialized"
-        case .connectionFailed(let message):
-            return "connectionFailed_\(message)"
-        case .signatureFailed(let message):
-            return "signatureFailed_\(message)"
-        case .noAccountsFound:
-            return "noAccountsFound"
-        case .userCancelled:
-            return "userCancelled"
-        case .unsupportedWallet(let wallet):
-            return "unsupportedWallet_\(wallet)"
-        case .networkError(let message):
-            return "networkError_\(message)"
-        case .qrCodeScanRequired:
-            return "qrCodeScanRequired"
-        case .showQRCode(let uri):
-            return "showQRCode_\(uri)"
-        }
-    }
-    
-    var errorDescription: String? {
-        switch self {
-        case .sdkNotInitialized:
-            return "Wallet SDK not initialized"
-        case .connectionFailed(let message):
-            return "Connection failed: \(message)"
-        case .signatureFailed(let message):
-            return "Signature failed: \(message)"
-        case .noAccountsFound:
-            return "No wallet accounts found"
-        case .userCancelled:
-            return "User cancelled the operation"
-        case .unsupportedWallet(let wallet):
-            return "Unsupported wallet: \(wallet)"
-        case .networkError(let message):
-            return "Network error: \(message)"
-        case .qrCodeScanRequired:
-            return "QR code scan required"
-        case .showQRCode:
-            return "Show QR code for wallet to scan"
-        }
-    }
-}
+// WalletError is now defined in WalletErrors.swift as WalletConnectionError
+// The type alias in WalletErrors.swift provides backward compatibility
 
 // MARK: - Response Types
 // NonceResponse and NonceData are defined in SIWEModels.swift

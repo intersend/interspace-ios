@@ -158,7 +158,11 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
     // Check for WalletConnect URLs
     if url.scheme == "interspace" && url.host == "walletconnect" {
         print("📱 AppDelegate: Handling WalletConnect deep link")
-        // WalletConnect SDK handles these internally
+        // Notify WalletDeepLinkGenerator to handle the callback
+        let handled = WalletDeepLinkGenerator.shared.handleWalletReturn(url: url)
+        if handled {
+            print("📱 AppDelegate: WalletConnect callback handled successfully")
+        }
         return true
     }
     
@@ -200,16 +204,44 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
                 print("📱 AppDelegate: Error handling Coinbase universal link: \(error)")
             }
             
-//             if url.absoluteString.contains("wc") {
-//                 print("📱 AppDelegate: Handling WalletConnect universal link")
-//                 // Handle WalletConnect universal links
-//                 do {
-//                     try WalletKit.instance.dispatchEnvelope(url.absoluteString)
-//                     return true
-//                 } catch {
-//                     print("📱 AppDelegate: WalletConnect universal link handling error: \(error)")
-//                 }
-//             }
+            // Handle wallet universal links (Trust, Rainbow, Phantom, etc.)
+            let universalLinkDomains = [
+                "link.trustwallet.com": WalletType.trust,
+                "rnbwapp.com": WalletType.rainbow,
+                "phantom.app": WalletType.phantom,
+                "argent.link": WalletType.argent,
+                "safe.global": WalletType.gnosisSafe,
+                "1inch.io": WalletType.oneInch,
+                "app.zerion.io": WalletType.zerion
+            ]
+            
+            for (domain, walletType) in universalLinkDomains {
+                if url.absoluteString.contains(domain) {
+                    print("📱 AppDelegate: Detected \(walletType.displayName) universal link")
+                    
+                    // Check if this is a return from wallet after SIWE signing
+                    if url.absoluteString.contains("wc") || url.absoluteString.contains("walletconnect") {
+                        // This is likely a WalletConnect callback
+                        NotificationCenter.default.post(
+                            name: .walletConnectCallback,
+                            object: nil,
+                            userInfo: ["url": url, "walletType": walletType]
+                        )
+                        return true
+                    }
+                }
+            }
+            
+            // Handle generic WalletConnect universal links
+            if url.absoluteString.contains("wc") || url.absoluteString.contains("walletconnect") {
+                print("📱 AppDelegate: Handling WalletConnect universal link")
+                NotificationCenter.default.post(
+                    name: .walletConnectCallback,
+                    object: nil,
+                    userInfo: ["url": url]
+                )
+                return true
+            }
         }
         print("📱 AppDelegate: Universal link not handled")
         return false
