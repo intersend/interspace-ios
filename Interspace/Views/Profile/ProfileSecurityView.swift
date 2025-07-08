@@ -6,6 +6,10 @@ struct ProfileSecurityView: View {
     
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @State private var biometricType: LABiometryType = .none
+    @State private var showPINSetup = false
+    @State private var showPINChange = false
+    @State private var hasPIN = false
+    @StateObject private var pinManager = PINCodeManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -63,7 +67,46 @@ struct ProfileSecurityView: View {
                         .onChange(of: biometricLockEnabled) { newValue in
                             if newValue {
                                 authenticateWithBiometrics()
+                            } else {
+                                // When disabling Face ID, also remove the PIN
+                                Task {
+                                    try? await pinManager.removePIN()
+                                    await MainActor.run {
+                                        hasPIN = false
+                                    }
+                                }
                             }
+                        }
+                        
+                        // PIN Management
+                        if hasPIN && biometricLockEnabled {
+                            Button(action: {
+                                showPINChange = true
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "number.circle.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.orange)
+                                        .frame(width: 36, height: 36)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Change PIN")
+                                            .font(.body)
+                                            .foregroundColor(.white)
+                                        
+                                        Text("Update your 6-digit backup PIN")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                            .listRowBackground(Color(white: 0.1))
                         }
                     }
                     
@@ -96,6 +139,35 @@ struct ProfileSecurityView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             checkBiometricType()
+            checkPINStatus()
+        }
+        .sheet(isPresented: $showPINSetup) {
+            PINSetupView(
+                onSuccess: {
+                    showPINSetup = false
+                    hasPIN = true
+                    // PIN is now set, biometric lock is already enabled
+                    HapticManager.notification(.success)
+                },
+                onCancel: {
+                    showPINSetup = false
+                    // User cancelled PIN setup, disable biometric lock
+                    biometricLockEnabled = false
+                }
+            )
+        }
+        .sheet(isPresented: $showPINChange) {
+            // For PIN change, we'll show the setup view again
+            // In a real app, you might want to verify the old PIN first
+            PINSetupView(
+                onSuccess: {
+                    showPINChange = false
+                    HapticManager.notification(.success)
+                },
+                onCancel: {
+                    showPINChange = false
+                }
+            )
         }
     }
     
@@ -132,27 +204,48 @@ struct ProfileSecurityView: View {
         }
     }
     
+    private func checkPINStatus() {
+        Task {
+            let pinExists = await pinManager.hasPIN()
+            await MainActor.run {
+                hasPIN = pinExists
+            }
+        }
+    }
+    
     private func authenticateWithBiometrics() {
-        let context = LAContext()
-        var error: NSError?
-        
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            let reason = "Enable biometric authentication to secure your profile"
+        Task {
+            let hasPIN = await pinManager.hasPIN()
             
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, error in
-                DispatchQueue.main.async {
-                    if success {
-                        HapticManager.notification(.success)
+            await MainActor.run {
+                if !hasPIN {
+                    // Need to set up PIN first
+                    showPINSetup = true
+                } else {
+                    // PIN already set, proceed with biometric authentication
+                    let context = LAContext()
+                    var error: NSError?
+                    
+                    if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+                        let reason = "Enable biometric authentication to secure your profile"
+                        
+                        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, error in
+                            DispatchQueue.main.async {
+                                if success {
+                                    HapticManager.notification(.success)
+                                } else {
+                                    // Authentication failed, revert toggle
+                                    biometricLockEnabled = false
+                                    HapticManager.notification(.error)
+                                }
+                            }
+                        }
                     } else {
-                        // Authentication failed, revert toggle
+                        // Biometrics not available, revert toggle
                         biometricLockEnabled = false
-                        HapticManager.notification(.error)
                     }
                 }
             }
-        } else {
-            // Biometrics not available, revert toggle
-            biometricLockEnabled = false
         }
     }
 }
