@@ -1,0 +1,48 @@
+{
+  "project": {
+    "name": "Interspace",
+    "deployment_target": "16.0",
+    "swift_version": "5.9"
+  },
+  "dependencies": {
+    "swift_packages": [
+      {
+        "name": "GoogleSignIn",
+        "url": "https://github.com/google/GoogleSignIn-iOS",
+        "version": "8.0.0"
+      },
+      {
+        "name": "metamask-ios-sdk",
+        "url": "https://github.com/MetaMask/metamask-ios-sdk",
+        "version": "0.8.10"
+      },
+      {
+        "name": "wallet-mobile-sdk",
+        "url": "https://github.com/MobileWalletProtocol/wallet-mobile-sdk.git",
+        "version": "1.1.2"
+      },
+      {
+        "name": "reown-swift",
+        "url": "https://github.com/reown-com/reown-swift",
+        "version": "1.6.5"
+      },
+      {
+        "name": "AppAuth-iOS",
+        "url": "https://github.com/openid/AppAuth-iOS.git",
+        "version": "1.7.6"
+      },
+      {
+        "name": "silentshard-artifacts",
+        "url": "https://github.com/your-org/silentshard-artifacts",
+        "branch": "main"
+      }
+    ]
+  },
+  "build_settings": {
+    "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+    "SWIFT_VERSION": "5.9",
+    "ENABLE_BITCODE": "NO",
+    "SWIFT_OPTIMIZATION_LEVEL": "-Onone",
+    "SWIFT_COMPILATION_MODE": "wholemodule"
+  }
+}
