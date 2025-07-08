@@ -8,141 +8,160 @@ struct ProfileDetailView: View {
     @State private var showDeleteConfirmation = false
     
     var body: some View {
-        NavigationStack {
-            List {
-                // Profile Information Section
-                Section {
-                    // Profile Icon and Name
-                    HStack(spacing: 16) {
-                        if let profile = sessionCoordinator.activeProfile {
-                            ProfileIconGenerator.generateIcon(for: profile.id, size: 80)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(sessionCoordinator.activeProfile?.name ?? "Profile")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
+        StandardTray(
+            title: "Profile Details",
+            titleDisplayMode: .inline,
+            onDismiss: { dismiss() }
+        ) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Profile Information Section
+                    VStack(spacing: 0) {
+                        // Profile Icon and Name
+                        HStack(spacing: 16) {
+                            if let profile = sessionCoordinator.activeProfile {
+                                ProfileIconGenerator.generateIcon(for: profile.id, size: 80)
+                            }
                             
-                            Text("Active Profile")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding(.vertical, 8)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 16, trailing: 20))
-                }
-                
-                // Wallet Address Section
-                Section(header: Text("WALLET ADDRESS")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.gray)) {
-                    
-                    // Address Display
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(sessionCoordinator.activeProfile?.sessionWalletAddress ?? "")
-                            .font(.system(size: 15, design: .monospaced))
-                            .foregroundColor(.white)
-                            .textSelection(.enabled)
-                            .padding(.vertical, 4)
-                        
-                        // Copy Button
-                        Button(action: {
-                            UIPasteboard.general.string = sessionCoordinator.activeProfile?.sessionWalletAddress
-                            HapticManager.notification(.success)
-                        }) {
-                            Label("Copy Address", systemImage: "doc.on.doc")
-                                .font(.body)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                }
-                .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))
-                
-                // Privacy Settings Section
-                Section(header: Text("PRIVACY")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.gray)) {
-                    
-                    Toggle(isOn: $isAddressHidden) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Hide Addresses")
-                                .font(.body)
-                                .foregroundColor(.white)
-                            
-                            Text("Hide wallet addresses throughout the app")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    .toggleStyle(SwitchToggleStyle(tint: .green))
-                }
-                .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))
-                
-                // Development Mode Section (if applicable)
-                if sessionCoordinator.activeProfile?.isDevelopmentWallet == true {
-                    Section(header: Text("DEVELOPMENT")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.gray)) {
-                        
-                        HStack {
-                            Image(systemName: "hammer.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.yellow)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Development Mode Active")
-                                    .font(.body)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(sessionCoordinator.activeProfile?.name ?? "Profile")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
                                     .foregroundColor(.white)
                                 
-                                Text("This profile is using a development wallet")
-                                    .font(.caption)
+                                Text("Active Profile")
+                                    .font(.subheadline)
                                     .foregroundColor(.gray)
                             }
                             
                             Spacer()
                         }
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 20)
                     }
-                    .listRowBackground(Color.yellow.opacity(0.15))
-                }
                 
-                // Delete Profile Section
-                Section {
-                    Button(action: {
-                        showDeleteConfirmation = true
-                    }) {
-                        HStack {
-                            Image(systemName: "trash")
-                                .font(.system(size: 16))
-                            Text("Delete Profile")
-                            Spacer()
+                    // Wallet Address Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("WALLET ADDRESS")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 24)
+                        
+                        // Address Display with Apple Style Copy Button
+                        if let address = sessionCoordinator.activeProfile?.sessionWalletAddress {
+                            SingleLineAddressView(address: address, maxWidth: UIScreen.main.bounds.width - 120)
+                                .padding(.horizontal, 20)
                         }
-                        .foregroundColor(.red)
+                        
+                        // Glass background card
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.thinMaterial)
+                            .frame(height: 1)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
                     }
-                }
-                .listRowBackground(Color(UIColor.secondarySystemGroupedBackground))
-            }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color.black)
-            .navigationTitle("Profile Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                
+                    // Privacy Settings Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("PRIVACY")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 24)
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Hide Addresses")
+                                    .font(.body)
+                                    .foregroundColor(.white)
+                                
+                                Text("Hide wallet addresses throughout the app")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            Toggle("", isOn: $isAddressHidden)
+                                .labelsHidden()
+                                .toggleStyle(SwitchToggleStyle(tint: .green))
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .background(.thinMaterial)
+                        .cornerRadius(16)
+                        .padding(.horizontal, 20)
                     }
-                    .fontWeight(.medium)
+                
+                    // Development Mode Section (if applicable)
+                    if sessionCoordinator.activeProfile?.isDevelopmentWallet == true {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("DEVELOPMENT")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.gray)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 24)
+                            
+                            HStack {
+                                Image(systemName: "hammer.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.yellow)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Development Mode Active")
+                                        .font(.body)
+                                        .foregroundColor(.white)
+                                    
+                                    Text("This profile is using a development wallet")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
+                            .background(
+                                ZStack {
+                                    Rectangle()
+                                        .fill(.thinMaterial)
+                                    Color.yellow.opacity(0.1)
+                                }
+                            )
+                            .cornerRadius(16)
+                            .padding(.horizontal, 20)
+                        }
+                    }
+                
+                    // Delete Profile Section
+                    VStack(spacing: 0) {
+                        Button(action: {
+                            showDeleteConfirmation = true
+                        }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 16))
+                                Text("Delete Profile")
+                                Spacer()
+                            }
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
+                            .background(.thinMaterial)
+                            .cornerRadius(16)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal, 20)
+                        .padding(.top, 32)
+                    }
+                    
+                    // Bottom spacing
+                    Spacer(minLength: 40)
                 }
             }
         }
-        .preferredColorScheme(.dark)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .standardTrayStyle()
         .alert("Delete Profile", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {

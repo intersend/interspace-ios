@@ -31,19 +31,9 @@ struct PINEntryView: View {
                             .font(.system(size: 28, weight: .semibold))
                             .foregroundColor(.white)
                         
-                        if pinManager.isLocked {
-                            Text("Too many failed attempts")
-                                .font(.system(size: 16))
-                                .foregroundColor(.red)
-                        } else if pinManager.failedAttempts > 0 {
-                            Text("\(5 - pinManager.failedAttempts) attempts remaining")
-                                .font(.system(size: 16))
-                                .foregroundColor(.orange)
-                        } else {
-                            Text("Enter your 6-digit PIN")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.7))
-                        }
+                        Text("Enter your \(pinManager.pinLength)-digit PIN")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.7))
                     }
                     
                     // PIN Input
@@ -51,10 +41,10 @@ struct PINEntryView: View {
                         PINInputField(
                             pin: $pin,
                             isSecure: true,
+                            length: pinManager.pinLength,
                             onComplete: validatePIN
                         )
                         .offset(x: shakeOffset)
-                        .disabled(pinManager.isLocked)
                         
                         if showError {
                             Text(errorMessage)
@@ -119,11 +109,6 @@ struct PINEntryView: View {
     @Environment(\.dismiss) private var dismiss
     
     private func validatePIN() {
-        guard !pinManager.isLocked else {
-            showLockedError()
-            return
-        }
-        
         withAnimation(.easeInOut(duration: 0.2)) {
             showError = false
         }
@@ -169,22 +154,8 @@ struct PINEntryView: View {
                     // Error haptic
                     let notificationFeedback = UINotificationFeedbackGenerator()
                     notificationFeedback.notificationOccurred(.error)
-                    
-                    // Check if we should show locked message
-                    if pinManager.isLocked {
-                        showLockedError()
-                    }
                 }
             }
         }
-    }
-    
-    private func showLockedError() {
-        errorMessage = "Too many failed attempts. Please try again later."
-        showError = true
-        
-        // Heavy haptic for lockout
-        let notificationFeedback = UINotificationFeedbackGenerator()
-        notificationFeedback.notificationOccurred(.error)
     }
 }

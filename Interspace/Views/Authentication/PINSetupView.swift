@@ -10,6 +10,7 @@ struct PINSetupView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isProcessing = false
+    @State private var selectedPINLength: Int = 6
     
     let onSuccess: () -> Void
     let onCancel: () -> Void
@@ -35,7 +36,7 @@ struct PINSetupView: View {
                             .foregroundColor(.white)
                         
                         Text(currentStep == .enterPIN ? 
-                             "Create a 6-digit PIN for backup access" : 
+                             "Create a \(selectedPINLength)-digit PIN for backup access" : 
                              "Enter your PIN again to confirm")
                             .font(.system(size: 16))
                             .foregroundColor(.white.opacity(0.7))
@@ -48,16 +49,28 @@ struct PINSetupView: View {
                             PINInputField(
                                 pin: $firstPIN,
                                 isSecure: true,
+                                length: selectedPINLength,
                                 onComplete: handlePINComplete
                             )
-                            .id("first-pin")
+                            .id("first-pin-\(selectedPINLength)")
+                            
+                            // Switch PIN length button
+                            Button {
+                                switchPINLength()
+                            } label: {
+                                Text("Switch to \(nextPINLength)-digit PIN")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         } else {
                             PINInputField(
                                 pin: $confirmPIN,
                                 isSecure: true,
+                                length: selectedPINLength,
                                 onComplete: handlePINComplete
                             )
-                            .id("confirm-pin")
+                            .id("confirm-pin-\(selectedPINLength)")
                         }
                         
                         if showError {
@@ -94,6 +107,9 @@ struct PINSetupView: View {
             .navigationBarHidden(true)
         }
         .interactiveDismissDisabled()
+        .onAppear {
+            selectedPINLength = pinManager.pinLength
+        }
     }
     
     private func handlePINComplete() {
@@ -159,6 +175,30 @@ struct PINSetupView: View {
             }
         }
     }
+    
+    private var nextPINLength: Int {
+        switch selectedPINLength {
+        case 4: return 6
+        case 6: return 8
+        case 8: return 4
+        default: return 6
+        }
+    }
+    
+    private func switchPINLength() {
+        // Clear any existing input
+        firstPIN = ""
+        confirmPIN = ""
+        showError = false
+        
+        // Update to next length
+        selectedPINLength = nextPINLength
+        pinManager.updatePINLength(selectedPINLength)
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+    }
 }
 
 // MARK: - PIN Input Field
@@ -166,6 +206,7 @@ struct PINSetupView: View {
 struct PINInputField: View {
     @Binding var pin: String
     let isSecure: Bool
+    let length: Int
     let onComplete: () -> Void
     
     @FocusState private var isFocused: Bool
@@ -174,7 +215,7 @@ struct PINInputField: View {
         VStack(spacing: 20) {
             // PIN dots
             HStack(spacing: 16) {
-                ForEach(0..<6) { index in
+                ForEach(0..<length) { index in
                     Circle()
                         .fill(index < pin.count ? Color.white : Color.white.opacity(0.3))
                         .frame(width: 12, height: 12)
@@ -187,12 +228,12 @@ struct PINInputField: View {
             TextField("", text: Binding(
                 get: { pin },
                 set: { newValue in
-                    // Ensure only digits and limit to 6
-                    let filtered = String(newValue.filter { $0.isNumber }.prefix(6))
+                    // Ensure only digits and limit to length
+                    let filtered = String(newValue.filter { $0.isNumber }.prefix(length))
                     pin = filtered
                     
-                    // Auto-complete when 6 digits entered
-                    if filtered.count == 6 {
+                    // Auto-complete when required digits entered
+                    if filtered.count == length {
                         // Delay slightly to ensure the binding updates
                         DispatchQueue.main.async {
                             onComplete()

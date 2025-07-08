@@ -9,15 +9,11 @@ struct ProfileCreationTray: View {
     @FocusState private var isNameFocused: Bool
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Handle bar
-            Capsule()
-                .fill(Color(UIColor.tertiaryLabel))
-                .frame(width: 36, height: 5)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
-            
-            // Content
+        StandardTray(
+            title: "Name Your Profile",
+            titleDisplayMode: .hidden,
+            onDismiss: { isPresented = false }
+        ) {
             VStack(spacing: 24) {
                 // Icon
                 ZStack {
@@ -30,18 +26,12 @@ struct ProfileCreationTray: View {
                         .foregroundColor(DesignTokens.Colors.primary)
                 }
                 
-                // Title
-                VStack(spacing: 8) {
-                    Text("Name Your Profile")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(DesignTokens.Colors.textPrimary)
-                    
-                    Text("Give your profile a memorable name")
-                        .font(.system(size: 15))
-                        .foregroundColor(DesignTokens.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.horizontal, 20)
+                // Title - now hidden in StandardTray header
+                Text("Give your profile a memorable name")
+                    .font(.system(size: 15))
+                    .foregroundColor(DesignTokens.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
                 
                 // Input field
                 VStack(alignment: .leading, spacing: 8) {
@@ -91,10 +81,7 @@ struct ProfileCreationTray: View {
             }
             .padding(.bottom, 40)
         }
-        .presentationDetents([.height(360)])
-        .background(Color.black.opacity(0.001))
-        .background(Material.ultraThinMaterial)
-        .preferredColorScheme(.dark)
+        .standardTrayStyle(presentationDetents: [.height(360)])
         .onAppear {
             // Auto-focus the text field
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
