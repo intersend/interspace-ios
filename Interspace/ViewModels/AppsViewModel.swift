@@ -30,6 +30,7 @@ final class AppsViewModel: ObservableObject {
     
     init() {
         // Initial load will be triggered by the view
+        setupProfileChangeObserver()
     }
     
     // MARK: - Public Methods
@@ -73,6 +74,9 @@ final class AppsViewModel: ObservableObject {
                 folders = foldersResult.sorted { $0.position < $1.position }
                 
                 print("📱 AppsViewModel: Loaded \(apps.count) apps and \(folders.count) folders")
+                for app in apps {
+                    print("  - App: \(app.name) at position \(app.position), folderId: \(app.folderId ?? "nil")")
+                }
                 
                 // Invalidate cache for future updates
                 dataSyncManager.invalidate(type: [BookmarkedApp].self)
@@ -176,23 +180,9 @@ final class AppsViewModel: ObservableObject {
     }
     
     func addAppWithMetadata(url: String, to profileId: String? = nil) async throws -> BookmarkedApp {
-        // Fetch metadata
+        // Validate URL
         guard let siteURL = URL(string: url) else {
             throw AppsError.invalidURL
-        }
-        
-        let metadata = try await MetadataFetcher.shared.fetchMetadata(for: siteURL)
-        
-        // Generate icon if needed
-        var iconUrl = metadata.iconURL
-        if iconUrl == nil || iconUrl?.isEmpty == true {
-            // Generate icon from first letter of title
-            if let iconImage = IconGenerator.generateIcon(for: metadata.title),
-               let _ = iconImage.pngData() {
-                // TODO: Upload generated icon to storage
-                // For now, use a placeholder
-                iconUrl = nil
-            }
         }
         
         // Get target profile
@@ -207,22 +197,54 @@ final class AppsViewModel: ObservableObject {
             targetProfileId = activeProfile.id
         }
         
-        // Create app request
+        // Create app immediately with basic info
+        let basicName = siteURL.host?.replacingOccurrences(of: "www.", with: "").capitalized ?? "New App"
+        let faviconUrl = "\(siteURL.scheme ?? "https")://\(siteURL.host ?? "")/favicon.ico"
+        
         let request = CreateAppRequest(
-            name: metadata.title.isEmpty ? siteURL.host ?? "New App" : metadata.title,
+            name: basicName,
             url: url,
-            iconUrl: iconUrl,
+            iconUrl: faviconUrl,
             folderId: nil,
             position: apps.count
         )
         
-        // Create app
+        // Create app immediately
         let newApp = try await profileAPI.createApp(profileId: targetProfileId, request: request)
         
-        // Update local state
+        // Update local state immediately
         await MainActor.run {
             apps.append(newApp)
             apps.sort { $0.position < $1.position }
+        }
+        
+        // Fetch metadata in background and update if better info is found
+        Task {
+            do {
+                // Try lightweight fetch first (much faster)
+                let metadata = try await MetadataFetcher.shared.fetchMetadata(for: siteURL)
+                
+                // Only update if we got better information
+                let betterName = metadata.title
+                let betterIcon = metadata.iconURL
+                
+                if (!betterName.isEmpty && betterName != basicName && betterName != siteURL.host) || 
+                   (betterIcon != nil && betterIcon != faviconUrl && !betterIcon!.hasSuffix("/favicon.ico")) {
+                    
+                    await self.updateApp(
+                        newApp,
+                        name: betterName.isEmpty ? nil : betterName,
+                        iconUrl: betterIcon
+                    )
+                }
+                
+                // Optionally, if lightweight fetch was successful, we could try full fetch later
+                // for even better metadata (manifest, etc.) but this is usually not necessary
+                
+            } catch {
+                // Silently fail - we already have the basic app created
+                print("Failed to fetch enhanced metadata: \(error)")
+            }
         }
         
         return newApp
@@ -596,6 +618,54 @@ final class AppsViewModel: ObservableObject {
         }
         showError = true
     }
+    
+    private func setupProfileChangeObserver() {
+        // Listen for profile change notifications
+        NotificationCenter.default.publisher(for: .profileDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    
+                    print("📱 AppsViewModel: Profile changed, clearing and reloading apps")
+                    
+                    // Clear current data immediately for smooth transition
+                    self.apps = []
+                    self.folders = []
+                    
+                    // Show loading state
+                    self.isLoading = true
+                    
+                    // Reload apps for the new profile
+                    await self.loadApps()
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - Metadata Fetching
+    
+    func fetchMetadataForApp(url: String) async {
+        guard let appUrl = URL(string: url) else { return }
+        
+        // Find the app with this URL
+        guard let appIndex = apps.firstIndex(where: { $0.url == url }) else { return }
+        
+        do {
+            // Fetch metadata
+            let metadata = try await MetadataFetcher.shared.fetchMetadata(for: appUrl)
+            
+            // Update the app with fetched metadata
+            let app = apps[appIndex]
+            let updatedName = !metadata.title.isEmpty ? metadata.title : app.name
+            let updatedIconUrl = metadata.iconURL ?? app.iconUrl
+            
+            // Update via API
+            await updateApp(app, name: updatedName, iconUrl: updatedIconUrl)
+            
+        } catch {
+            print("Failed to fetch metadata for \(url): \(error)")
+        }
+    }
 }
 
 // MARK: - Apps Error
@@ -628,3 +698,4 @@ enum AppsError: LocalizedError {
         }
     }
 }
+

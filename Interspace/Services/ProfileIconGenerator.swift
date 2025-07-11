@@ -308,12 +308,12 @@ private struct DotPattern: View {
                 Circle()
                     .fill(i % 2 == 0 ? colorScheme.primary.opacity(0.3) : colorScheme.secondary.opacity(0.3))
                     .frame(
-                        width: CGFloat(hashBytes[8 + i % 20] % 20 + 5),
-                        height: CGFloat(hashBytes[8 + i % 20] % 20 + 5)
+                        width: CGFloat(hashBytes[(8 + i) % hashBytes.count] % 20 + 5),
+                        height: CGFloat(hashBytes[(8 + i) % hashBytes.count] % 20 + 5)
                     )
                     .position(
-                        x: CGFloat(hashBytes[10 + i * 2] % 80 + 10) / 100 * size.width,
-                        y: CGFloat(hashBytes[11 + i * 2] % 80 + 10) / 100 * size.height
+                        x: CGFloat(hashBytes[(10 + i) % hashBytes.count] % 80 + 10) / 100 * size.width,
+                        y: CGFloat(hashBytes[(11 + i * 2) % hashBytes.count] % 80 + 10) / 100 * size.height
                     )
             }
         }

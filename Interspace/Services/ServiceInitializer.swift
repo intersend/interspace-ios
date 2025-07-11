@@ -20,6 +20,7 @@ class ServiceInitializer: ObservableObject {
     private var _authenticationManagerV2: AuthenticationManagerV2?
     private var _sessionCoordinator: SessionCoordinator?
     private var _walletService: WalletService?
+    private var _appKitService: AppKitService?
     private var _profileIconGenerator: ProfileIconGenerator?
     private var _googleSignInService: GoogleSignInService?
 //    private var _appleSignInService: AppleSignInService?
@@ -52,6 +53,10 @@ class ServiceInitializer: ObservableObject {
             
             group.addTask { @MainActor in
                 self.initializeWalletService()
+            }
+            
+            group.addTask { @MainActor in
+                self.initializeAppKitService()
             }
         }
         
@@ -121,6 +126,13 @@ class ServiceInitializer: ObservableObject {
         recordInitTime("WalletService", start: start)
     }
     
+    private func initializeAppKitService() {
+        let start = CFAbsoluteTimeGetCurrent()
+        _appKitService = AppKitService.shared
+        _appKitService?.configure()
+        recordInitTime("AppKitService", start: start)
+    }
+    
     private func initializeProfileIconGenerator() {
         let start = CFAbsoluteTimeGetCurrent()
         _profileIconGenerator = ProfileIconGenerator()
@@ -174,6 +186,13 @@ class ServiceInitializer: ObservableObject {
             initializeWalletService()
         }
         return _walletService!
+    }
+    
+    var appKit: AppKitService {
+        if _appKitService == nil {
+            initializeAppKitService()
+        }
+        return _appKitService!
     }
     
     // MARK: - Lazy Service Getters
@@ -269,6 +288,7 @@ class ServiceInitializer: ObservableObject {
             _authenticationManagerV2 = nil
             _sessionCoordinator = nil
             _walletService = nil
+            _appKitService = nil
             _profileIconGenerator = nil
             _googleSignInService = nil
 //            _appleSignInService = nil

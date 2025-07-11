@@ -45,37 +45,6 @@ struct DeveloperSettingsView: View {
                     )
                 }
                 
-                // Wallet Section
-                SettingsSection(header: "WALLET SETTINGS") {
-                    HStack {
-                        SettingsRow(
-                            icon: "hammer.fill",
-                            iconColor: .yellow,
-                            title: "Development Wallets",
-                            subtitle: "Create profiles without MPC setup",
-                            showDisclosure: false
-                        )
-                        
-                        Spacer()
-                        
-                        Toggle("", isOn: Binding(
-                            get: { envConfig.isDevelopmentModeEnabled },
-                            set: { _ in envConfig.toggleDevelopmentMode() }
-                        ))
-                        .labelsHidden()
-                    }
-                    
-                    if envConfig.isDevelopmentModeEnabled {
-                        SettingsRow(
-                            icon: "info.circle",
-                            iconColor: .blue,
-                            title: "Note",
-                            subtitle: "Development wallets are for testing only and cannot be used in production",
-                            action: {}
-                        )
-                    }
-                }
-                
                 // Debug Options Section
                 SettingsSection(header: "DEBUG OPTIONS") {
                     HStack {

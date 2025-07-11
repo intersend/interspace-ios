@@ -28,14 +28,19 @@ struct ReceiveTokenSheetEnhanced: View {
             return [(1, "Ethereum"), (137, "Polygon"), (10, "Optimism")]
         }
         
-        var chains = Set<(Int, String)>()
+        struct ChainInfo: Hashable {
+            let chainId: Int
+            let chainName: String
+        }
+        
+        var chains = Set<ChainInfo>()
         for token in unifiedBalance.unifiedBalance.tokens {
             for chainBalance in token.balancesPerChain {
-                chains.insert((chainBalance.chainId, chainBalance.chainName))
+                chains.insert(ChainInfo(chainId: chainBalance.chainId, chainName: chainBalance.chainName))
             }
         }
         
-        return Array(chains).sorted { $0.0 < $1.0 }
+        return chains.map { ($0.chainId, $0.chainName) }.sorted { $0.0 < $1.0 }
     }
     
     private var selectedChainName: String {
@@ -110,10 +115,10 @@ struct ReceiveTokenSheetEnhanced: View {
         .onAppear {
             generateQRCode()
         }
-        .onChange(of: qrCodeContent) { _, _ in
+        .onChange(of: qrCodeContent) { _ in
             generateQRCode()
         }
-        .onChange(of: selectedChainId) { _, _ in
+        .onChange(of: selectedChainId) { _ in
             generateQRCode()
         }
     }
@@ -123,7 +128,7 @@ struct ReceiveTokenSheetEnhanced: View {
     private var qrCodeSection: some View {
         VStack(spacing: DesignTokens.Spacing.lg) {
             // QR Code Container
-            LiquidGlassCard(padding: DesignTokens.Spacing.xl) {
+            VStack {
                 VStack(spacing: DesignTokens.Spacing.md) {
                     if let qrImage = qrCodeImage {
                         Image(uiImage: qrImage)
@@ -184,6 +189,16 @@ struct ReceiveTokenSheetEnhanced: View {
                     }
                 }
             }
+            .padding(DesignTokens.Spacing.xl)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
             .animatedListItem(index: 0)
             
             // Instructions
@@ -196,7 +211,7 @@ struct ReceiveTokenSheetEnhanced: View {
     }
     
     private var addressSection: some View {
-        LiquidGlassCard {
+        VStack {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                 Text("Wallet Address")
                     .font(.system(size: 14, weight: .medium))
@@ -228,7 +243,7 @@ struct ReceiveTokenSheetEnhanced: View {
     }
     
     private var chainSelectorSection: some View {
-        LiquidGlassCard {
+        VStack {
             Button {
                 showChainSelector = true
                 HapticManager.shared.impact(style: .light)
@@ -306,7 +321,7 @@ struct ReceiveTokenSheetEnhanced: View {
     }
     
     private var amountRequestSection: some View {
-        LiquidGlassCard {
+        VStack {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
                 Text("Request Amount")
                     .font(.system(size: 14, weight: .medium))

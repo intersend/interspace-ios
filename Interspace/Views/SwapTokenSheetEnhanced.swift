@@ -239,7 +239,7 @@ struct SwapTokenSheetEnhanced: View {
                 )
             }
         }
-        .onChange(of: fromAmount) { _, newValue in
+        .onChange(of: fromAmount) { newValue in
             if let rate = viewModel.exchangeRate,
                let amount = Double(newValue),
                amount > 0 {
@@ -300,7 +300,7 @@ struct SwapTokenSheetEnhanced: View {
     }
     
     private var swapCard: some View {
-        LiquidGlassCard {
+        VStack {
             VStack(spacing: 0) {
                 // From Token
                 tokenInputSection(
@@ -493,7 +493,7 @@ struct SwapTokenSheetEnhanced: View {
     }
     
     private var exchangeRateCard: some View {
-        LiquidGlassCard {
+        VStack {
             VStack(spacing: DesignTokens.Spacing.sm) {
                 HStack {
                     Text("Exchange Rate")
@@ -592,7 +592,7 @@ struct SwapTokenSheetEnhanced: View {
     }
     
     private func routeVisualizationCard(_ route: RouteVisualization) -> some View {
-        LiquidGlassCard {
+        VStack {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                 HStack {
                     Text("Route")

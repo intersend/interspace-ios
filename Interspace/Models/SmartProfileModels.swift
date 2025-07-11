@@ -10,9 +10,8 @@ struct SmartProfile: Codable, Identifiable, Hashable {
     let linkedAccountsCount: Int
     let appsCount: Int
     let foldersCount: Int
-    let isDevelopmentWallet: Bool? // Indicates if this profile uses a development wallet
     let needsMpcGeneration: Bool? // Indicates if MPC wallet needs to be generated
-    let clientShare: ClientShare? // Only present for development wallets
+    let clientShare: ClientShare? // Only present during initial creation
     let createdAt: String
     let updatedAt: String
     
@@ -44,13 +43,11 @@ struct ClientShare: Codable, Hashable {
 
 struct CreateProfileRequest: Codable {
     let name: String
-    let clientShare: String? // Optional, not needed for development mode
-    let developmentMode: Bool // Flag to create development wallet (non-optional to ensure it's always sent)
+    let clientShare: String? // Optional
     
-    init(name: String, clientShare: String? = nil, developmentMode: Bool = false) {
+    init(name: String, clientShare: String? = nil) {
         self.name = name
         self.clientShare = clientShare
-        self.developmentMode = developmentMode
     }
 }
 

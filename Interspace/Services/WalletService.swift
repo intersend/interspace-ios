@@ -1416,11 +1416,31 @@ final class WalletService: ObservableObject {
         // Store the actual wallet type for later use
         self.connectedWallet = walletType
         
-        // Generate WalletConnect URI
-        let uri = try await walletConnectService.connectToWallet()
+        // Check if wallet supports Link Mode
+        let supportsLinkMode = [WalletType.trust, .family, .phantom, .zerion].contains(walletType)
         
-        // Open wallet app with deep link (must be on main thread)
-        await openWalletWithDeepLink(walletType: walletType, uri: uri)
+        if supportsLinkMode && walletConnectService.useLinkMode {
+            print("🔗 WalletService: Using Link Mode for \(walletType.displayName)")
+            
+            // Use Link Mode connection
+            let linkModeURI = try await walletConnectService.connectWithLinkMode(walletType: walletType)
+            
+            // Open wallet app with Link Mode deep link
+            await openWalletWithDeepLink(walletType: walletType, uri: linkModeURI)
+            
+            // For Link Mode, we wait for the response via deep link callback
+            // The session will be established through the Link Mode response
+            return try await waitForLinkModeResponse()
+        } else {
+            // Use standard WalletConnect flow
+            print("📱 WalletService: Using standard WalletConnect for \(walletType.displayName)")
+            
+            // Generate WalletConnect URI
+            let uri = try await walletConnectService.connectToWallet()
+            
+            // Open wallet app with deep link (must be on main thread)
+            await openWalletWithDeepLink(walletType: walletType, uri: uri)
+        }
         
         // Wait for session to be established
         var attempts = 0
@@ -1464,6 +1484,161 @@ final class WalletService: ObservableObject {
             walletType: .walletConnect
         )
     }
+    
+    // MARK: - Transaction Methods
+    
+    /// Send a transaction using the active wallet account
+    func sendTransaction(
+        to address: String,
+        value: String? = nil,
+        data: String? = nil,
+        chainId: String = "1"
+    ) async throws {
+        // Get the active wallet from the profile
+        guard let activeProfile = await SessionCoordinator.shared.activeProfile else {
+            throw WalletError.noSession
+        }
+        
+        // Check if user has linked wallet accounts
+        // For now, we'll need to check linked accounts through a different approach
+        // since SmartProfile doesn't contain linkedAccounts directly
+        guard activeProfile.linkedAccountsCount > 0 else {
+            throw WalletError.noAccountsFound
+        }
+        
+        // For now, we'll use a placeholder since we need to fetch linked accounts separately
+        // This would require accessing ProfileViewModel or making an API call
+        let walletAddress = "0x0000000000000000000000000000000000000000" // Placeholder
+        
+        // TODO: Properly fetch linked accounts for the active profile
+        // This should be done through ProfileViewModel.shared.linkedAccounts
+        throw WalletError.noAccountsFound
+        
+        // Determine wallet type - placeholder for now
+        let walletType = WalletType.metamask // Default
+        
+        // Open the wallet app with transaction deeplink
+        let deepLinkGenerator = WalletDeepLinkGenerator.shared
+        
+        await withCheckedContinuation { continuation in
+            deepLinkGenerator.openWalletForTransaction(
+                walletType: walletType,
+                to: address,
+                value: value,
+                data: data,
+                chainId: chainId
+            ) { success in
+                if success {
+                    print("💰 WalletService: Transaction deeplink opened successfully")
+                } else {
+                    print("❌ WalletService: Failed to open transaction deeplink")
+                }
+                continuation.resume()
+            }
+        }
+    }
+    
+    /// Wait for Link Mode response
+    private func waitForLinkModeResponse() async throws -> WalletConnectionResult {
+        print("🔗 WalletService: Waiting for Link Mode response...")
+        
+        // Set up a timeout for Link Mode response
+        let timeoutTask = Task {
+            try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+            throw WalletError.timeout("Link Mode connection timed out")
+        }
+        
+        // Wait for Link Mode response notification
+        return try await withCheckedThrowingContinuation { continuation in
+            var observer: NSObjectProtocol?
+            
+            observer = NotificationCenter.default.addObserver(
+                forName: .linkModeAuthCompleted,
+                object: nil,
+                queue: .main
+            ) { notification in
+                timeoutTask.cancel()
+                
+                if let userInfo = notification.userInfo,
+                   let address = userInfo["address"] as? String,
+                   let signature = userInfo["signature"] as? String,
+                   let message = userInfo["message"] as? String {
+                    
+                    // Remove observer
+                    if let obs = observer {
+                        NotificationCenter.default.removeObserver(obs)
+                    }
+                    
+                    let result = WalletConnectionResult(
+                        address: address,
+                        signature: signature,
+                        message: message,
+                        walletType: self.connectedWallet ?? .walletConnect
+                    )
+                    
+                    continuation.resume(returning: result)
+                } else if let error = notification.userInfo?["error"] as? Error {
+                    // Remove observer
+                    if let obs = observer {
+                        NotificationCenter.default.removeObserver(obs)
+                    }
+                    
+                    continuation.resume(throwing: error)
+                } else {
+                    // Remove observer
+                    if let obs = observer {
+                        NotificationCenter.default.removeObserver(obs)
+                    }
+                    
+                    continuation.resume(throwing: WalletError.connectionFailed("Invalid Link Mode response"))
+                }
+            }
+            
+            // Handle timeout
+            Task {
+                do {
+                    try await timeoutTask.value
+                    // If we reach here, it means timeout occurred
+                    if let obs = observer {
+                        NotificationCenter.default.removeObserver(obs)
+                    }
+                    continuation.resume(throwing: WalletError.timeout("Link Mode response timed out"))
+                } catch {
+                    // Task was cancelled, which means we got a response
+                }
+            }
+        }
+    }
+    
+    /// Determine wallet type from linked account
+    private func determineWalletType(from account: LinkedAccount) -> WalletType {
+        // Check the account authStrategy and walletType
+        if let walletTypeString = account.walletType?.lowercased() {
+            switch walletTypeString {
+            case "metamask":
+                return .metamask
+            case "coinbase":
+                return .coinbase
+            case "trust":
+                return .trust
+            case "family":
+                return .family
+            case "phantom":
+                return .phantom
+            case "zerion":
+                return .zerion
+            case "rainbow":
+                return .rainbow
+            case "argent":
+                return .argent
+            default:
+                return .walletConnect
+            }
+        }
+        
+        // Default to WalletConnect
+        return .walletConnect
+    }
 }
 
 // MARK: - Supporting Types
@@ -1486,3 +1661,9 @@ struct WalletConnectionResult {
 
 // MARK: - Response Types
 // NonceResponse and NonceData are defined in SIWEModels.swift
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let linkModeAuthCompleted = Notification.Name("linkModeAuthCompleted")
+}

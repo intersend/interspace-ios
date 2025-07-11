@@ -93,7 +93,7 @@ extension AuthAPI {
             endpoint: v2Endpoint("/auth/logout"),
             method: .POST,
             responseType: SuccessResponse.self,
-            requiresAuth: true
+            requiresAuth: false
         )
     }
 }

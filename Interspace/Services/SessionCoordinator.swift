@@ -182,12 +182,8 @@ final class SessionCoordinator: ObservableObject {
         // This synchronously sets the token in APIService if found
         authManager.checkAuthenticationStatus()
         
-        // If authenticated after token check, ensure token is set before any API calls
-        if authManager.isAuthenticated {
-            print("🔐 SessionCoordinator: User authenticated from stored tokens")
-            // Token should already be set in APIService by checkAuthenticationStatus
-            // The auth state change will trigger loadUserSession via the binding
-        }
+        // Note: The auth state change will trigger loadUserSession via the binding
+        // Token validation happens in checkAuthenticationStatus and loadCachedSession
     }
     
     private func loadCachedSession() async {
@@ -209,8 +205,16 @@ final class SessionCoordinator: ObservableObject {
             
             if !isTokenValid {
                 print("🔐 SessionCoordinator: Cached session has invalid token, clearing session")
-                sessionState = .unauthenticated
+                // Clear everything immediately
+                await MainActor.run {
+                    self.isAuthenticated = false
+                    self.currentUser = nil
+                    self.activeProfile = nil
+                    self.sessionState = .unauthenticated
+                }
                 await cacheManager.clearAllCacheAsync()
+                // Ensure AuthManager is also in sync
+                await authManager.logout()
                 return
             }
             
@@ -241,11 +245,19 @@ final class SessionCoordinator: ObservableObject {
                     self.sessionState = biometricLockEnabled ? .locked : .authenticated
                     self.cacheProfile(firstProfile)
                 } else if profiles.isEmpty {
-                    self.sessionState = .needsProfile
+                    // No cached profiles - automatically create a default profile
+                    print("🔐 SessionCoordinator: No cached profiles found, creating default profile")
+                    Task {
+                        await self.ensureActiveProfile()
+                    }
                 }
             }
             
             print("🔐 SessionCoordinator: Loaded cached session data with valid token")
+        } else {
+            // No cached data or incomplete data
+            print("🔐 SessionCoordinator: No valid cached session data found")
+            // Let AuthenticationManagerV2 handle the authentication check
         }
     }
     
@@ -345,13 +357,57 @@ final class SessionCoordinator: ObservableObject {
             // Check if this is an orphan account (first time sign-in with no profiles)
             if profiles.isEmpty {
                 print("🔐 SessionCoordinator: New user detected - no profiles exist")
-                
-                // In V2, profiles are created automatically during authentication
                 print("🔐 SessionCoordinator: User email: \(user.email ?? "none")")
                 
-                // For all new users, we need them to create their first profile
-                sessionState = .needsProfile
-                return
+                // Automatically create a default profile for new users
+                print("🔐 SessionCoordinator: Automatically creating default profile for new user")
+                
+                do {
+                    let newProfile = try await profileAPI.createProfile(
+                        name: "Main"
+                    )
+                    
+                    print("🔐 SessionCoordinator: Default profile created successfully - ID: \(newProfile.id)")
+                    
+                    // If it's a development wallet, store the clientShare locally
+                    if let clientShare = newProfile.clientShare {
+                        try? KeychainManager.shared.saveDevelopmentClientShare(
+                            clientShare: clientShare,
+                            profileId: newProfile.id
+                        )
+                    }
+                    
+                    // Set as active profile and cache it
+                    activeProfile = newProfile
+                    cacheProfile(newProfile)
+                    await cacheManager.cacheActiveProfile(newProfile)
+                    
+                    // Cache the new profile in the profiles list
+                    await cacheManager.cacheProfiles([newProfile])
+                    
+                    // Cache auth state with token
+                    if let token = KeychainManager.shared.getAccessToken() {
+                        cacheManager.cacheAuthState(isAuthenticated: true, token: token)
+                    }
+                    
+                    // Update session state
+                    let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
+                    sessionState = biometricLockEnabled ? .locked : .authenticated
+                    
+                    // Notify other parts of the app
+                    NotificationCenter.default.post(
+                        name: .profileDidChange,
+                        object: nil,
+                        userInfo: ["profile": newProfile]
+                    )
+                    
+                    return
+                } catch {
+                    print("🔴 SessionCoordinator: Failed to create default profile: \(error)")
+                    // Fall back to needsProfile state if automatic creation fails
+                    sessionState = .needsProfile
+                    return
+                }
             }
             
             // Find and cache active profile
@@ -599,13 +655,17 @@ final class SessionCoordinator: ObservableObject {
         // Reset security timer
         resetSessionTimer()
         
-        // Check if biometric lock is enabled
-        let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
-        
-        // Require biometric verification if session was locked or biometric lock is enabled
-        if sessionState == .locked || biometricLockEnabled {
-            Task {
-                await verifyBiometricAccess()
+        // Check if we're authenticated
+        if isAuthenticated {
+            // With 100-year tokens, we don't need to validate on foreground
+            // Just check if biometric lock is needed
+            let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
+            
+            // Require biometric verification if session was locked or biometric lock is enabled
+            if sessionState == .locked || biometricLockEnabled {
+                Task {
+                    await verifyBiometricAccess()
+                }
             }
         }
     }
@@ -633,13 +693,76 @@ final class SessionCoordinator: ObservableObject {
     
     // MARK: - Profile Management
     
+    /// Ensures that the authenticated user has an active profile
+    /// Creates a default profile if activeProfile is nil
+    func ensureActiveProfile() async {
+        // Only proceed if user is authenticated
+        guard isAuthenticated else {
+            print("🔐 SessionCoordinator: Cannot ensure active profile - user not authenticated")
+            return
+        }
+        
+        // Check if we already have an active profile
+        if activeProfile != nil {
+            print("🔐 SessionCoordinator: Active profile already exists")
+            return
+        }
+        
+        print("🔐 SessionCoordinator: No active profile found, creating default profile")
+        
+        do {
+            // First, check if user has any profiles at all
+            let profiles = try await profileAPI.getProfiles()
+            
+            if let firstProfile = profiles.first {
+                // User has profiles but none are active - activate the first one
+                print("🔐 SessionCoordinator: Found existing profiles, activating first profile")
+                try await switchProfile(firstProfile)
+            } else {
+                // No profiles exist - create a default one
+                print("🔐 SessionCoordinator: No profiles exist, creating new default profile")
+                
+                let newProfile = try await profileAPI.createProfile(
+                    name: "Main"
+                )
+                
+                print("🔐 SessionCoordinator: Default profile created successfully - ID: \(newProfile.id)")
+                
+                // If it's a development wallet, store the clientShare locally
+                if let clientShare = newProfile.clientShare {
+                    try? KeychainManager.shared.saveDevelopmentClientShare(
+                        clientShare: clientShare,
+                        profileId: newProfile.id
+                    )
+                }
+                
+                // Set as active profile and cache it
+                activeProfile = newProfile
+                cacheProfile(newProfile)
+                await cacheManager.cacheActiveProfile(newProfile)
+                
+                // Cache the new profile in the profiles list
+                await cacheManager.cacheProfiles([newProfile])
+                
+                // Update session state
+                sessionState = .authenticated
+                
+                // Notify other parts of the app
+                NotificationCenter.default.post(
+                    name: .profileDidChange,
+                    object: nil,
+                    userInfo: ["profile": newProfile]
+                )
+            }
+        } catch {
+            print("🔴 SessionCoordinator: Failed to ensure active profile: \(error)")
+            handleError(.profileCreationFailed(error.localizedDescription))
+        }
+    }
+    
     func createInitialProfile(name: String) async {
         do {
             sessionState = .loading
-            
-            // Check if development mode is enabled
-            // Use actual development mode setting
-            let isDevelopmentMode = EnvironmentConfiguration.shared.isDevelopmentModeEnabled
             
             // In V2, profiles are created automatically during authentication
             // This method is only called if something went wrong
@@ -651,8 +774,7 @@ final class SessionCoordinator: ObservableObject {
             }
             
             let newProfile = try await profileAPI.createProfile(
-                name: name,
-                developmentMode: isDevelopmentMode
+                name: name
             )
             
             print("🔐 SessionCoordinator: Profile created successfully - ID: \(newProfile.id)")
@@ -712,18 +834,26 @@ final class SessionCoordinator: ObservableObject {
     private func handleAuthExpiry() async {
         print("🔐 SessionCoordinator: Handling authentication expiry")
         
-        // Update state to show transitioning
-        sessionState = .loading
+        // Immediately clear session and show auth view - no delays
+        await MainActor.run {
+            self.currentUser = nil
+            self.activeProfile = nil
+            self.isAuthenticated = false
+            self.sessionState = .unauthenticated
+            self.error = nil
+            self.showError = false
+        }
         
-        // Clear cached auth data immediately
+        // Clear cached auth data
         await cacheManager.clearAuthState()
         
-        // Small delay for smooth transition
-        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-        
-        // Sign out and clear session
+        // Sign out from auth manager (clears tokens)
         await authManager.logout()
-        clearSession()
+        
+        // Clear any remaining session data
+        clearProfileCache()
+        
+        NotificationCenter.default.post(name: .sessionDidEnd, object: nil)
     }
     
     private func clearSession() {

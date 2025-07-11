@@ -229,4 +229,96 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return DesignTokens.Colors.primary
         }
     }
+    
+    var deepLinkScheme: String {
+        switch self {
+        case .metamask:
+            return "metamask"
+        case .coinbase:
+            return "cbwallet"
+        case .walletConnect:
+            return "wc"
+        case .rainbow:
+            return "rainbow"
+        case .trust:
+            return "trust"
+        case .argent:
+            return "argent"
+        case .gnosisSafe:
+            return "gnosissafe"
+        case .family:
+            return "familywallet"
+        case .phantom:
+            return "phantom"
+        case .oneInch:
+            return "oneinch"
+        case .zerion:
+            return "zerion"
+        case .imToken:
+            return "imtoken"
+        case .tokenPocket:
+            return "tpoutside"
+        case .spot:
+            return "spot"
+        case .omni:
+            return "omni"
+        case .safe:
+            return "safe"
+        case .ledger:
+            return "ledgerlive"
+        case .trezor:
+            return "trezor"
+        case .google:
+            return "google"
+        case .apple:
+            return "apple"
+        case .mpc:
+            return "mpc"
+        case .unknown:
+            return "unknown"
+        }
+    }
+    
+    var appStoreURL: URL? {
+        switch self {
+        case .metamask:
+            return URL(string: "https://apps.apple.com/app/metamask/id1438144202")
+        case .coinbase:
+            return URL(string: "https://apps.apple.com/app/coinbase-wallet/id1278383455")
+        case .walletConnect:
+            return nil
+        case .rainbow:
+            return URL(string: "https://apps.apple.com/app/rainbow-ethereum-wallet/id1457119021")
+        case .trust:
+            return URL(string: "https://apps.apple.com/app/trust-crypto-bitcoin-wallet/id1288339409")
+        case .argent:
+            return URL(string: "https://apps.apple.com/app/argent/id1358741926")
+        case .gnosisSafe:
+            return URL(string: "https://apps.apple.com/app/gnosis-safe/id1515759131")
+        case .family:
+            return URL(string: "https://apps.apple.com/app/family-wallet/id1644169549")
+        case .phantom:
+            return URL(string: "https://apps.apple.com/app/phantom-crypto-wallet/id1598432977")
+        case .oneInch:
+            return URL(string: "https://apps.apple.com/app/1inch-defi-wallet/id1546049391")
+        case .zerion:
+            return URL(string: "https://apps.apple.com/app/zerion-wallet/id1456732565")
+        case .imToken:
+            return URL(string: "https://apps.apple.com/app/imtoken/id1384798940")
+        case .tokenPocket:
+            return URL(string: "https://apps.apple.com/app/tokenpocket/id1436028697")
+        case .spot:
+            return URL(string: "https://apps.apple.com/app/spot-wallet/id1567759439")
+        case .omni:
+            return URL(string: "https://apps.apple.com/app/omni/id1569088095")
+        case .safe:
+            return URL(string: "https://apps.apple.com/app/safe/id1515759131")
+        case .ledger:
+            return URL(string: "https://apps.apple.com/app/ledger-live/id1361671700")
+        case .trezor:
+            return URL(string: "https://apps.apple.com/app/trezor-suite/id1631884497")
+        case .google, .apple, .mpc, .unknown:
+            return nil
+        }
+    }
 }

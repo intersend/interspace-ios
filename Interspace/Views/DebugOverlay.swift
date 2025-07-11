@@ -6,7 +6,7 @@ struct DebugOverlay: View {
     @State private var apiCallCount: Int = 0
     
     var body: some View {
-        if envConfig.showDebugOverlay && envConfig.isDevelopmentModeEnabled {
+        if envConfig.showDebugOverlay {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Image(systemName: "ladybug.fill")

@@ -167,6 +167,15 @@ final class KeychainManager {
         return Date() >= expiryDate
     }
     
+    func getTokenExpiry() -> Date? {
+        guard let expiryString = try? loadString(for: .tokenExpiry),
+              let expiryTimestamp = Double(expiryString) else {
+            return nil
+        }
+        
+        return Date(timeIntervalSince1970: expiryTimestamp)
+    }
+    
     func clearTokens() {
         try? delete(for: .accessToken)
         try? delete(for: .refreshToken)

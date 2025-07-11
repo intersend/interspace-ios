@@ -13,7 +13,10 @@ enum WalletConnectionError: LocalizedError, Identifiable, Equatable {
     case networkError(String)
     case qrCodeScanRequired
     case showQRCode(String)
-    case timeout(String)
+    case timeout(String = "Connection timed out")
+    case noSession
+    case invalidAccount
+    case walletNotInstalled
     
     var id: String {
         switch self {
@@ -37,6 +40,12 @@ enum WalletConnectionError: LocalizedError, Identifiable, Equatable {
             return "showQRCode_\(uri)"
         case .timeout(let message):
             return "timeout_\(message)"
+        case .noSession:
+            return "noSession"
+        case .invalidAccount:
+            return "invalidAccount"
+        case .walletNotInstalled:
+            return "walletNotInstalled"
         }
     }
     
@@ -62,6 +71,12 @@ enum WalletConnectionError: LocalizedError, Identifiable, Equatable {
             return "Please scan the QR code with your wallet"
         case .timeout(let message):
             return message
+        case .noSession:
+            return "No active wallet session found"
+        case .invalidAccount:
+            return "Invalid wallet account format"
+        case .walletNotInstalled:
+            return "The selected wallet is not installed"
         }
     }
 }

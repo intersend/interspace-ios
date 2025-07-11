@@ -4,7 +4,7 @@ struct ProfileDetailView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var sessionCoordinator: SessionCoordinator
     @Binding var isAddressHidden: Bool
-    @StateObject private var viewModel = ProfileViewModel.shared
+    private let viewModel = ProfileViewModel.shared
     @State private var showDeleteConfirmation = false
     
     var body: some View {
@@ -94,46 +94,6 @@ struct ProfileDetailView: View {
                         .padding(.horizontal, 20)
                     }
                 
-                    // Development Mode Section (if applicable)
-                    if sessionCoordinator.activeProfile?.isDevelopmentWallet == true {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("DEVELOPMENT")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.gray)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 24)
-                            
-                            HStack {
-                                Image(systemName: "hammer.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.yellow)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Development Mode Active")
-                                        .font(.body)
-                                        .foregroundColor(.white)
-                                    
-                                    Text("This profile is using a development wallet")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
-                            .background(
-                                ZStack {
-                                    Rectangle()
-                                        .fill(.thinMaterial)
-                                    Color.yellow.opacity(0.1)
-                                }
-                            )
-                            .cornerRadius(16)
-                            .padding(.horizontal, 20)
-                        }
-                    }
-                
                     // Delete Profile Section
                     VStack(spacing: 0) {
                         Button(action: {
@@ -161,7 +121,6 @@ struct ProfileDetailView: View {
                 }
             }
         }
-        .standardTrayStyle()
         .alert("Delete Profile", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -214,3 +173,4 @@ struct ProfileDetailView_Previews: PreviewProvider {
             .preferredColorScheme(.dark)
     }
 }
+

@@ -5,6 +5,7 @@ import WalletConnectNetworking
 import WalletConnectPairing
 import WalletConnectRelay
 import Starscream
+import ReownAppKit
 
 final class WalletConnectService: ObservableObject {
     static let shared = WalletConnectService()
@@ -23,6 +24,14 @@ final class WalletConnectService: ObservableObject {
     
     // Connection management
     private let connectionManager = WalletConnectionManager.shared
+    private let appKitService = AppKitService.shared
+    
+    // One-Click Auth support
+    private var useAppKitAuth = true
+    
+    // Link Mode support
+    var useLinkMode = true
+    private var pendingLinkModeResponse: ((Result<String, Error>) -> Void)?
     
     // Project configuration
     private let projectId: String
@@ -140,6 +149,17 @@ final class WalletConnectService: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Subscribe to Link Mode responses
+        NotificationCenter.default.publisher(for: .linkModeResponse)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                if let envelope = notification.userInfo?["envelope"] as? String,
+                   let data = notification.userInfo?["data"] as? String {
+                    self?.handleLinkModeResponse(envelope: envelope, data: data)
+                }
+            }
+            .store(in: &cancellables)
+        
         // For SIWE auth only, we don't need profile change notifications or persistent sessions
     }
     
@@ -147,6 +167,15 @@ final class WalletConnectService: ObservableObject {
     
     /// Connect to a wallet using WalletConnect URI for SIWE authentication
     func connectForAuth(uri: String) async throws {
+        // Try AppKit first if available
+        let isAppKitConfigured = await Task { @MainActor in
+            return useAppKitAuth && appKitService.isConfigured
+        }.value
+        
+        if isAppKitConfigured {
+            // AppKit handles URI-based connections internally
+            return
+        }
         // For connecting FROM a wallet app TO our dApp
         // This is when a wallet scans our QR code
         guard uri.hasPrefix("wc:") else {
@@ -175,6 +204,8 @@ final class WalletConnectService: ObservableObject {
     
     /// Connect to a wallet by generating our own URI
     func connectToWallet() async throws -> String {
+        // Always use standard WalletConnect flow for all wallets
+        // This ensures proper session proposal for Trust wallet and others
         print("📱 WalletConnectService: Creating connection request as dApp")
         
         // Set a timeout for the entire connection process
@@ -285,9 +316,223 @@ final class WalletConnectService: ObservableObject {
         return uriString
     }
     
+    /// Connect using Link Mode for supported wallets
+    func connectWithLinkMode(walletType: WalletType) async throws -> String {
+        print("🔗 WalletConnectService: Using Link Mode for \(walletType.displayName)")
+        
+        // Check if wallet supports Link Mode
+        guard walletSupportsLinkMode(walletType) else {
+            print("⚠️ WalletConnectService: Wallet doesn't support Link Mode, falling back to WebSocket")
+            return try await connectToWallet()
+        }
+        
+        // Create session proposal for Link Mode
+        let proposal = try createLinkModeProposal()
+        
+        // Encode proposal for Link Mode
+        let encodedProposal = try encodeLinkModeProposal(proposal)
+        
+        // Create Link Mode URI
+        let linkModeURI = createLinkModeURI(
+            for: walletType,
+            proposal: encodedProposal
+        )
+        
+        print("✅ WalletConnectService: Link Mode URI created: \(linkModeURI)")
+        
+        // Store pending response handler
+        return try await withCheckedThrowingContinuation { continuation in
+            pendingLinkModeResponse = { result in
+                continuation.resume(with: result)
+            }
+            
+            // Set a timeout for Link Mode response
+            Task {
+                try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+                if self.pendingLinkModeResponse != nil {
+                    self.pendingLinkModeResponse = nil
+                    continuation.resume(throwing: WalletConnectError.pairingFailed("Link Mode timeout"))
+                }
+            }
+        }
+    }
+    
+    /// Check if wallet supports Link Mode
+    private func walletSupportsLinkMode(_ walletType: WalletType) -> Bool {
+        switch walletType {
+        case .trust, .family, .phantom, .zerion:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    /// Create Link Mode proposal
+    private func createLinkModeProposal() throws -> [String: Any] {
+        // Create a session proposal for Link Mode
+        let proposal: [String: Any] = [
+            "id": Int.random(in: 1...999999),
+            "params": [
+                "requiredNamespaces": [
+                    "eip155": [
+                        "chains": ["eip155:1"],
+                        "methods": ["personal_sign", "eth_sign"],
+                        "events": []
+                    ]
+                ],
+                "proposer": [
+                    "publicKey": UUID().uuidString, // Temporary key for Link Mode
+                    "metadata": [
+                        "name": "Interspace",
+                        "description": "Your Digital Universe",
+                        "url": "https://interspace.fi",
+                        "icons": ["https://interspace.fi/icon.png"]
+                    ]
+                ]
+            ]
+        ]
+        
+        return proposal
+    }
+    
+    /// Encode proposal for Link Mode
+    private func encodeLinkModeProposal(_ proposal: [String: Any]) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: proposal)
+        return data.base64EncodedString()
+    }
+    
+    /// Create Link Mode URI for wallet
+    private func createLinkModeURI(for walletType: WalletType, proposal: String) -> String {
+        // Get the wallet's Link Mode base URL
+        let linkModeBase: String
+        switch walletType {
+        case .trust:
+            linkModeBase = "https://link.trustwallet.com/wc"
+        case .family:
+            linkModeBase = "https://link.family.co/wc"
+        case .phantom:
+            linkModeBase = "https://phantom.app/ul/v1/connect"
+        case .zerion:
+            linkModeBase = "https://app.zerion.io/wc"
+        default:
+            linkModeBase = ""
+        }
+        
+        // Create return URL
+        let returnURL = "interspace://walletconnect"
+        
+        // Build Link Mode URI with proposal
+        var components = URLComponents(string: linkModeBase)!
+        components.queryItems = [
+            URLQueryItem(name: "proposal", value: proposal),
+            URLQueryItem(name: "returnURL", value: returnURL),
+            URLQueryItem(name: "version", value: "2")
+        ]
+        
+        return components.url?.absoluteString ?? ""
+    }
+    
+    /// Handle Link Mode response
+    func handleLinkModeResponse(envelope: String, data: String) {
+        print("🔗 WalletConnectService: Handling Link Mode response")
+        
+        guard let responseData = Data(base64Encoded: data) else {
+            pendingLinkModeResponse?(.failure(WalletConnectError.invalidResponse))
+            pendingLinkModeResponse = nil
+            postLinkModeError(WalletConnectError.invalidResponse)
+            return
+        }
+        
+        do {
+            // Parse the Link Mode response
+            if let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any] {
+                
+                // Check if this is a SIWE response
+                if let signature = json["signature"] as? String,
+                   let address = json["address"] as? String,
+                   let message = json["message"] as? String {
+                    
+                    print("✅ WalletConnectService: Link Mode SIWE response received")
+                    
+                    // Post notification for auth completion
+                    NotificationCenter.default.post(
+                        name: .linkModeAuthCompleted,
+                        object: nil,
+                        userInfo: [
+                            "address": address,
+                            "signature": signature,
+                            "message": message
+                        ]
+                    )
+                    
+                    pendingLinkModeResponse?(.success("link-mode-auth-completed"))
+                    pendingLinkModeResponse = nil
+                    
+                } else if let result = json["result"] as? [String: Any],
+                          let session = result["session"] as? [String: Any] {
+                    
+                    // Handle session establishment
+                    print("✅ WalletConnectService: Link Mode session established")
+                    
+                    // Extract address from session
+                    if let namespaces = session["namespaces"] as? [String: Any],
+                       let eip155 = namespaces["eip155"] as? [String: Any],
+                       let accounts = eip155["accounts"] as? [String],
+                       let firstAccount = accounts.first {
+                        
+                        // Extract address from account string (format: "eip155:1:0x...")
+                        let components = firstAccount.split(separator: ":")
+                        if components.count >= 3 {
+                            let address = String(components[2])
+                            
+                            // For Link Mode, we need to handle SIWE signing
+                            // This would be the next step after session establishment
+                            print("🔗 WalletConnectService: Session established with address: \(address)")
+                            
+                            // Store session info for SIWE signing
+                            self.currentAddress = address
+                            
+                            pendingLinkModeResponse?(.success("link-mode-session"))
+                            pendingLinkModeResponse = nil
+                        }
+                    }
+                } else {
+                    throw WalletConnectError.invalidResponse
+                }
+            } else {
+                throw WalletConnectError.invalidResponse
+            }
+        } catch {
+            pendingLinkModeResponse?(.failure(error))
+            pendingLinkModeResponse = nil
+            postLinkModeError(error)
+        }
+    }
+    
+    /// Post Link Mode error notification
+    private func postLinkModeError(_ error: Error) {
+        NotificationCenter.default.post(
+            name: .linkModeAuthCompleted,
+            object: nil,
+            userInfo: ["error": error]
+        )
+    }
+    
     
     /// Sign a SIWE message for authentication
     func signSIWEMessage(_ message: String, address: String, session: Session) async throws -> String {
+        // Use AppKit if available and configured
+        let hasAppKitSession = await Task { @MainActor in
+            return useAppKitAuth && appKitService.isConfigured && appKitService.currentSession != nil
+        }.value
+        
+        if hasAppKitSession {
+            print("📱 WalletConnectService: Using AppKit for SIWE signing")
+            return try await Task { @MainActor in
+                try await appKitService.signMessage(message)
+            }.value
+        }
+        
         // Store current address for verification
         currentAddress = address
         
@@ -331,8 +576,35 @@ final class WalletConnectService: ObservableObject {
         }
     }
     
+    /// Connect to a specific wallet using deeplink
+    func connectWithWalletDeeplink(_ walletId: String) async throws {
+        let isAppKitConfigured = await Task { @MainActor in
+            return useAppKitAuth && appKitService.isConfigured
+        }.value
+        
+        guard isAppKitConfigured else {
+            throw WalletConnectError.appKitNotConfigured
+        }
+        
+        try await Task { @MainActor in
+            try await appKitService.connectWithWallet(walletId)
+        }.value
+    }
+    
     /// Get the connected wallet address for SIWE auth
     func getConnectedAddress() async -> String? {
+        // Check AppKit first
+        let appKitAddress = await Task<String?, Never> { @MainActor in
+            if useAppKitAuth && appKitService.isConfigured,
+               let address = appKitService.connectedAccount {
+                return address
+            }
+            return nil
+        }.value
+        
+        if let address = appKitAddress {
+            return address
+        }
         // First check if we have a current address
         if let address = currentAddress {
             return address
@@ -607,7 +879,7 @@ final class WalletConnectService: ObservableObject {
                     await handlePersonalSign(request)
                     
                 case "eth_sign":
-                    await handleEthSign(request)
+                    await handlePersonalSign(request)
                     
                 case "eth_sendTransaction":
                     await handleSendTransaction(request)
@@ -653,11 +925,6 @@ final class WalletConnectService: ObservableObject {
         } catch {
             print("❌ WalletConnectService: Failed to respond to request: \(error)")
         }
-    }
-    
-    private func handleEthSign(_ request: Request) async {
-        // Similar to personal_sign
-        await handlePersonalSign(request)
     }
     
     private func handleSendTransaction(_ request: Request) async {
@@ -735,6 +1002,7 @@ enum WalletConnectError: LocalizedError {
     case noActiveSession
     case signingFailed(String)
     case invalidResponse
+    case appKitNotConfigured
     
     var errorDescription: String? {
         switch self {
@@ -750,6 +1018,8 @@ enum WalletConnectError: LocalizedError {
             return "Signing failed: \(message)"
         case .invalidResponse:
             return "Invalid response from wallet"
+        case .appKitNotConfigured:
+            return "WalletConnect AppKit is not configured"
         }
     }
 }
@@ -1000,3 +1270,4 @@ struct DefaultCryptoProvider: CryptoProvider {
         return Data(SHA256.hash(data: data))
     }
 }
+

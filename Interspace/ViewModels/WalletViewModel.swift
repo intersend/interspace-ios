@@ -26,6 +26,7 @@ final class WalletViewModel: ObservableObject {
     
     init() {
         setupAutoRefresh()
+        setupProfileChangeObserver()
     }
     
     deinit {
@@ -264,6 +265,29 @@ final class WalletViewModel: ObservableObject {
             self.error = WalletViewError.unknown(error.localizedDescription)
         }
         showError = true
+    }
+    
+    private func setupProfileChangeObserver() {
+        // Listen for profile change notifications
+        NotificationCenter.default.publisher(for: .profileDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    
+                    print("💰 WalletViewModel: Profile changed, clearing and reloading balance")
+                    
+                    // Clear current data immediately for smooth transition
+                    self.unifiedBalance = nil
+                    self.transactionHistory = nil
+                    
+                    // Show loading state
+                    self.isLoading = true
+                    
+                    // Reload balance for the new profile
+                    await self.loadBalance()
+                }
+            }
+            .store(in: &cancellables)
     }
 }
 

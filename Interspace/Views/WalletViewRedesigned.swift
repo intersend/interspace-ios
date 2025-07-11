@@ -108,14 +108,16 @@ struct WalletViewRedesigned: View {
             TransactionHistoryView()
         }
         .sheet(isPresented: $showSendSheet) {
-            SendTokenSheet()
+            SendTokenSheetBase()
                 .environmentObject(viewModel)
         }
         .sheet(isPresented: $showReceiveSheet) {
-            ReceiveTokenSheet()
+            ReceiveTokenSheetBase()
+                .environmentObject(viewModel)
+                .environmentObject(ProfileViewModel.shared)
         }
         .sheet(isPresented: $showSwapSheet) {
-            SwapTokenSheet()
+            SwapTokenSheetBase()
                 .environmentObject(viewModel)
         }
         .sheet(isPresented: $showAbout) {
@@ -651,24 +653,7 @@ struct RefreshControl: View {
 }
 
 // MARK: - Receive Sheet
-struct ReceiveSheet: View {
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationView {
-            VStack {
-                Text("Receive placeholder")
-            }
-            .navigationTitle("Receive")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-}
+// Removed placeholder - using ReceiveTokenSheetBase instead
 
 // MARK: - Simple Token Cell
 struct SimpleTokenCell: View {

@@ -80,8 +80,8 @@ struct ProfileCreationTray: View {
                 .padding(.top, 8)
             }
             .padding(.bottom, 40)
+            .frame(height: 360)
         }
-        .standardTrayStyle(presentationDetents: [.height(360)])
         .onAppear {
             // Auto-focus the text field
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

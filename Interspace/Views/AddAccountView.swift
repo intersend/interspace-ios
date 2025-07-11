@@ -74,10 +74,74 @@ struct AddAccountView: View {
                                     title: "WalletConnect",
                                     subtitle: "Connect any WalletConnect wallet",
                                     isFirst: false,
-                                    isLast: true,
+                                    isLast: false,
                                     onTap: {
                                         HapticManager.impact(.light)
                                         selectedWalletType = .walletConnect
+                                    }
+                                )
+                                
+                                Divider()
+                                    .padding(.leading, 72)
+                                
+                                // Trust Wallet
+                                WalletOptionRow(
+                                    walletType: .trust,
+                                    title: "Trust Wallet",
+                                    subtitle: "Connect your Trust wallet",
+                                    isFirst: false,
+                                    isLast: false,
+                                    onTap: {
+                                        HapticManager.impact(.light)
+                                        selectedWalletType = .trust
+                                    }
+                                )
+                                
+                                Divider()
+                                    .padding(.leading, 72)
+                                
+                                // Family Wallet
+                                WalletOptionRow(
+                                    walletType: .family,
+                                    title: "Family",
+                                    subtitle: "Connect your Family wallet",
+                                    isFirst: false,
+                                    isLast: false,
+                                    onTap: {
+                                        HapticManager.impact(.light)
+                                        selectedWalletType = .family
+                                    }
+                                )
+                                
+                                Divider()
+                                    .padding(.leading, 72)
+                                
+                                // Phantom
+                                WalletOptionRow(
+                                    walletType: .phantom,
+                                    title: "Phantom",
+                                    subtitle: "Connect your Phantom wallet",
+                                    isFirst: false,
+                                    isLast: false,
+                                    onTap: {
+                                        HapticManager.impact(.light)
+                                        selectedWalletType = .phantom
+                                    }
+                                )
+                                
+                                Divider()
+                                    .padding(.leading, 72)
+                                
+                                // Zerion
+                                WalletOptionRow(
+                                    walletType: .zerion,
+                                    title: "Zerion",
+                                    subtitle: "Connect your Zerion wallet",
+                                    isFirst: false,
+                                    isLast: true,
+                                    onTap: {
+                                        HapticManager.impact(.light)
+                                        selectedWalletType = .zerion
                                     }
                                 )
                             }
@@ -109,8 +173,8 @@ struct AddAccountView: View {
                                 
                                 ComingSoonRow(
                                     icon: "iphone",
-                                    title: "Mobile Wallets",
-                                    subtitle: "Trust, Rainbow support",
+                                    title: "More Wallets",
+                                    subtitle: "Argent, Rainbow, and more",
                                     isFirst: false,
                                     isLast: true
                                 )

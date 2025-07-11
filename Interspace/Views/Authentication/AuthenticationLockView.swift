@@ -20,6 +20,7 @@ struct AuthenticationLockView: View {
             if showPINEntry {
                 PINEntryView(
                     onSuccess: {
+                        // With 100-year tokens, we don't need to validate
                         withAnimation(.easeInOut(duration: 0.2)) {
                             sessionCoordinator.sessionState = .authenticated
                         }
@@ -101,6 +102,7 @@ struct AuthenticationLockView: View {
                 print("DEBUG: authenticateWithOptions returned: \(success)")
                 
                 if success {
+                    // With 100-year tokens, we don't need to validate
                     // Haptic feedback for success
                     let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                     impactFeedback.impactOccurred()
