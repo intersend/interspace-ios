@@ -155,13 +155,15 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
          return true
      }
     
-    // Check for WalletConnect URLs
-    if url.scheme == "interspace" && url.host == "walletconnect" {
-        print("📱 AppDelegate: Handling WalletConnect deep link")
-        // Notify WalletDeepLinkGenerator to handle the callback
+    // Check for WalletConnect/AppKit URLs
+    if url.scheme == "interspace" && (url.host == "walletconnect" || url.host == "auth") {
+        print("📱 AppDelegate: Handling WalletConnect/AppKit deep link")
+        ServiceInitializer.shared.appKit.handleDeeplink(url)
+        
+        // Use WalletDeepLinkGenerator for handling
         let handled = WalletDeepLinkGenerator.shared.handleWalletReturn(url: url)
         if handled {
-            print("📱 AppDelegate: WalletConnect callback handled successfully")
+            print("📱 AppDelegate: WalletConnect/AppKit callback handled successfully")
         }
         return true
     }
@@ -212,7 +214,8 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
                 "argent.link": WalletType.argent,
                 "safe.global": WalletType.gnosisSafe,
                 "1inch.io": WalletType.oneInch,
-                "app.zerion.io": WalletType.zerion
+                "app.zerion.io": WalletType.zerion,
+                "family.co": WalletType.family
             ]
             
             for (domain, walletType) in universalLinkDomains {
@@ -221,7 +224,11 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
                     
                     // Check if this is a return from wallet after SIWE signing
                     if url.absoluteString.contains("wc") || url.absoluteString.contains("walletconnect") {
-                        // This is likely a WalletConnect callback
+                        // This is likely a WalletConnect/AppKit callback
+                        if [WalletType.trust, WalletType.family, WalletType.phantom, WalletType.zerion].contains(walletType) {
+                            ServiceInitializer.shared.appKit.handleDeeplink(url)
+                        }
+                        
                         NotificationCenter.default.post(
                             name: .walletConnectCallback,
                             object: nil,

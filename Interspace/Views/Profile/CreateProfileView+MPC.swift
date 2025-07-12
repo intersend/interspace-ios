@@ -25,8 +25,7 @@ extension CreateProfileView {
         do {
             // Step 1: Create the profile
             let profile = try await profileService.createProfile(
-                name: profileName,
-                developmentMode: false
+                name: profileName
             )
             
             // Step 2: Generate MPC wallet using HTTP service

@@ -57,7 +57,6 @@ struct ProfileSelectorCard_Previews: PreviewProvider {
                     linkedAccountsCount: 3,
                     appsCount: 12,
                     foldersCount: 2,
-                    isDevelopmentWallet: false,
                     needsMpcGeneration: false,
                     clientShare: nil,
                     createdAt: "2024-01-01T00:00:00Z",

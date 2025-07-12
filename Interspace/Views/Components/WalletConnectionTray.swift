@@ -45,20 +45,35 @@ struct WalletConnectionTray: View {
                                 .padding(.horizontal, 20)
                             
                             VStack(spacing: 0) {
-                                ForEach(availableWallets.filter { $0.available }, id: \.type) { wallet in
+                                // WalletConnect option that uses AppKit
+                                TrayWalletOptionRow(
+                                    walletType: .walletConnect,
+                                    title: "WalletConnect",
+                                    subtitle: "Connect with 300+ wallets",
+                                    isFirst: true,
+                                    isLast: false,
+                                    onTap: {
+                                        handleWalletConnectTap()
+                                    }
+                                )
+                                
+                                Divider()
+                                    .padding(.leading, 72)
+                                
+                                ForEach(availableWallets.filter { $0.available && $0.type != .walletConnect }, id: \.type) { wallet in
                                     TrayWalletOptionRow(
                                         walletType: wallet.type,
                                         title: wallet.type.displayName,
                                         subtitle: subtitle(for: wallet.type),
-                                        isFirst: wallet.type == availableWallets.filter { $0.available }.first?.type,
-                                        isLast: wallet.type == availableWallets.filter { $0.available }.last?.type,
+                                        isFirst: false,
+                                        isLast: wallet.type == availableWallets.filter { $0.available && $0.type != .walletConnect }.last?.type,
                                         onTap: {
                                             selectedWallet = wallet.type
                                             showWalletConnection = true
                                         }
                                     )
                                     
-                                    if wallet.type != availableWallets.filter { $0.available }.last?.type {
+                                    if wallet.type != availableWallets.filter { $0.available && $0.type != .walletConnect }.last?.type {
                                         Divider()
                                             .padding(.leading, 72)
                                     }
@@ -186,6 +201,96 @@ struct WalletConnectionTray: View {
             return "Hardware wallet integration"
         default:
             return "Connect your wallet"
+        }
+    }
+    
+    // MARK: - WalletConnect Handling
+    
+    private func handleWalletConnectTap() {
+        Task { @MainActor in
+            // Dismiss current tray
+            isPresented = false
+            
+            // Small delay to ensure smooth dismissal
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            
+            // Present AppKit modal
+            AppKitService.shared.presentModal()
+            
+            // Subscribe to auth response if needed
+            if isForAuthentication {
+                AppKitService.shared.setAuthCompletion { [weak authViewModel] result in
+                    Task { @MainActor in
+                        switch result {
+                        case .success(let (session, cacaos)):
+                            // Handle successful authentication
+                            if let address = session?.namespaces.values.flatMap({ $0.accounts }).first {
+                                let components = address.absoluteString.split(separator: ":")
+                                if components.count >= 3 {
+                                    let walletAddress = String(components[2])
+                                    
+                                    // Get SIWE message and signature from cacaos
+                                    if let cacao = cacaos.first {
+                                        // Cacao contains the signature in 's' property
+                                        // The signature might be nested - try accessing string value
+                                        let signature: String
+                                        if let sigString = cacao.s as? String {
+                                            signature = sigString
+                                        } else {
+                                            // Try common nested properties
+                                            signature = String(describing: cacao.s)
+                                        }
+                                        
+                                        // The message is in the payload 'p' property
+                                        // For SIWE, we need to reconstruct or use the original message
+                                        let message = cacao.p.statement ?? "Sign in with Ethereum"
+                                        
+                                        await authViewModel?.handleWalletConnectAuth(
+                                            address: walletAddress,
+                                            signature: signature,
+                                            message: message
+                                        )
+                                    }
+                                }
+                            }
+                            
+                        case .failure(let error):
+                            print("❌ WalletConnectionTray: Auth failed: \(error)")
+                            await authViewModel?.handleWalletConnectError(error)
+                        }
+                    }
+                }
+            } else {
+                // For profile linking
+                AppKitService.shared.setSessionCompletion { result in
+                    Task { @MainActor in
+                        switch result {
+                        case .success(let session):
+                            // Handle successful session for linking
+                            if let address = session.namespaces.values.flatMap({ $0.accounts }).first {
+                                let components = address.absoluteString.split(separator: ":")
+                                if components.count >= 3 {
+                                    let walletAddress = String(components[2])
+                                    
+                                    // For profile linking, we need to request signature
+                                    // TODO: Implement proper SIWE signing for profile linking
+                                    print("🔐 WalletConnectionTray: Need to implement SIWE signing for profile linking")
+                                    
+                                    // For now, just inform that connection is successful but needs signing
+                                    await MainActor.run {
+                                        // Show success but note that signing is required
+                                        print("✅ Wallet connected: \(walletAddress)")
+                                        print("⚠️ Note: SIWE signing required for profile linking")
+                                    }
+                                }
+                            }
+                            
+                        case .failure(let error):
+                            print("❌ WalletConnectionTray: Session failed: \(error)")
+                        }
+                    }
+                }
+            }
         }
     }
 }

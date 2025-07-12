@@ -5,18 +5,23 @@ import SwiftUI
 struct WiggleModifier: ViewModifier {
     let isActive: Bool
     @State private var rotation: Double = 0
-    @State private var offset: CGFloat = 0
+    @State private var verticalOffset: CGFloat = 0
+    @State private var horizontalOffset: CGFloat = 0
+    @State private var isAnimating = false
     
-    // Random parameters for each icon
-    private let rotationAngle = Double.random(in: -2.3...2.3)
-    private let verticalBounce = Double.random(in: -1.5...1.5)
-    private let animationDelay = Double.random(in: 0...0.2)
-    private let animationDuration = 0.125
+    // Random parameters for each icon - matching iOS behavior
+    private let baseRotation = Double.random(in: 2.5...3.0) * (Bool.random() ? 1 : -1)
+    private let verticalBounce = Double.random(in: 0.8...1.2)
+    private let horizontalBounce = Double.random(in: 0.3...0.5)
+    private let animationDelay = Double.random(in: 0...0.15)
+    private let rotationDuration = Double.random(in: 0.12...0.14)
+    private let bounceDuration = Double.random(in: 0.13...0.15)
     
     func body(content: Content) -> some View {
         content
-            .rotationEffect(.degrees(isActive ? rotation : 0))
-            .offset(y: isActive ? offset : 0)
+            .rotationEffect(.degrees(rotation), anchor: .center)
+            .offset(x: horizontalOffset, y: verticalOffset)
+            .scaleEffect(isAnimating ? 1.0 : 0.98)
             .onAppear {
                 if isActive {
                     startWiggle()
@@ -32,21 +37,53 @@ struct WiggleModifier: ViewModifier {
     }
     
     private func startWiggle() {
-        withAnimation(
-            Animation
-                .easeInOut(duration: animationDuration)
-                .repeatForever(autoreverses: true)
-                .delay(animationDelay)
-        ) {
-            rotation = rotationAngle
-            offset = verticalBounce
+        // Smooth scale-in animation
+        withAnimation(.easeOut(duration: 0.15)) {
+            isAnimating = true
+        }
+        
+        // Delay the wiggle start for organic feel
+        DispatchQueue.main.asyncAfter(deadline: .now() + animationDelay) {
+            guard isActive else { return }
+            
+            // Rotation animation - alternating left and right
+            withAnimation(
+                Animation
+                    .easeInOut(duration: rotationDuration)
+                    .repeatForever(autoreverses: true)
+            ) {
+                rotation = baseRotation
+            }
+            
+            // Vertical bounce - slightly offset from rotation for realism
+            withAnimation(
+                Animation
+                    .easeInOut(duration: bounceDuration)
+                    .repeatForever(autoreverses: true)
+                    .delay(0.05)
+            ) {
+                verticalOffset = verticalBounce
+            }
+            
+            // Subtle horizontal movement
+            withAnimation(
+                Animation
+                    .easeInOut(duration: bounceDuration * 1.1)
+                    .repeatForever(autoreverses: true)
+                    .delay(0.1)
+            ) {
+                horizontalOffset = horizontalBounce * (baseRotation > 0 ? -1 : 1)
+            }
         }
     }
     
     private func stopWiggle() {
-        withAnimation(.easeOut(duration: 0.2)) {
+        // Smooth transition back to rest state
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
             rotation = 0
-            offset = 0
+            verticalOffset = 0
+            horizontalOffset = 0
+            isAnimating = false
         }
     }
 }
@@ -135,7 +172,15 @@ extension View {
     }
     
     func editModeScale(_ isEditMode: Bool) -> some View {
-        self.scaleEffect(isEditMode ? 0.95 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isEditMode)
+        self
+            .scaleEffect(isEditMode ? 0.93 : 1.0)
+            .animation(
+                .spring(
+                    response: 0.35,
+                    dampingFraction: 0.75,
+                    blendDuration: 0.15
+                ),
+                value: isEditMode
+            )
     }
 }

@@ -8,6 +8,7 @@ struct ProfileSelectorTray: View {
     @State private var selectedProfileId: String?
     @State private var showCreateProfile = false
     @State private var newProfileName = ""
+    @State private var profileSnapshot: [SmartProfile] = []
     
     var body: some View {
         StandardTray(
@@ -20,8 +21,8 @@ struct ProfileSelectorTray: View {
                             GridItem(.flexible()),
                             GridItem(.flexible())
                         ], spacing: 16) {
-                            // Existing profiles
-                            ForEach(viewModel.profiles) { profile in
+                            // Existing profiles - use snapshot to prevent concurrent modification crashes
+                            ForEach(profileSnapshot) { profile in
                                 ProfileTrayCard(
                                     profile: profile,
                                     isActive: profile.isActive,
@@ -40,7 +41,16 @@ struct ProfileSelectorTray: View {
                         .padding(.bottom, 20)
             }
         }
-        .standardTrayStyle(presentationDetents: [.height(UIScreen.main.bounds.height * 0.7)])
+        .onAppear {
+            // Create a snapshot of profiles when the view appears
+            profileSnapshot = viewModel.profiles
+        }
+        .onChange(of: viewModel.profiles) { newProfiles in
+            // Update snapshot when profiles change
+            // This prevents crashes from concurrent modifications during ForEach iteration
+            profileSnapshot = newProfiles
+        }
+        .presentationDetents([.fraction(0.7)])
         .alert("Create New Profile", isPresented: $showCreateProfile) {
             TextField("Profile Name", text: $newProfileName)
             Button("Cancel", role: .cancel) {

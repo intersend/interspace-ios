@@ -23,6 +23,10 @@
 		789C7C922E02421B00FF5B32 /* metamask-ios-sdk in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C912E02421B00FF5B32 /* metamask-ios-sdk */; };
 		789C7C952E02423600FF5B32 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C942E02423600FF5B32 /* GoogleSignIn */; };
 		789C7C972E02424200FF5B32 /* CoinbaseWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 789C7C962E02424200FF5B32 /* CoinbaseWalletSDK */; };
+		789CF0892E20101000CDBD72 /* ReownAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 789CF0882E20101000CDBD72 /* ReownAppKit */; };
+		789CF2092E20116C00CDBD72 /* ReownAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 789CF2082E20116C00CDBD72 /* ReownAppKit */; };
+		789CF20B2E20116C00CDBD72 /* ReownAppKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 789CF20A2E20116C00CDBD72 /* ReownAppKitUI */; };
+		789CF8FD2E20145500CDBD72 /* ReownAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 789CF8FC2E20145500CDBD72 /* ReownAppKit */; };
 		78CFACFE2E0DEBD900999473 /* ReownWalletKit in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFACFD2E0DEBD900999473 /* ReownWalletKit */; };
 		78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFACFF2E0DEBD900999473 /* WalletConnect */; };
 		78CFC5602E0ED25600999473 /* ReownWalletKit in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFC55F2E0ED25600999473 /* ReownWalletKit */; };
@@ -130,6 +134,7 @@
 		785509932E098AD400EDDF1C /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				AppStoreModels.swift,
 				AuthModels.swift,
 				Environment.swift,
 				ErrorWrapper.swift,
@@ -154,12 +159,12 @@
 				AccountLinkingService.swift,
 				APIService.swift,
 				AppleSignInService.swift,
+				AppStoreAPI.swift,
 				AuthAPI.swift,
 				AuthenticationManagerV2.swift,
 				AuthService.swift,
 				CacheStorageManager.swift,
 				DataSyncManager.swift,
-				DevelopmentWalletService.swift,
 				FarcasterAuthService.swift,
 				GoogleSignInService.swift,
 				KeychainManager.swift,
@@ -188,6 +193,7 @@
 				UserAPI.swift,
 				UserCacheManager.swift,
 				WalletAPI.swift,
+				WalletConnect/AppKitService.swift,
 				WalletConnect/WalletConnectService.swift,
 				WalletConnect/WalletConnectSessionManager.swift,
 				WalletConnectionManager.swift,
@@ -226,6 +232,7 @@
 				AddAccountView.swift,
 				AddAppView.swift,
 				AddSocialAccountView.swift,
+				AppStoreView.swift,
 				AppsView.swift,
 				Authentication/AuthenticationLockView.swift,
 				Authentication/EmailAuthenticationView.swift,
@@ -235,12 +242,10 @@
 				Authentication/PINSetupView.swift,
 				AuthView.swift,
 				Components/AddToProfileTray.swift,
+				Components/AppStoreComponents.swift,
 				Components/AuthLoadingOverlay.swift,
 				Components/BottomSheet.swift,
 				Components/ConnectionProgressView.swift,
-				Components/DevelopmentModeIndicator.swift,
-				Components/DevelopmentModeToggle.swift,
-				Components/DevelopmentToggle.swift,
 				Components/LiquidGlass/LiquidGlassAppIcon.swift,
 				Components/LiquidGlass/LiquidGlassFolder.swift,
 				Components/LiquidGlass/LiquidGlassMaterial.swift,
@@ -249,6 +254,7 @@
 				Components/LiquidGlassLoadingOverlay.swift,
 				Components/LiquidGlassWalletScanner.swift,
 				Components/LoadingSkeletons.swift,
+				Components/MiniWalletAuthorizationTray.swift,
 				Components/NativeCodeInput.swift,
 				Components/OAuthProviderIcon.swift,
 				Components/ProfileSelectorCard.swift,
@@ -261,7 +267,6 @@
 				Components/SpringboardGrid.swift,
 				Components/StandardToolbarButtons.swift,
 				Components/StatefulAuthorizationTray.swift,
-				Components/TrayComponents.swift,
 				Components/UniversalAddTray.swift,
 				Components/VerificationCodeField.swift,
 				Components/WalletConnectionTray.swift,
@@ -276,7 +281,6 @@
 				FarcasterAuthView.swift,
 				HomeView.swift,
 				LoadingOverlay.swift,
-				Modifiers/DevelopmentModeModifier.swift,
 				Modifiers/GlassEffectModifier.swift,
 				Modifiers/ScrollOffsetModifier.swift,
 				Modifiers/ShakeDetector.swift,
@@ -289,25 +293,27 @@
 				Profile/ProfileHeaderView.swift,
 				Profile/ProfileNotificationsView.swift,
 				Profile/ProfileSecurityView.swift,
+				Profile/SingleLineAddressView.swift,
+				"Profile/StandardTray 2.swift",
+				Profile/StandardTray.swift,
 				ProfileCreationTray.swift,
 				ProfileIconPicker.swift,
 				ProfileSelectorTray.swift,
 				ProfileSettingsView.swift,
 				ProfileSwitcherView.swift,
 				ProfileView.swift,
+				ReceiveTokenSheet.swift,
 				SendTokenSheet.swift,
 				Settings/DeveloperSettingsView.swift,
 				Settings/SettingsRow.swift,
 				Settings/SettingsSection.swift,
 				Settings/WalletSecurityView.swift,
 				SocialAccountDetailView.swift,
+				SwapTokenSheet.swift,
 				TokenSelectionView.swift,
 				Wallet/BalanceCardView.swift,
 				Wallet/BalanceDisplayView.swift,
 				Wallet/NFTGalleryView.swift,
-				Wallet/ReceiveTokenSheetWrapper.swift,
-				Wallet/SendTokenSheetWrapper.swift,
-				Wallet/SwapTokenSheetWrapper.swift,
 				Wallet/TokenListView.swift,
 				Wallet/TransactionHistoryView.swift,
 				WalletAuthenticationView.swift,
@@ -337,6 +343,7 @@
 		7861E42F2E011AA5005D228A /* ViewModels */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (785509972E098AD400EDDF1C /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ViewModels; sourceTree = "<group>"; };
 		7861E4532E011AA5005D228A /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (785509982E098AD400EDDF1C /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = Views; sourceTree = "<group>"; };
 		787BF3742E038D0A0013A88C /* Extensions */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Extensions; sourceTree = "<group>"; };
+		789CF0832E1F0ADE00CDBD72 /* Web3 */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Web3; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -346,7 +353,10 @@
 			files = (
 				78CFC5642E0ED25600999473 /* WalletConnectVerify in Frameworks */,
 				788B6D452E12FAB000EDAAC5 /* duo_schnorr in Frameworks */,
+				789CF20B2E20116C00CDBD72 /* ReownAppKitUI in Frameworks */,
+				789CF0892E20101000CDBD72 /* ReownAppKit in Frameworks */,
 				78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */,
+				789CF8FD2E20145500CDBD72 /* ReownAppKit in Frameworks */,
 				78CFC5602E0ED25600999473 /* ReownWalletKit in Frameworks */,
 				789C7C972E02424200FF5B32 /* CoinbaseWalletSDK in Frameworks */,
 				789C7C922E02421B00FF5B32 /* metamask-ios-sdk in Frameworks */,
@@ -358,6 +368,7 @@
 				788B6D492E12FAB800EDAAC5 /* c2dkls in Frameworks */,
 				789C7C952E02423600FF5B32 /* GoogleSignIn in Frameworks */,
 				788B6D432E12FAB000EDAAC5 /* c2dkls in Frameworks */,
+				789CF2092E20116C00CDBD72 /* ReownAppKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1138,6 +1149,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				789CF0832E1F0ADE00CDBD72 /* Web3 */,
 				784D9DDE2E13541200D65859 /* MPCIntegrationTests.swift */,
 				784D9DDC2E1353FC00D65859 /* MPCWalletUITests.swift */,
 				780212432E00478000A47913 /* Interspace */,
@@ -2151,6 +2163,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				787BF3742E038D0A0013A88C /* Extensions */,
+				789CF0832E1F0ADE00CDBD72 /* Web3 */,
 			);
 			name = Interspace;
 			productName = Interspace;
@@ -2768,6 +2781,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7861E7282E02317E005D228A /* XCRemoteSwiftPackageReference "wallet-mobile-sdk" */;
 			productName = CoinbaseWalletSDK;
+		};
+		789CF0882E20101000CDBD72 /* ReownAppKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownAppKit;
+		};
+		789CF2082E20116C00CDBD72 /* ReownAppKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownAppKit;
+		};
+		789CF20A2E20116C00CDBD72 /* ReownAppKitUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownAppKitUI;
+		};
+		789CF8FC2E20145500CDBD72 /* ReownAppKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownAppKit;
 		};
 		78CFACFD2E0DEBD900999473 /* ReownWalletKit */ = {
 			isa = XCSwiftPackageProductDependency;

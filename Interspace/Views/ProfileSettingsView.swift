@@ -150,14 +150,13 @@ struct ProfileSettingsView: View {
                                     iconColor: DesignTokens.Colors.primary,
                                     showChevron: true,
                                     isFirst: true,
-                                    isLast: (profile.isDevelopmentWallet ?? false)
+                                    isLast: false
                                 ) {
                                     showWalletSecurity = true
                                 }
                                 
                                 // Export Key Share
-                                if !(profile.isDevelopmentWallet ?? false) {
-                                    ActionRow(
+                                ActionRow(
                                         title: "Export Key Share",
                                         subtitle: "Backup your MPC key share",
                                         icon: "square.and.arrow.up",
@@ -168,7 +167,6 @@ struct ProfileSettingsView: View {
                                     ) {
                                         // Handle key share export
                                     }
-                                }
                                 
                                 // Show delete button for all profiles (including active ones)
                                 ActionRow(
@@ -570,7 +568,6 @@ struct ProfileSettingsView_Previews: PreviewProvider {
                 linkedAccountsCount: 3,
                 appsCount: 8,
                 foldersCount: 2,
-                isDevelopmentWallet: false,
                 needsMpcGeneration: true,
                 clientShare: nil,
                 createdAt: "2024-01-01T00:00:00Z",

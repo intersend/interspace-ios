@@ -102,8 +102,9 @@ final class AuthenticationManagerV2: ObservableObject {
                       let message = config.message else {
                     throw AuthenticationError.invalidCredentials
                 }
-                identifier = address
-                credential = signature
+                // Backend expects walletAddress in the body, not identifier
+                identifier = nil
+                credential = nil
                 
             case .google:
                 // Handle Google auth - needs oauth code or access token
@@ -132,10 +133,11 @@ final class AuthenticationManagerV2: ObservableObject {
                 email: config.strategy == .email ? config.email : nil,
                 verificationCode: config.strategy == .email ? config.verificationCode : nil,
                 // Wallet-specific fields
-                walletAddress: config.strategy == .wallet ? config.walletAddress : nil,
+                walletAddress: config.strategy == .wallet ? config.walletAddress?.lowercased() : nil, // Normalize to lowercase
                 signature: config.strategy == .wallet ? config.signature : nil,
                 message: config.strategy == .wallet ? config.message : nil,
-                walletType: config.strategy == .wallet ? config.walletType : nil,
+                walletType: config.strategy == .wallet ? (config.walletType ?? "unknown") : nil,
+                chainId: config.strategy == .wallet ? 1 : nil, // Default to Ethereum mainnet
                 // Social-specific fields
                 idToken: config.idToken,
                 accessToken: config.accessToken,
@@ -152,8 +154,31 @@ final class AuthenticationManagerV2: ObservableObject {
             
         } catch {
             isLoading = false
-            self.error = error as? AuthenticationError ?? .unknown("Authentication failed")
-            throw error
+            
+            // Handle API errors with specific error codes
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .apiError(let message):
+                    // Check for specific error patterns
+                    if message.lowercased().contains("invalid verification code") {
+                        self.error = .invalidVerificationCode
+                    } else if message.lowercased().contains("invalid wallet signature") {
+                        self.error = .walletConnectionFailed("Invalid signature. Please try signing the message again.")
+                    } else if message.lowercased().contains("passkey not registered") {
+                        self.error = .passkeyNotFound
+                    } else {
+                        self.error = .unknown(message)
+                    }
+                case .unauthorized:
+                    self.error = .tokenExpired
+                default:
+                    self.error = .networkError(error.localizedDescription)
+                }
+            } else {
+                self.error = error as? AuthenticationError ?? .unknown("Authentication failed")
+            }
+            
+            throw self.error ?? error
         }
     }
     
@@ -182,6 +207,13 @@ final class AuthenticationManagerV2: ObservableObject {
         privacyMode = PrivacyMode(rawValue: response.privacyMode) ?? .linked
         sessionToken = response.sessionId
         isAuthenticated = true
+        
+        // Check if profile creation is required
+        if let requiresProfile = response.requiresProfile, requiresProfile {
+            print("🔐 AuthenticationManagerV2: Profile creation required")
+            isNewUser = true
+            // iOS should show profile creation UI
+        }
         
         // Load additional data if needed
         if !isNewUser && activeProfile != nil {
@@ -267,6 +299,7 @@ final class AuthenticationManagerV2: ObservableObject {
                 signature: nil,
                 message: nil,
                 walletType: nil,
+                chainId: nil,
                 idToken: tokens.idToken,
                 accessToken: tokens.accessToken,
                 shopDomain: provider.lowercased() == "shopify" ? UserDefaults.standard.string(forKey: "shopify_shop_domain") : nil
@@ -350,27 +383,19 @@ final class AuthenticationManagerV2: ObservableObject {
             return
         }
         
-        // Set token in API service immediately
+        // With 100-year tokens, we don't need to check expiry
+        // Just set the token and mark as authenticated
         APIService.shared.setAccessToken(accessToken)
         print("🔐 AuthenticationManagerV2: Access token set in APIService")
         
-        // Mark as authenticated immediately since we have valid tokens
-        // This prevents race conditions where API calls fail due to missing auth state
+        // Set authenticated state
         isAuthenticated = true
         print("🔐 AuthenticationManagerV2: Authentication state updated")
         
-        // Check if token is expired
-        if keychainManager.isTokenExpired() {
-            print("🔐 AuthenticationManagerV2: Token expired, refreshing...")
-            Task {
-                await refreshTokenIfNeeded()
-            }
-        } else {
-            // Token is valid, fetch current session in background
-            print("🔐 AuthenticationManagerV2: Token valid, fetching session data")
-            Task {
-                await fetchCurrentSession()
-            }
+        // Fetch current session in background
+        print("🔐 AuthenticationManagerV2: Fetching session data")
+        Task {
+            await fetchCurrentSession()
         }
     }
     
@@ -395,7 +420,10 @@ final class AuthenticationManagerV2: ObservableObject {
                     username: nil,
                     avatarUrl: nil,
                     privacyMode: "linked",
-                    isActive: profile.isActive
+                    isActive: profile.isActive,
+                    linkedAccountsCount: profile.linkedAccountsCount,
+                    appsCount: profile.appsCount,
+                    foldersCount: profile.foldersCount
                 )
             }
             
@@ -407,7 +435,10 @@ final class AuthenticationManagerV2: ObservableObject {
                     username: nil,
                     avatarUrl: nil,
                     privacyMode: "linked",
-                    isActive: true
+                    isActive: true,
+                    linkedAccountsCount: active.linkedAccountsCount,
+                    appsCount: active.appsCount,
+                    foldersCount: active.foldersCount
                 )
             }
         } catch {
@@ -425,16 +456,11 @@ final class AuthenticationManagerV2: ObservableObject {
             return false
         }
         
-        // Ensure token is set in APIService
+        // With 100-year tokens, we don't need to check expiry
+        // Just ensure token is set in APIService
         APIService.shared.setAccessToken(accessToken)
         
-        // Check if token is expired locally first
-        if keychainManager.isTokenExpired() {
-            print("🔐 AuthenticationManagerV2: Token is expired locally")
-            return false
-        }
-        
-        // Token appears valid
+        // Token is valid if it exists
         return true
     }
     
@@ -578,7 +604,7 @@ extension AuthenticationManagerV2 {
             walletType: walletType,
             email: nil,
             verificationCode: nil,
-            walletAddress: address,
+            walletAddress: address.lowercased(), // Normalize to lowercase
             signature: signature,
             message: message,
             socialProvider: nil,
@@ -697,6 +723,7 @@ extension AuthenticationManagerV2 {
                 signature: signature,
                 message: message,
                 walletType: nil,
+                chainId: nil,
                 idToken: nil,
                 accessToken: nil,
                 shopDomain: nil
@@ -753,6 +780,7 @@ extension AuthenticationManagerV2 {
                 signature: nil,
                 message: nil,
                 walletType: nil,
+                chainId: nil,
                 idToken: nil,
                 accessToken: nil,
                 shopDomain: nil
@@ -1027,39 +1055,6 @@ extension AuthenticationManagerV2 {
             }
             throw error
         }
-    }
-    
-    /// Authenticate with development wallet
-    func authenticateWithDevelopmentWallet(profileId: String) async throws {
-        #if DEBUG
-        guard EnvironmentConfiguration.shared.isDevelopmentModeEnabled else {
-            throw AuthenticationError.unknown("Development mode not enabled")
-        }
-        
-        let devAddress = "0xDEV\(profileId.prefix(8))"
-        let devSignature = "dev_signature_\(UUID().uuidString)"
-        let devMessage = "Development authentication for testing"
-        
-        let config = WalletConnectionConfig(
-            strategy: .wallet,
-            walletType: "development",
-            email: nil,
-            verificationCode: nil,
-            walletAddress: devAddress,
-            signature: devSignature,
-            message: devMessage,
-            socialProvider: nil,
-            socialProfile: nil,
-            oauthCode: nil,
-            idToken: nil,
-            accessToken: nil,
-            shopDomain: nil
-        )
-        
-        try await authenticate(with: config)
-        #else
-        throw AuthenticationError.unknown("Development authentication not available in release builds")
-        #endif
     }
 }
 

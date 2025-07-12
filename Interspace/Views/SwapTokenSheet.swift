@@ -214,7 +214,7 @@ struct SwapTokenSheetBase: View {
                 )
             }
         }
-        .onChange(of: fromAmount) { _, newValue in
+        .onChange(of: fromAmount) { newValue in
             if let rate = viewModel.exchangeRate,
                let amount = Double(newValue),
                amount > 0 {
@@ -260,7 +260,7 @@ struct SwapTokenSheetBase: View {
     }
     
     private var swapCard: some View {
-        LiquidGlassCard {
+        VStack {
             VStack(spacing: 0) {
                 // From Token
                 tokenInputSection(
@@ -312,6 +312,15 @@ struct SwapTokenSheetBase: View {
             }
             .padding(DesignTokens.Spacing.md)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
     
     private func tokenInputSection(
@@ -430,7 +439,7 @@ struct SwapTokenSheetBase: View {
     }
     
     private var exchangeRateCard: some View {
-        LiquidGlassCard {
+        VStack {
             VStack(spacing: DesignTokens.Spacing.sm) {
                 HStack {
                     Text("Exchange Rate")
@@ -480,6 +489,15 @@ struct SwapTokenSheetBase: View {
             }
             .padding(DesignTokens.Spacing.md)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
     
     private var priceImpactWarning: some View {
@@ -506,7 +524,7 @@ struct SwapTokenSheetBase: View {
     }
     
     private func routeVisualizationCard(_ route: RouteVisualization) -> some View {
-        LiquidGlassCard {
+        VStack {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                 HStack {
                     Text("Route")
@@ -550,6 +568,15 @@ struct SwapTokenSheetBase: View {
             }
             .padding(DesignTokens.Spacing.md)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
     
     private var swapButton: some View {
@@ -628,9 +655,7 @@ class SwapTokenViewModel: ObservableObject {
     private var currentIntent: IntentResponse?
     
     func initialize(walletViewModel: WalletViewModel) async {
-        if let user = AuthenticationManagerV2.shared.currentUser,
-           let profiles = user.profiles,
-           let activeProfile = profiles.first(where: { $0.isActive }) {
+        if let activeProfile = ProfileViewModel.shared.activeProfile {
             self.profileId = activeProfile.id
         }
     }
@@ -689,13 +714,13 @@ class SwapTokenViewModel: ObservableObject {
         // Build swap intent
         let intentRequest = CreateIntentRequest(
             type: "SWAP",
-            from: CreateIntentRequest.IntentEndpoint(
+            from: CreateIntentRequest.TokenEndpoint(
                 token: fromToken.symbol,
                 chainId: fromChainId,
                 amount: fromAmountWei,
                 address: nil
             ),
-            to: CreateIntentRequest.IntentEndpoint(
+            to: CreateIntentRequest.TokenEndpoint(
                 token: toToken.symbol,
                 chainId: toChainId,
                 amount: minAmountOut,
@@ -722,7 +747,7 @@ class SwapTokenViewModel: ObservableObject {
             id: intentResponse.data.intentId,
             type: .swap,
             status: .pending,
-            from: profileViewModel.activeProfile?.sessionWalletAddress ?? "",
+            from: ProfileViewModel.shared.activeProfile?.sessionWalletAddress ?? "",
             to: operation.to,
             value: operation.value,
             tokenSymbol: fromToken.symbol,

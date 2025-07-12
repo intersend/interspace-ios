@@ -3,7 +3,6 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject private var sessionCoordinator = SessionCoordinator.shared
     @State private var hasTrackedLaunch = false
-    @State private var showAuthExpiry = false
     
     var body: some View {
         ZStack {
@@ -49,16 +48,8 @@ struct ContentView: View {
                         .transition(.opacity)
                 }
             }
-            
-            // Auth expiry overlay - smooth fade effect
-            if showAuthExpiry {
-                AuthExpiryOverlay()
-                    .transition(.opacity)
-                    .zIndex(100)
-            }
         }
         .animation(.easeInOut(duration: 0.3), value: sessionCoordinator.sessionState)
-        .animation(.easeInOut(duration: 0.3), value: showAuthExpiry)
         .onAppear {
             if !hasTrackedLaunch {
                 hasTrackedLaunch = true
@@ -66,17 +57,9 @@ struct ContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .authenticationExpired)) { _ in
-            // Show auth expiry overlay briefly before transitioning
-            withAnimation(.easeIn(duration: 0.2)) {
-                showAuthExpiry = true
-            }
-            
-            // Hide overlay after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    showAuthExpiry = false
-                }
-            }
+            // No overlay needed - SessionCoordinator will handle the transition
+            // The state change to .unauthenticated will trigger the AuthView
+            print("🔐 ContentView: Authentication expired notification received")
         }
         .alert("Session Error", isPresented: $sessionCoordinator.showError) {
             Button("OK") {
@@ -303,6 +286,7 @@ struct OnboardingView: View {
 */
 
 struct MainTabView: View {
+    @ObservedObject private var sessionCoordinator = SessionCoordinator.shared
     @State private var selectedTab: Tab = .apps {
         didSet {
             if oldValue != selectedTab {
@@ -372,6 +356,26 @@ struct MainTabView: View {
         .accentColor(DesignTokens.Colors.primary)
         .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8), value: selectedTab)
         .preferredColorScheme(.dark) // Consistent dark mode
+        .overlay(
+            // Profile switching loading overlay
+            Group {
+                if sessionCoordinator.isSwitchingProfile {
+                    ZStack {
+                        // Semi-transparent background
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .transition(.opacity)
+                        
+                        // Native loading indicator
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                    .animation(.easeInOut(duration: 0.2), value: sessionCoordinator.isSwitchingProfile)
+                }
+            }
+        )
         .onAppear {
             // Configure tab bar for native iOS appearance
             let tabAppearance = UITabBarAppearance()

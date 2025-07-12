@@ -366,13 +366,40 @@ enum MetadataValue: Codable {
 
 struct AccountV2: Codable, Identifiable {
     let id: String
-    let type: String?  // Backend uses 'type'
-    let strategy: String?  // For compatibility
+    private let type: String?  // Backend uses 'type'
+    let strategy: String?  // Backend response uses 'strategy' field
     let identifier: String
     let metadata: [String: MetadataValue]?  // Now supports mixed types
     let verified: Bool?
     let createdAt: String?
     let updatedAt: String?
+    
+    // Custom coding to handle backend sending 'strategy' in response
+    enum CodingKeys: String, CodingKey {
+        case id, type, strategy, identifier, metadata, verified, createdAt, updatedAt
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        identifier = try container.decode(String.self, forKey: .identifier)
+        metadata = try container.decodeIfPresent([String: MetadataValue].self, forKey: .metadata)
+        verified = try container.decodeIfPresent(Bool.self, forKey: .verified)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        
+        // Backend sends 'strategy' in response but we store it as type
+        if let strategyValue = try container.decodeIfPresent(String.self, forKey: .strategy) {
+            type = strategyValue
+            strategy = strategyValue
+        } else if let typeValue = try container.decodeIfPresent(String.self, forKey: .type) {
+            type = typeValue
+            strategy = typeValue
+        } else {
+            type = nil
+            strategy = nil
+        }
+    }
     
     // Computed property to get the account type
     var accountType: String {
@@ -387,11 +414,14 @@ struct AccountV2: Codable, Identifiable {
 
 struct ProfileSummaryV2: Codable {
     let id: String
-    let displayName: String
+    let displayName: String  // Backend sends 'displayName'
     let username: String?
     let avatarUrl: String?
     let privacyMode: String
     var isActive: Bool
+    let linkedAccountsCount: Int?
+    let appsCount: Int?
+    let foldersCount: Int?
 }
 
 struct UserV2: Codable {  // Legacy compatibility - represents account in flat identity model
@@ -406,10 +436,12 @@ struct AuthResponseV2: Codable {
     let user: UserV2
     let profiles: [ProfileSummaryV2]
     let activeProfile: ProfileSummaryV2?
-    let tokens: AuthTokens
+    let tokens: AuthTokensV2
     let isNewAccount: Bool  // Changed from isNewUser to reflect account-centric model
     let privacyMode: String
     let sessionId: String
+    let requiresProfile: Bool?  // Backend sends this when profile creation is needed
+    let message: String?  // Backend may send a message
 }
 
 struct AuthenticationRequestV2: Codable {
@@ -430,6 +462,7 @@ struct AuthenticationRequestV2: Codable {
     let signature: String?
     let message: String?
     let walletType: String?
+    let chainId: Int? // For wallet authentication
     
     // Social-specific fields
     let idToken: String?

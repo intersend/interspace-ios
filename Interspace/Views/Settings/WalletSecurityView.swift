@@ -101,8 +101,7 @@ struct WalletSecurityView: View {
                         }
                         
                         // Emergency Actions
-                        if !(profile.isDevelopmentWallet ?? false) {
-                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                                 Text("EMERGENCY")
                                     .font(DesignTokens.Typography.caption)
                                     .foregroundColor(DesignTokens.Colors.textTertiary)
@@ -134,7 +133,6 @@ struct WalletSecurityView: View {
                                 .background(DesignTokens.GlassEffect.thin)
                                 .cornerRadius(DesignTokens.CornerRadius.lg)
                                 .padding(.horizontal, DesignTokens.Spacing.screenPadding)
-                            }
                         }
                         
                         Spacer(minLength: DesignTokens.Spacing.xl)
@@ -250,13 +248,13 @@ struct SecurityStatusCard: View {
                 SecurityFeatureRow(
                     icon: "key.horizontal",
                     title: "MPC Key Protection",
-                    isEnabled: !(profile.isDevelopmentWallet ?? false)
+                    isEnabled: true
                 )
                 
                 SecurityFeatureRow(
                     icon: "lock.rotation",
                     title: "Key Rotation Available",
-                    isEnabled: !(profile.isDevelopmentWallet ?? false)
+                    isEnabled: true
                 )
             }
         }
@@ -276,9 +274,7 @@ struct SecurityStatusCard: View {
             score += 0.3
         }
         
-        if !(profile.isDevelopmentWallet ?? false) {
-            score += 0.2
-        }
+        score += 0.2
         
         // Add more factors as needed
         
@@ -522,7 +518,6 @@ struct WalletSecurityView_Previews: PreviewProvider {
                 linkedAccountsCount: 3,
                 appsCount: 8,
                 foldersCount: 2,
-                isDevelopmentWallet: false,
                 needsMpcGeneration: false,
                 clientShare: nil,
                 createdAt: "2024-01-01T00:00:00Z",

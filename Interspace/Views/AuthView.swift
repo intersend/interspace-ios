@@ -12,23 +12,29 @@ struct AuthView: View {
     @State private var isLoading = false
     @State private var showWalletConnectionTray = false
     @State private var showSocialConnectionTray = false
+    @State private var isShowingAuth = false
     
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
                 ZStack {
-                    // Full-screen background - extends to all edges
-                    DesignTokens.Colors.backgroundPrimary
-                        .ignoresSafeArea(.all)
+                    // Native iOS adaptive background
+                    Color(UIColor.systemBackground)
+                        .ignoresSafeArea()
                     
-                    // Main content - proper full-screen layout
+                    // Main content
                     if authManager.isAuthenticated {
                         AuthenticatedView()
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                                removal: .opacity
+                            ))
                     } else {
-                        UnauthenticatedView(
+                        NativeAppleAuthView(
                             showingWalletConnectScanner: $showingWalletConnectScanner,
                             showWalletConnectionTray: $showWalletConnectionTray,
                             showSocialConnectionTray: $showSocialConnectionTray,
+                            isShowingAuth: $isShowingAuth,
                             onConnectMetaMask: connectMetaMask,
                             onConnectCoinbase: connectCoinbaseWallet,
                             onConnectWalletConnect: connectWalletConnect,
@@ -37,11 +43,12 @@ struct AuthView: View {
                             onShowEmailAuth: showEmailAuthentication,
                             screenHeight: geometry.size.height
                         )
+                        .transition(.opacity)
                     }
                     
-                    // Loading Overlay
+                    // Loading Overlay with native blur
                     if authManager.isLoading || walletService.connectionStatus == .connecting || isLoading {
-                        LoadingOverlay()
+                        NativeLoadingOverlay()
                     }
                 }
             }
@@ -192,63 +199,92 @@ struct AuthView: View {
 // MARK: - Authenticated State View
 struct AuthenticatedView: View {
     @ObservedObject private var authManager = AuthenticationManagerV2.shared
+    @State private var isAnimating = false
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header section - flows from top
-            VStack(spacing: 24) {
-                // Success animation
+            Spacer()
+            
+            // Native Apple success animation
+            VStack(spacing: 32) {
+                // Success checkmark with native animation
                 ZStack {
+                    // Background circle with subtle animation
                     Circle()
-                        .fill(DesignTokens.Colors.success.opacity(0.2))
-                        .frame(width: 100, height: 100)
+                        .fill(Color(UIColor.systemGreen).opacity(0.15))
+                        .frame(width: 120, height: 120)
+                        .scaleEffect(isAnimating ? 1.0 : 0.8)
+                        .opacity(isAnimating ? 1.0 : 0.0)
                     
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 50, weight: .medium))
-                        .foregroundColor(DesignTokens.Colors.success)
+                        .font(.system(size: 64, weight: .regular))
+                        .foregroundColor(Color(UIColor.systemGreen))
+                        .scaleEffect(isAnimating ? 1.0 : 0.5)
+                        .opacity(isAnimating ? 1.0 : 0.0)
                 }
                 
-                VStack(spacing: DesignTokens.Spacing.md) {
-                    Text("Welcome to Interspace!")
-                        .font(DesignTokens.Typography.largeTitle)
-                        .foregroundColor(DesignTokens.Colors.textPrimary)
+                VStack(spacing: 8) {
+                    Text("Welcome to Interspace")
+                        .font(.system(size: 28, weight: .semibold, design: .default))
+                        .foregroundColor(.primary)
                         .multilineTextAlignment(.center)
                     
-                    Text("Authentication successful")
-                        .font(DesignTokens.Typography.body)
-                        .foregroundColor(DesignTokens.Colors.textSecondary)
+                    Text("You're all set!")
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                 }
+                .opacity(isAnimating ? 1.0 : 0.0)
+                .offset(y: isAnimating ? 0 : 20)
             }
-            .padding(.top, 40)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 40)
             
             Spacer()
             
-            // Bottom action
-            VStack {
-                Button("Sign Out") {
+            // Sign out button - native iOS style
+            VStack(spacing: 12) {
+                Button(action: {
                     HapticManager.impact(.light)
                     Task {
                         await SessionCoordinator.shared.logout()
                     }
+                }) {
+                    Text("Sign Out")
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundColor(.red)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color(UIColor.tertiarySystemBackground))
+                        .cornerRadius(12)
                 }
-                .buttonStyle(LiquidGlassButtonStyle(variant: .destructive, size: .medium))
+                .buttonStyle(PlainButtonStyle())
+                
+                Text("You can sign out at any time from Settings")
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .multilineTextAlignment(.center)
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 40)
+            .padding(.bottom, 50)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+                isAnimating = true
+            }
         }
     }
 }
 
-// MARK: - Unauthenticated State View
-struct UnauthenticatedView: View {
+// MARK: - Native Apple Style Auth View
+struct NativeAppleAuthView: View {
     @ObservedObject private var authManager = AuthenticationManagerV2.shared
     @ObservedObject private var walletService = WalletService.shared
     @Binding var showingWalletConnectScanner: Bool
     @Binding var showWalletConnectionTray: Bool
     @Binding var showSocialConnectionTray: Bool
+    @Binding var isShowingAuth: Bool
     @State private var showUniversalAddTray = false
+    @State private var isAnimating = false
     
     let onConnectMetaMask: () async -> Void
     let onConnectCoinbase: () async -> Void
@@ -261,94 +297,98 @@ struct UnauthenticatedView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                Spacer()
-                
-                // Centered content with Apple-native styling
-                VStack(spacing: 48) {
-                    // App identity - Apple Health/Wallet inspired
-                    VStack(spacing: 24) {
-                        // Modern icon design
-                        ZStack {
-                            // Gradient background circle
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.blue.opacity(0.8),
-                                            Color.purple.opacity(0.8)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 120, height: 120)
-                                .blur(radius: 20)
-                                .opacity(0.5)
-                            
-                            // Glass effect circle
-                            Circle()
-                                .fill(Material.ultraThinMaterial)
-                                .frame(width: 100, height: 100)
-                            
-                            // Wallet icon with gradient
-                            Image(systemName: "wallet.pass.fill")
-                                .font(.system(size: 48))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [Color.blue, Color.purple],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        }
+                // Top section with logo - Apple Fitness+ style
+                VStack(spacing: 0) {
+                    Spacer()
+                        .frame(height: geometry.safeAreaInsets.top + 60)
+                    
+                    // Subtle app icon - Apple native style
+                    VStack(spacing: 28) {
+                        // Minimalist icon with subtle branding - Apple Health/Fitness style
+                        Image("SplashScreenLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 80, height: 80)
+                        .scaleEffect(isAnimating ? 1.0 : 0.8)
+                        .opacity(isAnimating ? 1.0 : 0.0)
                         
-                        // App name and tagline
-                        VStack(spacing: 8) {
-                            Text("Interspace")
-                                .font(.system(size: 34, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            
-                            Text("Your gateway to Web3")
-                                .font(.system(size: 17, weight: .regular))
-                                .foregroundColor(.gray)
-                        }
+                        // Title - Apple native typography
+                        Text("Interspace")
+                            .font(.system(size: 32, weight: .bold, design: .default))
+                            .foregroundColor(.primary)
+                        .opacity(isAnimating ? 1.0 : 0.0)
+                        .offset(y: isAnimating ? 0 : 10)
                     }
                     
-                    // Single Connect button - Apple native style
-                    Button(action: {
-                        HapticManager.impact(.medium)
-                        showUniversalAddTray = true
-                    }) {
-                        HStack {
-                            Text("Get Started")
-                                .font(.system(size: 17, weight: .semibold))
-                            
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 15, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: 320)
-                        .frame(height: 56)
-                        .background(
-                            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.blue, Color.purple],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                        )
-                        .shadow(color: Color.blue.opacity(0.3), radius: 20, x: 0, y: 10)
-                    }
-                    .buttonStyle(ScaleButtonStyle(scale: 0.98))
+                    Spacer()
+                        .frame(height: 60)
                 }
-                .padding(.horizontal, 20)
                 
                 Spacer()
-                Spacer() // Extra spacer to push content up slightly
+                
+                // Bottom section with actions - Apple native style
+                VStack(spacing: 12) {
+                    // Continue button - Primary action
+                    Button(action: {
+                        HapticManager.impact(.light)
+                        showUniversalAddTray = true
+                    }) {
+                        Text("Continue")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color(UIColor.systemBlue))
+                            )
+                    }
+                    .buttonStyle(NativeButtonStyle())
+                    
+                    // Secondary actions
+                    HStack(spacing: 12) {
+                        // Sign in with Apple
+                        Button(action: {
+                            HapticManager.impact(.light)
+                            Task {
+                                await onAuthenticatePasskey()
+                            }
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "applelogo")
+                                    .font(.system(size: 16, weight: .medium))
+                                Text("Sign in with Apple")
+                                    .font(.system(size: 17, weight: .regular))
+                            }
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color(UIColor.tertiarySystemBackground))
+                            )
+                        }
+                        .buttonStyle(NativeButtonStyle())
+                    }
+                    
+                    // Privacy note - Apple style
+                    Text("By continuing, you agree to our Terms of Service")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 8)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 34)
+                .opacity(isAnimating ? 1.0 : 0.0)
+                .offset(y: isAnimating ? 0 : 20)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
+                isAnimating = true
+            }
         }
         .sheet(isPresented: $showUniversalAddTray) {
             UniversalAddTray(
@@ -434,6 +474,53 @@ struct LiquidGlassAuthButton: View {
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
+    }
+}
+
+// MARK: - Native Loading Overlay
+struct NativeLoadingOverlay: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        ZStack {
+            // Background blur
+            Color.clear
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea()
+            
+            // Loading indicator
+            VStack(spacing: 16) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .scaleEffect(1.2)
+                
+                Text("Connecting...")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            .padding(24)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .scaleEffect(isAnimating ? 1.0 : 0.9)
+            .opacity(isAnimating ? 1.0 : 0.0)
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.2)) {
+                isAnimating = true
+            }
+        }
+    }
+}
+
+// MARK: - Native Button Style
+struct NativeButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 

@@ -14,11 +14,11 @@ enum AppEnvironment: String, CaseIterable {
                 return url
             }
             // Fallback for development
-            return "https://8572-184-147-176-114.ngrok-free.app/api/v2"
+            return "https://staging-api.interspace.fi/api/v2"
         case .staging:
-            return "https://8572-184-147-176-114.ngrok-free.app/api/v2"
+          return "https://staging-api.interspace.fi/api/v2"
         case .production:
-            return "https://8572-184-147-176-114.ngrok-free.app/api/v2"
+          return "https://staging-api.interspace.fi/api/v2"
         }
     }
     
@@ -40,13 +40,11 @@ class EnvironmentConfiguration: ObservableObject {
     static let shared = EnvironmentConfiguration()
     
     @Published private(set) var currentEnvironment: AppEnvironment
-    @Published var isDevelopmentModeEnabled: Bool = false
     @Published var showDebugOverlay: Bool = false
     @Published var enableMockData: Bool = false
     @Published var enableDetailedLogging: Bool = false
     
     private let environmentKey = "com.interspace.environment"
-    private let devModeKey = "com.interspace.devModeEnabled"
     
     private init() {
         // Initialize currentEnvironment first
@@ -60,20 +58,6 @@ class EnvironmentConfiguration: ObservableObject {
             self.currentEnvironment = .production
             #endif
         }
-        
-        // Then initialize other properties
-        #if DEBUG
-        let savedDevMode = UserDefaults.standard.bool(forKey: devModeKey)
-        if !UserDefaults.standard.contains(key: devModeKey) {
-            // First time in debug, enable dev mode
-            self.isDevelopmentModeEnabled = true
-            UserDefaults.standard.set(true, forKey: devModeKey)
-        } else {
-            self.isDevelopmentModeEnabled = savedDevMode
-        }
-        #else
-        self.isDevelopmentModeEnabled = false
-        #endif
         
         // Load other settings
         #if DEBUG
@@ -94,13 +78,6 @@ class EnvironmentConfiguration: ObservableObject {
         
         // Update APIService with new base URL
         NotificationCenter.default.post(name: .environmentChanged, object: nil)
-    }
-    
-    func toggleDevelopmentMode() {
-        #if DEBUG
-        isDevelopmentModeEnabled.toggle()
-        UserDefaults.standard.set(isDevelopmentModeEnabled, forKey: devModeKey)
-        #endif
     }
     
     func toggleDebugOverlay() {

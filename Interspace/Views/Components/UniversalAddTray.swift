@@ -12,27 +12,27 @@ struct UniversalAddTray: View {
     let initialSection: AddSection
     var isForAuthentication: Bool = false
     var authViewModel: AuthViewModel? = nil
+    var appsViewModel: AppsViewModel? = nil
     
     @ObservedObject private var profileViewModel = ProfileViewModel.shared
     @ObservedObject private var authManager = AuthenticationManagerV2.shared
     @ObservedObject private var sessionCoordinator = SessionCoordinator.shared
     @StateObject private var localAuthViewModel = AuthViewModel()
-    @State private var showWalletConnection = false
     @State private var showSocialConnection = false
     @State private var selectedWalletType: WalletType?
     @State private var selectedSocialProvider: SocialProvider?
     @State private var showEmailAuth = false
     @State private var showPasskeyAuth = false
     @State private var showAppleSignIn = false
-    @State private var showWalletAuthorization = false
+    @State private var showMiniWalletAuth = false
     @State private var showAddApp = false
     @State private var showProfileCreation = false
     @State private var availableWalletConnectWallets: [WalletType] = []
     @State private var showOAuthFlow = false
     @State private var selectedOAuthProvider: OAuthProviderInfo?
     @State private var isProcessing = false
+    @State private var processingProviderId: String?
     @State private var showFarcasterAuth = false
-    // Removed showWalletConnectionTray - using direct authorization
     
     private let walletService = WalletService.shared
     private let oauthService = OAuthProviderService.shared
@@ -44,11 +44,8 @@ struct UniversalAddTray: View {
             .preferredColorScheme(.dark)
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
-            .sheet(isPresented: $showWalletAuthorization) {
-                walletAuthorizationSheet
-            }
-            .sheet(isPresented: $showWalletConnection) {
-                walletConnectionSheet
+            .sheet(isPresented: $showMiniWalletAuth) {
+                miniWalletAuthSheet
             }
             .sheet(isPresented: $showEmailAuth) {
                 emailAuthSheet
@@ -68,11 +65,7 @@ struct UniversalAddTray: View {
             .sheet(isPresented: $showFarcasterAuth) {
                 farcasterAuthSheet
             }
-            .overlay {
-                if isProcessing {
-                    processingOverlay
-                }
-            }
+            // Remove full-screen processing overlay - use inline loading states instead
             .onAppear {
                 onAppearActions()
             }
@@ -130,7 +123,38 @@ struct UniversalAddTray: View {
     
     // MARK: - Authentication Handlers
     
-    // Wallet connection is now handled by WalletConnectionView directly
+    private func handleWalletAuthorization(_ walletType: WalletType) async {
+        do {
+            if isForAuthentication {
+                // Authentication flow - use standard WalletConnect for ALL wallets
+                try await walletService.connectWallet(walletType)
+                
+                // The authentication will be handled by the wallet service
+                // and the UI will update automatically when authentication succeeds
+            } else {
+                // Account linking flow - ensure profile exists first
+                if sessionCoordinator.activeProfile == nil {
+                    print("No active profile found, ensuring profile exists before linking wallet")
+                    await sessionCoordinator.ensureActiveProfile()
+                }
+                
+                // Verify profile exists after ensuring
+                guard sessionCoordinator.activeProfile != nil else {
+                    throw AuthenticationError.notAuthenticated
+                }
+                
+                // Link wallet to existing account using standard WalletConnect
+                _ = try await walletService.connectWallet(walletType)
+            }
+            
+            // Success feedback is handled by the respective services
+        } catch {
+            print("Wallet authorization error: \(error)")
+            await MainActor.run {
+                HapticManager.notification(.error)
+            }
+        }
+    }
     
     private func handleEmailAuthentication() {
         // Show email auth sheet
@@ -191,7 +215,9 @@ struct UniversalAddTray: View {
     }
     
     private func handleOAuthResult(provider: OAuthProviderInfo, result: Result<OAuthTokens, Error>) async {
-        isProcessing = true
+        await MainActor.run {
+            processingProviderId = provider.id
+        }
         
         do {
             switch result {
@@ -244,7 +270,9 @@ struct UniversalAddTray: View {
             }
         }
         
-        isProcessing = false
+        await MainActor.run {
+            processingProviderId = nil
+        }
     }
     
     private func createProfile(name: String) async {
@@ -365,7 +393,7 @@ struct UniversalAddTray: View {
             ) {
                 HapticManager.impact(.light)
                 selectedWalletType = .metamask
-                showWalletAuthorization = true
+                showMiniWalletAuth = true
             }
             
         default:
@@ -443,21 +471,34 @@ struct UniversalAddTray: View {
     
     private var walletOptionsContent: some View {
         VStack(spacing: 0) {
+            // WalletConnect option that uses AppKit modal
+            AddOptionRow(
+                icon: "link.circle.fill",
+                iconType: .system,
+                title: "WalletConnect",
+                iconColor: .purple,
+                isFirst: true,
+                isLast: false
+            ) {
+                HapticManager.impact(.light)
+                handleWalletConnectTap()
+            }
+            
+            Divider()
+                .padding(.leading, 72)
+            
             // MetaMask
             AddOptionRow(
                 icon: "metamask",
                 iconType: .asset,
                 title: "MetaMask",
                 iconColor: .orange,
-                isFirst: true,
+                isFirst: false,
                 isLast: false
             ) {
                 HapticManager.impact(.light)
                 selectedWalletType = .metamask
-                // Show authorization directly without intermediate tray
-                DispatchQueue.main.async {
-                    showWalletAuthorization = true
-                }
+                showMiniWalletAuth = true
             }
             
             Divider()
@@ -470,45 +511,11 @@ struct UniversalAddTray: View {
                 title: "Coinbase Wallet",
                 iconColor: .blue,
                 isFirst: false,
-                isLast: availableWalletConnectWallets.isEmpty
+                isLast: true
             ) {
                 HapticManager.impact(.light)
                 selectedWalletType = .coinbase
-                // Show authorization directly without intermediate tray
-                DispatchQueue.main.async {
-                    showWalletAuthorization = true
-                }
-            }
-            
-            if !availableWalletConnectWallets.isEmpty {
-                Divider()
-                    .padding(.leading, 72)
-            }
-            
-            // Add individual WalletConnect-compatible wallets
-            ForEach(availableWalletConnectWallets.indices, id: \.self) { index in
-                let walletType = availableWalletConnectWallets[index]
-                Group {
-                    if index > 0 {
-                        Divider()
-                            .padding(.leading, 72)
-                    }
-                    
-                    AddOptionRow(
-                        icon: walletType.systemIconName,
-                        iconType: .system,
-                        title: walletType.displayName,
-                        iconColor: walletType.primaryColor,
-                        isFirst: false,
-                        isLast: index == availableWalletConnectWallets.count - 1
-                    ) {
-                        HapticManager.impact(.light)
-                        selectedWalletType = walletType
-                        DispatchQueue.main.async {
-                            showWalletAuthorization = true
-                        }
-                    }
-                }
+                showMiniWalletAuth = true
             }
         }
         .background(
@@ -609,7 +616,8 @@ struct UniversalAddTray: View {
                         title: provider.displayName,
                         iconColor: provider.tintColor,
                         isFirst: index == 0,
-                        isLast: index == nonAppleProviders.count - 1
+                        isLast: index == nonAppleProviders.count - 1,
+                        isLoading: processingProviderId == provider.id
                     ) {
                         HapticManager.impact(.light)
                         handleOAuthProvider(provider)
@@ -656,40 +664,14 @@ struct UniversalAddTray: View {
     // MARK: - Sheet Contents
     
     @ViewBuilder
-    private var walletAuthorizationSheet: some View {
+    private var miniWalletAuthSheet: some View {
         if let walletType = selectedWalletType {
-            if isForAuthentication {
-                WalletConnectionView(
-                    isLinking: false,
-                    onSuccess: { result in
-                        isPresented = false
-                    }
-                )
-            } else {
-                WalletAuthorizationTray(
-                    walletType: walletType,
-                    onAuthorize: {
-                        showWalletAuthorization = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showWalletConnection = true
-                        }
-                    },
-                    onCancel: {
-                        showWalletAuthorization = false
-                        selectedWalletType = nil
-                    }
-                )
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var walletConnectionSheet: some View {
-        if let walletType = selectedWalletType {
-            WalletConnectionView(
-                isLinking: true,
-                onSuccess: { result in
-                    isPresented = false
+            MiniWalletAuthorizationTray(
+                isPresented: $showMiniWalletAuth,
+                walletType: walletType,
+                isForAuthentication: isForAuthentication,
+                onAuthorize: {
+                    await handleWalletAuthorization(walletType)
                 }
             )
         }
@@ -718,10 +700,17 @@ struct UniversalAddTray: View {
     }
     
     private var addAppSheet: some View {
-        AddAppView(viewModel: AppsViewModel())
-            .background(Color.black.opacity(0.001))
-            .background(Material.ultraThinMaterial)
-            .preferredColorScheme(.dark)
+        AppStoreView(
+            appsViewModel: appsViewModel ?? AppsViewModel(),
+            onDismiss: {
+                // Dismiss both the app store and the add tray
+                showAddApp = false
+                isPresented = false
+            }
+        )
+        .background(Color.black.opacity(0.001))
+        .background(Material.ultraThinMaterial)
+        .preferredColorScheme(ColorScheme.dark)
     }
     
     private var profileCreationSheet: some View {
@@ -772,15 +761,7 @@ struct UniversalAddTray: View {
         }
     }
     
-    private var processingOverlay: some View {
-        Color.black.opacity(0.5)
-            .ignoresSafeArea()
-            .overlay {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .scaleEffect(1.2)
-            }
-    }
+    // Removed processingOverlay - using inline loading states instead
     
     // MARK: - Helper Methods
     
@@ -801,12 +782,7 @@ struct UniversalAddTray: View {
     
     private func handlePasskeyLinking() {
         Task {
-            isProcessing = true
-            defer { 
-                Task { @MainActor in
-                    isProcessing = false
-                }
-            }
+            // Using inline loading states instead of full-screen overlay
             
             do {
                 // Register a new passkey for linking
@@ -830,6 +806,63 @@ struct UniversalAddTray: View {
             }
         }
     }
+    
+    // MARK: - WalletConnect Handling
+    
+    private func handleWalletConnectTap() {
+        // Present AppKit modal for WalletConnect
+        AppKitService.shared.presentModal()
+        
+        // Handle auth response
+        if isForAuthentication {
+            Task {
+                for await response in AppKitService.shared.authResponsePublisher.values {
+                    switch response.result {
+                    case .success(let (session, cacaos)):
+                        // Handle successful authentication
+                        if let address = session?.namespaces.values.flatMap({ $0.accounts }).first {
+                            let components = address.absoluteString.split(separator: ":")
+                            if components.count >= 3 {
+                                let walletAddress = String(components[2])
+                                
+                                // Get SIWE message and signature from cacaos
+                                if let cacao = cacaos.first {
+                                    // Cacao contains the signature in 's' property
+                                    // The signature might be nested - try accessing string value
+                                    let signature: String
+                                    if let sigString = cacao.s as? String {
+                                        signature = sigString
+                                    } else {
+                                        // Try common nested properties
+                                        signature = String(describing: cacao.s)
+                                    }
+                                    
+                                    // The message is in the payload 'p' property
+                                    // For SIWE, we need to reconstruct or use the original message
+                                    let message = cacao.p.statement ?? "Sign in with Ethereum"
+                                    
+                                    await authViewModel?.handleWalletConnectAuth(
+                                        address: walletAddress,
+                                        signature: signature,
+                                        message: message
+                                    )
+                                    isPresented = false
+                                    break
+                                }
+                            }
+                        }
+                        
+                    case .failure(let error):
+                        print("❌ UniversalAddTray: Auth failed: \(error)")
+                        break
+                    }
+                }
+            }
+        } else {
+            // For profile linking - close tray and let AppKit handle it
+            isPresented = false
+        }
+    }
 }
 
 // MARK: - Add Option Row
@@ -841,6 +874,7 @@ struct AddOptionRow: View {
     let iconColor: Color
     let isFirst: Bool
     let isLast: Bool
+    var isLoading: Bool = false
     let action: () -> Void
     
     var body: some View {
@@ -888,15 +922,22 @@ struct AddOptionRow: View {
                 
                 Spacer()
                 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                }
             }
             .padding(.horizontal, 16)
             .frame(height: 44) // Apple standard row height
             .contentShape(Rectangle()) // Ensures entire row is clickable
         }
         .buttonStyle(.plain) // Use .plain instead of PlainButtonStyle()
+        .disabled(isLoading)
     }
 }
 

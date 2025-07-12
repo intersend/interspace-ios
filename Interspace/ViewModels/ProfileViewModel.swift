@@ -263,22 +263,9 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            // Use MPC mode for real wallet generation
-            let isDevelopmentMode = false
-            
             let newProfile = try await profileAPI.createProfile(
-                name: name,
-                developmentMode: isDevelopmentMode
+                name: name
             )
-            
-            // If it's a development wallet, store the clientShare locally
-            if let clientShare = newProfile.clientShare {
-                // Store in keychain for this profile
-                try? KeychainManager.shared.saveDevelopmentClientShare(
-                    clientShare: clientShare,
-                    profileId: newProfile.id
-                )
-            }
             
             // Automatically switch to the newly created profile using SessionCoordinator
             // This ensures proper state synchronization across the app
@@ -289,14 +276,14 @@ class ProfileViewModel: ObservableObject {
                 self.activeProfile = newProfile
             }
             
-            // Generate MPC wallet for the new profile if not in development mode
-            if !isDevelopmentMode && MPCWalletServiceHTTP.isEnabled {
+            // Generate MPC wallet for the new profile
+            if MPCWalletServiceHTTP.isEnabled {
                 print("✅ MPC wallet generation enabled for profile: \(newProfile.id)")
                 
                 // Generate MPC wallet
                 await generateMPCWallet()
             } else {
-                print("❌ MPC wallet generation skipped - developmentMode: \(isDevelopmentMode), isEnabled: \(MPCWalletServiceHTTP.isEnabled)")
+                print("❌ MPC wallet generation skipped - MPC not enabled")
             }
             
             await MainActor.run {
@@ -439,8 +426,14 @@ class ProfileViewModel: ObservableObject {
             
             // Update the profile in the local array
             await MainActor.run {
-                if let index = self.profiles.firstIndex(where: { $0.id == profile.id }) {
-                    self.profiles[index] = updatedProfile
+                // Use a safer approach to update the array
+                var updatedProfiles = self.profiles
+                if let index = updatedProfiles.firstIndex(where: { $0.id == profile.id }) {
+                    // Bounds check before accessing
+                    if index < updatedProfiles.count {
+                        updatedProfiles[index] = updatedProfile
+                        self.profiles = updatedProfiles
+                    }
                 }
                 
                 // Update active profile if it's the one being updated
@@ -649,8 +642,14 @@ class ProfileViewModel: ObservableObject {
             )
             
             await MainActor.run {
-                if let index = self.linkedAccounts.firstIndex(where: { $0.id == account.id }) {
-                    self.linkedAccounts[index] = updatedAccount
+                // Use a safer approach to update the array
+                var updatedAccounts = self.linkedAccounts
+                if let index = updatedAccounts.firstIndex(where: { $0.id == account.id }) {
+                    // Bounds check before accessing
+                    if index < updatedAccounts.count {
+                        updatedAccounts[index] = updatedAccount
+                        self.linkedAccounts = updatedAccounts
+                    }
                 }
                 isLoading = false
                 // Show success feedback

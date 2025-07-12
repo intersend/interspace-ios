@@ -29,22 +29,10 @@ final class ProfileAPI {
     }
     
     /// POST /profiles
-    func createProfile(name: String, developmentMode: Bool = false) async throws -> SmartProfile {
-        var clientShareString: String? = nil
-        
-        // Generate mock clientShare for development mode
-        if developmentMode {
-            let mockClientShare = generateMockClientShare()
-            if let clientShareData = try? JSONEncoder().encode(mockClientShare),
-               let jsonString = String(data: clientShareData, encoding: .utf8) {
-                clientShareString = jsonString
-            }
-        }
-        
+    func createProfile(name: String) async throws -> SmartProfile {
         let request = CreateProfileRequest(
-            name: name, 
-            clientShare: clientShareString,
-            developmentMode: developmentMode
+            name: name,
+            clientShare: nil
         )
         
         let requestData = try JSONEncoder().encode(request)
@@ -62,23 +50,6 @@ final class ProfileAPI {
             responseType: ProfileResponse.self
         )
         return response.data
-    }
-    
-    private func generateMockClientShare() -> ClientShare {
-        // Generate deterministic values based on current timestamp
-        let timestamp = "\(Date().timeIntervalSince1970)"
-        let secretShare = Data(timestamp.utf8).sha256String()
-        let publicKey = Data("pubkey-\(timestamp)".utf8).sha256String().prefix(64)
-        let address = "0x" + Data("address-\(timestamp)".utf8).sha256String().prefix(40)
-        
-        return ClientShare(
-            p1_key_share: ClientShare.KeyShare(
-                secret_share: secretShare,
-                public_key: String(publicKey)
-            ),
-            public_key: String(publicKey),
-            address: String(address)
-        )
     }
     
     /// GET /profiles/:profileId

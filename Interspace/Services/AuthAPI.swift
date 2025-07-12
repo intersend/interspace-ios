@@ -113,7 +113,8 @@ final class AuthAPI {
         return try await apiService.performRequest(
             endpoint: "/auth/logout",
             method: .POST,
-            responseType: LogoutResponse.self
+            responseType: LogoutResponse.self,
+            requiresAuth: false
         )
     }
     
@@ -206,21 +207,22 @@ final class AuthAPI {
     }
     
     /// For V2 SIWE authentication, use authenticateV2 with strategy: "wallet"
-    func authenticateWithSIWEV2(message: String, signature: String, walletAddress: String) async throws -> AuthResponseV2 {
+    func authenticateWithSIWEV2(message: String, signature: String, walletAddress: String, walletType: String? = nil) async throws -> AuthResponseV2 {
         let request = AuthenticationRequestV2(
             strategy: "wallet",
-            identifier: walletAddress,
-            credential: signature,
+            identifier: nil,  // Backend expects walletAddress in its own field
+            credential: nil,  // Backend expects signature in its own field
             oauthCode: nil,
             appleAuth: nil,
             privacyMode: "linked",
             deviceId: DeviceInfo.deviceId,
             email: nil,
             verificationCode: nil,
-            walletAddress: walletAddress,
+            walletAddress: walletAddress.lowercased(),  // Normalize to lowercase
             signature: signature,
             message: message,
-            walletType: nil,
+            walletType: walletType,
+            chainId: 1,  // Default to Ethereum mainnet
             idToken: nil,
             accessToken: nil,
             shopDomain: nil
@@ -246,7 +248,8 @@ struct VerifyEmailCodeRequest: Codable {
     let code: String
 }
 
-// RefreshTokenRequest and LogoutRequest are defined in AuthService.swift
+// LogoutResponse is defined in AuthService.swift
+
 // SIWEAuthenticationRequest is defined in SIWEModels.swift
 
 // MARK: - Response Models (Not in AuthModels.swift)
@@ -302,5 +305,6 @@ struct SuccessResponse: Codable {
 }
 
 // LogoutResponse and UserResponse are defined in AuthService.swift
+
 
 

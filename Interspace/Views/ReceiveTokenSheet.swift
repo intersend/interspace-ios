@@ -30,14 +30,19 @@ struct ReceiveTokenSheetBase: View {
         }
         
         // Extract unique chains from all token balances
-        var chains = Set<(Int, String)>()
+        struct ChainInfo: Hashable {
+            let chainId: Int
+            let chainName: String
+        }
+        
+        var chains = Set<ChainInfo>()
         for token in unifiedBalance.unifiedBalance.tokens {
             for chainBalance in token.balancesPerChain {
-                chains.insert((chainBalance.chainId, chainBalance.chainName))
+                chains.insert(ChainInfo(chainId: chainBalance.chainId, chainName: chainBalance.chainName))
             }
         }
         
-        return Array(chains).sorted { $0.0 < $1.0 }
+        return chains.map { ($0.chainId, $0.chainName) }.sorted { $0.0 < $1.0 }
     }
     
     private var selectedChainName: String {
@@ -104,10 +109,10 @@ struct ReceiveTokenSheetBase: View {
         .onAppear {
             generateQRCode()
         }
-        .onChange(of: qrCodeContent) { _, _ in
+        .onChange(of: qrCodeContent) { _ in
             generateQRCode()
         }
-        .onChange(of: selectedChainId) { _, _ in
+        .onChange(of: selectedChainId) { _ in
             generateQRCode()
         }
     }
@@ -117,44 +122,52 @@ struct ReceiveTokenSheetBase: View {
     private var qrCodeSection: some View {
         VStack(spacing: DesignTokens.Spacing.lg) {
             // QR Code Container
-            LiquidGlassCard(padding: DesignTokens.Spacing.xl) {
-                VStack(spacing: DesignTokens.Spacing.md) {
-                    if let qrImage = qrCodeImage {
-                        Image(uiImage: qrImage)
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 260, height: 260)
-                            .background(Color.white)
-                            .cornerRadius(DesignTokens.CornerRadius.lg)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
-                                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-                            )
-                            .shadow(
-                                color: DesignTokens.Colors.primary.opacity(0.3),
-                                radius: 20,
-                                x: 0,
-                                y: 10
-                            )
-                    } else {
-                        // Loading state
-                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
-                            .fill(Material.ultraThinMaterial)
-                            .frame(width: 260, height: 260)
-                            .overlay(
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            )
-                    }
-                    
-                    if !requestedAmount.isEmpty {
-                        Text("Requesting \(requestedAmount) ETH")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
+            VStack(spacing: DesignTokens.Spacing.md) {
+                if let qrImage = qrCodeImage {
+                    Image(uiImage: qrImage)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 260, height: 260)
+                        .background(Color.white)
+                        .cornerRadius(DesignTokens.CornerRadius.lg)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
+                                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                        .shadow(
+                            color: DesignTokens.Colors.primary.opacity(0.3),
+                            radius: 20,
+                            x: 0,
+                            y: 10
+                        )
+                } else {
+                    // Loading state
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
+                        .fill(Material.ultraThinMaterial)
+                        .frame(width: 260, height: 260)
+                        .overlay(
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        )
+                }
+                
+                if !requestedAmount.isEmpty {
+                    Text("Requesting \(requestedAmount) ETH")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
                 }
             }
+            .padding(DesignTokens.Spacing.xl)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
             
             // Instructions
             Text("Scan to send tokens to this address")
@@ -189,7 +202,15 @@ struct ReceiveTokenSheetBase: View {
             }
         }
         .padding(DesignTokens.Spacing.md)
-        .liquidGlassCard()
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
     
     private var chainSelectorSection: some View {
@@ -216,7 +237,15 @@ struct ReceiveTokenSheetBase: View {
             }
             .padding(DesignTokens.Spacing.md)
         }
-        .liquidGlassCard()
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
     
     private var actionButtonsSection: some View {
@@ -279,7 +308,15 @@ struct ReceiveTokenSheetBase: View {
             }
         }
         .padding(DesignTokens.Spacing.md)
-        .liquidGlassCard()
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
     
@@ -451,7 +488,7 @@ struct ChainRow: View {
 #Preview("Receive Token Sheet") {
     ReceiveTokenSheetBase()
         .environmentObject(WalletViewModel())
-        .environmentObject(ProfileViewModel())
+        .environmentObject(ProfileViewModel.shared)
 }
 
 #Preview("Chain Selector") {

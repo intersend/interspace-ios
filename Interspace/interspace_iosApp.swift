@@ -56,6 +56,12 @@ struct interspace_iosApp: App {
                             print("📱 SwiftUI App: MetaMask SDK handled URL")
                         }
                     }
+                    // Handle WalletConnect AppKit URLs
+                    else if url.scheme == "interspace" && (url.host == "walletconnect" || url.host == "auth") {
+                        print("📱 SwiftUI App: Detected WalletConnect callback URL")
+                        ServiceInitializer.shared.appKit.handleDeeplink(url)
+                        print("📱 SwiftUI App: AppKit handled deeplink")
+                    }
                 }
             }
         }

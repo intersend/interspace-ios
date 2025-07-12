@@ -264,19 +264,28 @@ struct AccountDetailViewV2: View {
 
 struct AccountDetailViewV2_Previews: PreviewProvider {
     static var previews: some View {
-        AccountDetailViewV2(
-            account: AccountV2(
-                id: "1",
-                type: "email",
-                strategy: nil,
-                identifier: "test@example.com",
-                metadata: [:],
-                verified: true,
-                createdAt: ISO8601DateFormatter().string(from: Date()),
-                updatedAt: ISO8601DateFormatter().string(from: Date())
-            ),
-            viewModel: ProfileViewModel.shared
-        )
-        .preferredColorScheme(.dark)
+        // Create a mock account using JSON decoding
+        let jsonData = """
+        {
+            "id": "1",
+            "strategy": "email",
+            "identifier": "test@example.com",
+            "metadata": {},
+            "verified": true,
+            "createdAt": "\(ISO8601DateFormatter().string(from: Date()))",
+            "updatedAt": "\(ISO8601DateFormatter().string(from: Date()))"
+        }
+        """.data(using: .utf8)!
+        
+        if let account = try? JSONDecoder().decode(AccountV2.self, from: jsonData) {
+            AccountDetailViewV2(
+                account: account,
+                viewModel: ProfileViewModel.shared
+            )
+            .preferredColorScheme(.dark)
+        } else {
+            Text("Failed to create preview")
+                .preferredColorScheme(.dark)
+        }
     }
 }

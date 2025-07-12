@@ -90,8 +90,36 @@ class APIService {
         requiresAuth: Bool,
         retryCount: Int
     ) async throws -> T {
-        // Properly construct URL by appending endpoint to baseURL
-        let url = baseURL.appendingPathComponent(endpoint)
+        // Properly construct URL handling query parameters
+        let url: URL
+        if endpoint.contains("?") {
+            // Endpoint has query parameters
+            // Split into path and query components
+            let components = endpoint.split(separator: "?", maxSplits: 1)
+            let pathPart = String(components[0])
+            let queryPart = components.count > 1 ? String(components[1]) : ""
+            
+            // Build URL using URLComponents to properly handle encoding
+            guard var urlComponents = URLComponents(url: baseURL, resolvingAgainstBaseURL: true) else {
+                throw APIError.invalidURL
+            }
+            
+            // Append path to existing path
+            urlComponents.path = (urlComponents.path.hasSuffix("/") ? urlComponents.path : urlComponents.path + "/") + pathPart
+            
+            // Set query string directly (it should already be properly formatted)
+            if !queryPart.isEmpty {
+                urlComponents.query = queryPart
+            }
+            
+            guard let fullURL = urlComponents.url else {
+                throw APIError.invalidURL
+            }
+            url = fullURL
+        } else {
+            // No query parameters, use normal appending
+            url = baseURL.appendingPathComponent(endpoint)
+        }
         
         #if DEBUG
         print("🌐 APIService: Making \(method.rawValue) request to: \(url.absoluteString)")
@@ -169,28 +197,38 @@ class APIService {
                     // Request token refresh from AuthenticationManager
                     await AuthenticationManagerV2.shared.refreshTokenIfNeeded()
                     
-                    // Small delay to ensure token is properly set
-                    try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
-                    
-                    #if DEBUG
-                    print("🌐 APIService: Token refresh completed, retrying request to \(endpoint)")
-                    print("🌐 APIService: New token available: \(self.accessToken != nil)")
-                    if let token = self.accessToken {
-                        print("🌐 APIService: New token prefix: \(String(token.prefix(20)))")
+                    // Check if we still have a valid token after refresh attempt
+                    if let newToken = self.accessToken {
+                        #if DEBUG
+                        print("🌐 APIService: Token refresh successful, retrying request to \(endpoint)")
+                        print("🌐 APIService: New token prefix: \(String(newToken.prefix(20)))")
+                        #endif
+                        
+                        // Retry the request with new token
+                        return try await performRequestWithRetry(
+                            endpoint: endpoint,
+                            method: method,
+                            body: body,
+                            responseType: responseType,
+                            requiresAuth: requiresAuth,
+                            retryCount: retryCount + 1
+                        )
+                    } else {
+                        #if DEBUG
+                        print("🌐 APIService: Token refresh failed - no token available")
+                        #endif
                     }
-                    #endif
-                    
-                    // Retry the request with new token
-                    return try await performRequestWithRetry(
-                        endpoint: endpoint,
-                        method: method,
-                        body: body,
-                        responseType: responseType,
-                        requiresAuth: requiresAuth,
-                        retryCount: retryCount + 1
-                    )
                 }
-                // If refresh failed or this is a retry, notify about auth expiry
+                
+                // If refresh failed or this is a retry, clear token and notify about auth expiry
+                #if DEBUG
+                print("🌐 APIService: Authentication failed for \(endpoint), posting expiry notification")
+                #endif
+                
+                // Clear the access token to prevent further failed requests
+                self.accessToken = nil
+                
+                // Notify about auth expiry
                 await MainActor.run {
                     NotificationCenter.default.post(name: .authenticationExpired, object: nil)
                 }
@@ -305,6 +343,7 @@ struct APIErrorResponse: Codable {
     let error: String?
     let statusCode: Int?
     let code: String?
+    let errorCode: String?  // Backend sends specific error codes
     
     // Get the actual error message from either field
     var errorMessage: String {
