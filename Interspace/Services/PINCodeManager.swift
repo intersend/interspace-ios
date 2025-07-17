@@ -30,8 +30,8 @@ final class PINCodeManager: ObservableObject {
         let hashedPIN = hashPIN(pin, with: salt)
         
         // Store in keychain
-        try keychain.save(hashedPIN, for: keychainKey)
-        try keychain.save(salt, for: saltKey)
+        try await keychain.save(hashedPIN, for: keychainKey)
+        try await keychain.save(salt, for: saltKey)
         
         // Save PIN length
         savePINLength()
@@ -39,7 +39,7 @@ final class PINCodeManager: ObservableObject {
     
     func hasPIN() async -> Bool {
         do {
-            let _: Data = try keychain.load(for: keychainKey)
+            let _: Data = try await keychain.load(for: keychainKey)
             return true
         } catch {
             return false
@@ -47,8 +47,8 @@ final class PINCodeManager: ObservableObject {
     }
     
     func removePIN() async throws {
-        try keychain.delete(for: keychainKey)
-        try keychain.delete(for: saltKey)
+        try await keychain.delete(for: keychainKey)
+        try await keychain.delete(for: saltKey)
     }
     
     // MARK: - PIN Validation
@@ -60,8 +60,8 @@ final class PINCodeManager: ObservableObject {
         }
         
         do {
-            let storedHash: Data = try keychain.load(for: keychainKey)
-            let salt: Data = try keychain.load(for: saltKey)
+            let storedHash: Data = try await keychain.load(for: keychainKey)
+            let salt: Data = try await keychain.load(for: saltKey)
             
             let inputHash = hashPIN(pin, with: salt)
             
