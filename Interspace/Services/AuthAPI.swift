@@ -290,7 +290,7 @@ struct SIWENonceResponse: Codable {
 
 struct SIWENonceData: Codable {
     let nonce: String
-    let expiresIn: Int
+    let expiresIn: Int?  // Made optional as the API doesn't always return this field
 }
 
 struct IdentityGraph: Codable {

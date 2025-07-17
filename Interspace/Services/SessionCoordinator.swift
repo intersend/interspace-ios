@@ -1023,7 +1023,6 @@ extension Notification.Name {
     static let profileDidChange = Notification.Name("profileDidChange")
     static let profileDidDelete = Notification.Name("profileDidDelete")
     static let sessionDidEnd = Notification.Name("sessionDidEnd")
-    static let clearWalletConnections = Notification.Name("clearWalletConnections")
     static let clearProfileData = Notification.Name("clearProfileData")
     static let loadProfileWalletState = Notification.Name("loadProfileWalletState")
     static let initializeProfileServices = Notification.Name("initializeProfileServices")

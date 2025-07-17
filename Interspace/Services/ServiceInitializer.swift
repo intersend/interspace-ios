@@ -55,6 +55,7 @@ class ServiceInitializer: ObservableObject {
                 self.initializeWalletService()
             }
             
+            // AppKitService for WalletConnect/Reown
             group.addTask { @MainActor in
                 self.initializeAppKitService()
             }
@@ -126,6 +127,7 @@ class ServiceInitializer: ObservableObject {
         recordInitTime("WalletService", start: start)
     }
     
+    // AppKitService for WalletConnect/Reown
     private func initializeAppKitService() {
         let start = CFAbsoluteTimeGetCurrent()
         _appKitService = AppKitService.shared
@@ -188,6 +190,7 @@ class ServiceInitializer: ObservableObject {
         return _walletService!
     }
     
+    // AppKitService for WalletConnect/Reown
     var appKit: AppKitService {
         if _appKitService == nil {
             initializeAppKitService()

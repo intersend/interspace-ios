@@ -8,7 +8,8 @@ struct WalletConnectOptionsView: View {
     @State private var generatedURI: String?
     @State private var isGeneratingURI = false
     
-    private let walletService = WalletService.shared
+    private let walletService = WalletServiceV2.shared
+    private let walletFactory = WalletFactory.shared
     
     var body: some View {
         NavigationStack {
@@ -162,7 +163,22 @@ struct WalletConnectOptionsView: View {
     }
     
     private func checkAvailableWallets() {
-        availableWallets = walletService.getAvailableWalletApps()
+        // Get all supported wallets from factory
+        let supportedWallets = walletFactory.supportedWallets
+        
+        // For now, show all supported wallets (not just installed ones)
+        // This allows users to see which wallets they can use
+        availableWallets = supportedWallets.compactMap { walletType in
+            guard walletType != .walletConnect else { // Skip WalletConnect itself
+                return nil
+            }
+            
+            return WalletAppInfo(
+                name: walletType.displayName,
+                scheme: walletType.rawValue,
+                icon: walletType.iconName
+            )
+        }
     }
 }
 

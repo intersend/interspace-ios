@@ -378,6 +378,8 @@ final class AuthViewModel: ObservableObject {
                 address: address,
                 signature: signature,
                 message: message,
+                walletName: "WalletConnect",
+                walletIcon: nil,
                 walletType: .walletConnect
             )
             
@@ -411,4 +413,3 @@ final class AuthViewModel: ObservableObject {
         self.isLoading = false
     }
 }
-
