@@ -1035,6 +1035,7 @@ extension WalletConnectService {
 }
 
 
+//
 // MARK: - Helper Methods
 
 extension WalletConnectService {
@@ -1271,3 +1272,8 @@ struct DefaultCryptoProvider: CryptoProvider {
     }
 }
 
+// MARK: - Notification.Name Extension
+
+extension Notification.Name {
+    static let linkModeResponse = Notification.Name("linkModeResponse")
+}
