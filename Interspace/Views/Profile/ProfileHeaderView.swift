@@ -48,7 +48,6 @@ struct UserProfileHeaderView: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.primary)
                     
-                    DevelopmentModeIndicator(size: .small)
                 }
                 
                 // Full Wallet Address with Apple Style Copy Button
@@ -175,7 +174,6 @@ struct UserProfileHeaderView_Previews: PreviewProvider {
                 linkedAccountsCount: 2,
                 appsCount: 5,
                 foldersCount: 1,
-                isDevelopmentWallet: true,
                 needsMpcGeneration: false,
                 clientShare: nil,
                 createdAt: "2024-01-01T00:00:00Z",
