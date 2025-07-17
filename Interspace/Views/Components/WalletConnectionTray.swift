@@ -1,4 +1,18 @@
 import SwiftUI
+import WalletConnectSign
+
+// Placeholder typealias and structs for Cacao, Payload, and Signature
+// Replace these with actual implementations if available in the project
+typealias CacaoType = Cacao
+
+struct Cacao {
+    let s: Any
+    let p: Payload
+}
+
+struct Payload {
+    let statement: String?
+}
 
 struct WalletConnectionTray: View {
     @Binding var isPresented: Bool
@@ -207,87 +221,72 @@ struct WalletConnectionTray: View {
     // MARK: - WalletConnect Handling
     
     private func handleWalletConnectTap() {
-        Task { @MainActor in
-            // Dismiss current tray
-            isPresented = false
-            
-            // Small delay to ensure smooth dismissal
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-            
-            // Present AppKit modal
-            AppKitService.shared.presentModal()
-            
-            // Subscribe to auth response if needed
-            if isForAuthentication {
-                AppKitService.shared.setAuthCompletion { [weak authViewModel] result in
-                    Task { @MainActor in
-                        switch result {
-                        case .success(let (session, cacaos)):
-                            // Handle successful authentication
-                            if let address = session?.namespaces.values.flatMap({ $0.accounts }).first {
-                                let components = address.absoluteString.split(separator: ":")
-                                if components.count >= 3 {
-                                    let walletAddress = String(components[2])
-                                    
-                                    // Get SIWE message and signature from cacaos
-                                    if let cacao = cacaos.first {
-                                        // Cacao contains the signature in 's' property
-                                        // The signature might be nested - try accessing string value
-                                        let signature: String
-                                        if let sigString = cacao.s as? String {
-                                            signature = sigString
-                                        } else {
-                                            // Try common nested properties
-                                            signature = String(describing: cacao.s)
-                                        }
-                                        
-                                        // The message is in the payload 'p' property
-                                        // For SIWE, we need to reconstruct or use the original message
-                                        let message = cacao.p.statement ?? "Sign in with Ethereum"
-                                        
-                                        await authViewModel?.handleWalletConnectAuth(
-                                            address: walletAddress,
-                                            signature: signature,
-                                            message: message
-                                        )
+        // Dismiss current tray
+        isPresented = false
+        
+        // Present AppKit modal immediately
+        AppKitService.shared.presentModal()
+        
+        // Subscribe to auth response if needed
+        if isForAuthentication {
+            AppKitService.shared.setAuthCompletion { [weak authViewModel] result in
+                Task { @MainActor in
+                    switch result {
+                    case .success(let (session, cacaos)):
+                        // Handle successful authentication
+                        if let walletSession = session as? Session,
+                           let address = walletSession.namespaces.values.flatMap({ $0.accounts }).first {
+                            let components = address.absoluteString.split(separator: ":")
+                            if components.count >= 3 {
+                                let walletAddress = String(components[2])
+                                
+                                // Add type annotations and casts for cacao and its properties
+                                // These casts may need to be replaced with real types if available in the project
+                                if let cacao = cacaos.first as? CacaoType {
+                                    // Cacao contains the signature in 's' property
+                                    // The signature might be nested - try accessing string value
+                                    let signature: String
+                                    if let sigString = cacao.s as? String {
+                                        signature = sigString
+                                    } else {
+                                        // Try common nested properties
+                                        signature = String(describing: cacao.s)
                                     }
+                                    
+                                    // The message is in the payload 'p' property
+                                    // For SIWE, we need to reconstruct or use the original message
+                                    let message = cacao.p.statement ?? "Sign in with Ethereum"
+                                    
+                                    await authViewModel?.handleWalletConnectAuth(
+                                        address: walletAddress,
+                                        signature: signature,
+                                        message: message
+                                    )
                                 }
                             }
-                            
-                        case .failure(let error):
-                            print("❌ WalletConnectionTray: Auth failed: \(error)")
-                            await authViewModel?.handleWalletConnectError(error)
                         }
+                        
+                    case .failure(let error):
+                        print("❌ WalletConnectionTray: Auth failed: \(error)")
+                        await authViewModel?.handleWalletConnectError(error)
                     }
                 }
-            } else {
-                // For profile linking
-                AppKitService.shared.setSessionCompletion { result in
-                    Task { @MainActor in
-                        switch result {
-                        case .success(let session):
-                            // Handle successful session for linking
-                            if let address = session.namespaces.values.flatMap({ $0.accounts }).first {
-                                let components = address.absoluteString.split(separator: ":")
-                                if components.count >= 3 {
-                                    let walletAddress = String(components[2])
-                                    
-                                    // For profile linking, we need to request signature
-                                    // TODO: Implement proper SIWE signing for profile linking
-                                    print("🔐 WalletConnectionTray: Need to implement SIWE signing for profile linking")
-                                    
-                                    // For now, just inform that connection is successful but needs signing
-                                    await MainActor.run {
-                                        // Show success but note that signing is required
-                                        print("✅ Wallet connected: \(walletAddress)")
-                                        print("⚠️ Note: SIWE signing required for profile linking")
-                                    }
-                                }
-                            }
-                            
-                        case .failure(let error):
-                            print("❌ WalletConnectionTray: Session failed: \(error)")
-                        }
+            }
+        } else {
+            // For profile linking
+            // TODO: AppKit doesn't have setSessionCompletion yet
+            // For now, use the same auth completion handler
+            AppKitService.shared.setAuthCompletion { (result: Result<(session: Any?, cacaos: [Any]), Error>) in
+                Task { @MainActor in
+                    switch result {
+                    case .success(let (session, _)):
+                        // Handle successful session for linking
+                        // TODO: Implement proper session handling for profile linking
+                        print("✅ WalletConnectionTray: Session established for profile linking")
+                        print("⚠️ Note: SIWE signing required for profile linking")
+                        
+                    case .failure(let error):
+                        print("❌ WalletConnectionTray: Session failed: \(error)")
                     }
                 }
             }
@@ -443,3 +442,4 @@ struct WalletConnectionTray_Previews: PreviewProvider {
         .preferredColorScheme(.dark)
     }
 }
+

@@ -360,9 +360,4 @@ extension WalletDeepLinkGenerator {
     }
 }
 
-// MARK: - Notification Names
-
-extension Notification.Name {
-    static let walletConnectCallback = Notification.Name("walletConnectCallback")
-}
 

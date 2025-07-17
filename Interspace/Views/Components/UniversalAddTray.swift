@@ -33,8 +33,9 @@ struct UniversalAddTray: View {
     @State private var isProcessing = false
     @State private var processingProviderId: String?
     @State private var showFarcasterAuth = false
+    @State private var showWalletConnectOptions = false
     
-    private let walletService = WalletService.shared
+    private let walletService = WalletServiceV2.shared
     private let oauthService = OAuthProviderService.shared
     
     var body: some View {
@@ -64,6 +65,11 @@ struct UniversalAddTray: View {
             }
             .sheet(isPresented: $showFarcasterAuth) {
                 farcasterAuthSheet
+            }
+            .sheet(isPresented: $showWalletConnectOptions) {
+                WalletConnectOptionsView(isPresented: $showWalletConnectOptions) { walletScheme in
+                    handleWalletConnectSelection(walletScheme)
+                }
             }
             // Remove full-screen processing overlay - use inline loading states instead
             .onAppear {
@@ -810,57 +816,41 @@ struct UniversalAddTray: View {
     // MARK: - WalletConnect Handling
     
     private func handleWalletConnectTap() {
-        // Present AppKit modal for WalletConnect
-        AppKitService.shared.presentModal()
+        // Show WalletConnect options to select a specific wallet
+        showWalletConnectOptions = true
+    }
+    
+    private func handleWalletConnectSelection(_ walletScheme: String?) {
+        // Map wallet scheme to WalletType
+        guard let scheme = walletScheme else {
+            // User selected QR code option
+            // For MVP, just close the sheet
+            showWalletConnectOptions = false
+            return
+        }
         
-        // Handle auth response
-        if isForAuthentication {
-            Task {
-                for await response in AppKitService.shared.authResponsePublisher.values {
-                    switch response.result {
-                    case .success(let (session, cacaos)):
-                        // Handle successful authentication
-                        if let address = session?.namespaces.values.flatMap({ $0.accounts }).first {
-                            let components = address.absoluteString.split(separator: ":")
-                            if components.count >= 3 {
-                                let walletAddress = String(components[2])
-                                
-                                // Get SIWE message and signature from cacaos
-                                if let cacao = cacaos.first {
-                                    // Cacao contains the signature in 's' property
-                                    // The signature might be nested - try accessing string value
-                                    let signature: String
-                                    if let sigString = cacao.s as? String {
-                                        signature = sigString
-                                    } else {
-                                        // Try common nested properties
-                                        signature = String(describing: cacao.s)
-                                    }
-                                    
-                                    // The message is in the payload 'p' property
-                                    // For SIWE, we need to reconstruct or use the original message
-                                    let message = cacao.p.statement ?? "Sign in with Ethereum"
-                                    
-                                    await authViewModel?.handleWalletConnectAuth(
-                                        address: walletAddress,
-                                        signature: signature,
-                                        message: message
-                                    )
-                                    isPresented = false
-                                    break
-                                }
-                            }
-                        }
-                        
-                    case .failure(let error):
-                        print("❌ UniversalAddTray: Auth failed: \(error)")
-                        break
-                    }
-                }
-            }
-        } else {
-            // For profile linking - close tray and let AppKit handle it
-            isPresented = false
+        // Map scheme to wallet type
+        let walletType: WalletType?
+        switch scheme {
+        case "metamask":
+            walletType = .metamask
+        case "rainbow":
+            walletType = .rainbow
+        case "trust":
+            walletType = .trust
+        case "argent":
+            walletType = .argent
+        case "phantom":
+            walletType = .phantom
+        default:
+            walletType = nil
+        }
+        
+        // If we found a matching wallet type, use it
+        if let type = walletType {
+            selectedWalletType = type
+            showWalletConnectOptions = false
+            showMiniWalletAuth = true
         }
     }
 }
