@@ -1,5 +1,5 @@
 import SwiftUI
-import metamask_ios_sdk
+// MetaMask SDK is now handled via WalletServiceV2 and MetaMaskService
 import CoinbaseWalletSDK
 import GoogleSignIn
 import WalletConnectSign
@@ -83,51 +83,19 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
         print("📱 AppDelegate: Detected interspace:// URL")
         
         // Check if this is a MetaMask callback
-        if url.host == "mmsdk" || url.absoluteString.contains("metamask") {
+        if url.host == "mmsdk" || url.absoluteString.contains("metamask") || url.host == "metamask-callback" {
             print("📱 AppDelegate: This is a MetaMask callback URL")
             
-            // Prevent re-entrant URL handling
-            if isHandlingMetaMaskURL {
-                print("📱 AppDelegate: Already handling MetaMask URL, ignoring")
-                return true
-            }
-            
-            // Debounce rapid URL calls
-            if let lastTime = lastMetaMaskURLTime {
-                let timeSinceLastURL = Date().timeIntervalSince(lastTime)
-                if timeSinceLastURL < urlDebounceInterval {
-                    print("📱 AppDelegate: Ignoring rapid MetaMask URL (debouncing) - \(timeSinceLastURL)s since last URL")
-                    return true
+            // Use WalletServiceV2 for deep link handling
+            Task { @MainActor in
+                let handled = WalletServiceV2.shared.handleDeepLink(url)
+                if handled {
+                    print("📱 AppDelegate: MetaMask deep link handled by WalletServiceV2")
+                } else {
+                    print("📱 AppDelegate: MetaMask deep link not handled by WalletServiceV2")
                 }
             }
             
-            isHandlingMetaMaskURL = true
-            lastMetaMaskURLTime = Date()
-            
-            // Get the MetaMask SDK instance and handle the URL
-            if let metamaskSDK = WalletService.shared.metamaskSDK {
-                print("📱 AppDelegate: Passing URL to MetaMask SDK")
-                print("📱 AppDelegate: SDK account before handleUrl: \(metamaskSDK.account.isEmpty ? "none" : metamaskSDK.account)")
-                print("📱 AppDelegate: Is connection in progress: \(WalletService.shared.isConnectionInProgress)")
-                
-                // Handle the URL - this should trigger the SDK's internal callback
-                metamaskSDK.handleUrl(url)
-                
-                print("📱 AppDelegate: MetaMask SDK handled URL successfully")
-                print("📱 AppDelegate: SDK account after handleUrl: \(metamaskSDK.account.isEmpty ? "none" : metamaskSDK.account)")
-                
-                // If we're in a connection flow, the SDK should now have the account
-                if WalletService.shared.isConnectionInProgress && !metamaskSDK.account.isEmpty {
-                    print("📱 AppDelegate: Connection flow detected with account available")
-                }
-                
-                // Clear the handling flag after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                    self?.isHandlingMetaMaskURL = false
-                }
-            } else {
-                print("📱 AppDelegate: Warning - MetaMask SDK not initialized")
-            }
             return true
         }
         
@@ -155,15 +123,14 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
          return true
      }
     
-    // Check for WalletConnect/AppKit URLs
-    if url.scheme == "interspace" && (url.host == "walletconnect" || url.host == "auth") {
-        print("📱 AppDelegate: Handling WalletConnect/AppKit deep link")
-        ServiceInitializer.shared.appKit.handleDeeplink(url)
-        
-        // Use WalletDeepLinkGenerator for handling
+    // Check for WalletConnect/Reown URLs
+    if url.scheme == "interspace" && (url.host == "walletconnect" || url.host == "wc" || url.host == "auth") {
+        print("📱 AppDelegate: Handling WalletConnect/Reown deep link")
+        // TODO: Implement Reown SDK deep link handling
+        // For now, use WalletDeepLinkGenerator for handling
         let handled = WalletDeepLinkGenerator.shared.handleWalletReturn(url: url)
         if handled {
-            print("📱 AppDelegate: WalletConnect/AppKit callback handled successfully")
+            print("📱 AppDelegate: WalletConnect/Reown callback handled successfully")
         }
         return true
     }
@@ -224,7 +191,7 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
                     
                     // Check if this is a return from wallet after SIWE signing
                     if url.absoluteString.contains("wc") || url.absoluteString.contains("walletconnect") {
-                        // This is likely a WalletConnect/AppKit callback
+                        // This is likely a WalletConnect/Reown callback
                         if [WalletType.trust, WalletType.family, WalletType.phantom, WalletType.zerion].contains(walletType) {
                             ServiceInitializer.shared.appKit.handleDeeplink(url)
                         }

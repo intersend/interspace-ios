@@ -180,18 +180,16 @@ struct AuthView: View {
     }
     
     private func ensureCleanWalletState() async {
-        // If we're at the auth screen and MetaMask SDK has an account,
-        // it means we have a stale connection that needs to be cleared
-        if let metamaskSDK = walletService.metamaskSDK, !metamaskSDK.account.isEmpty {
-            print("🔐 AuthView: Found stale MetaMask connection at auth screen, clearing...")
-            print("🔐 AuthView: Stale account: \(metamaskSDK.account)")
-            await walletService.disconnect()
-        }
-        
-        // Also ensure our wallet service state is clean
+        // Ensure our wallet service state is clean
         if walletService.connectionStatus != .disconnected {
             print("🔐 AuthView: Wallet service not in disconnected state, clearing...")
             await walletService.disconnect()
+        }
+        
+        // Also check WalletServiceV2 for any active connections
+        if WalletServiceV2.shared.connectionState.isConnected {
+            print("🔐 AuthView: Found active wallet connection at auth screen, clearing...")
+            try? await WalletServiceV2.shared.disconnect()
         }
     }
 }

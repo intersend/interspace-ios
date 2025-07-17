@@ -14,6 +14,7 @@
 		7861E3192E0114AD005D228A /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7861E2D22E0114AD005D228A /* GoogleService-Info.plist */; };
 		7861E31A2E0114AD005D228A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7861E2DD2E0114AD005D228A /* PrivacyInfo.xcprivacy */; };
 		7861E31C2E0114AD005D228A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7861E2D02E0114AD005D228A /* Assets.xcassets */; };
+		7868079D2E285CFF00FACBA5 /* ReownAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7868079C2E285CFF00FACBA5 /* ReownAppKit */; };
 		788B6D3F2E12FA7000EDAAC5 /* duo_schnorr in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D3E2E12FA7000EDAAC5 /* duo_schnorr */; };
 		788B6D412E12FA7000EDAAC5 /* silentshardduo in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D402E12FA7000EDAAC5 /* silentshardduo */; };
 		788B6D432E12FAB000EDAAC5 /* c2dkls in Frameworks */ = {isa = PBXBuildFile; productRef = 788B6D422E12FAB000EDAAC5 /* c2dkls */; };
@@ -27,6 +28,7 @@
 		789CF2092E20116C00CDBD72 /* ReownAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 789CF2082E20116C00CDBD72 /* ReownAppKit */; };
 		789CF20B2E20116C00CDBD72 /* ReownAppKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 789CF20A2E20116C00CDBD72 /* ReownAppKitUI */; };
 		789CF8FD2E20145500CDBD72 /* ReownAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 789CF8FC2E20145500CDBD72 /* ReownAppKit */; };
+		78AA2A652E2975F400C7E6F9 /* metamask-ios-sdk in Frameworks */ = {isa = PBXBuildFile; productRef = 78AA2A642E2975F400C7E6F9 /* metamask-ios-sdk */; };
 		78CFACFE2E0DEBD900999473 /* ReownWalletKit in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFACFD2E0DEBD900999473 /* ReownWalletKit */; };
 		78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFACFF2E0DEBD900999473 /* WalletConnect */; };
 		78CFC5602E0ED25600999473 /* ReownWalletKit in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFC55F2E0ED25600999473 /* ReownWalletKit */; };
@@ -134,7 +136,6 @@
 		785509932E098AD400EDDF1C /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				AppStoreModels.swift,
 				AuthModels.swift,
 				Environment.swift,
 				ErrorWrapper.swift,
@@ -159,7 +160,6 @@
 				AccountLinkingService.swift,
 				APIService.swift,
 				AppleSignInService.swift,
-				AppStoreAPI.swift,
 				AuthAPI.swift,
 				AuthenticationManagerV2.swift,
 				AuthService.swift,
@@ -193,7 +193,6 @@
 				UserAPI.swift,
 				UserCacheManager.swift,
 				WalletAPI.swift,
-				WalletConnect/AppKitService.swift,
 				WalletConnect/WalletConnectService.swift,
 				WalletConnect/WalletConnectSessionManager.swift,
 				WalletConnectionManager.swift,
@@ -232,7 +231,6 @@
 				AddAccountView.swift,
 				AddAppView.swift,
 				AddSocialAccountView.swift,
-				AppStoreView.swift,
 				AppsView.swift,
 				Authentication/AuthenticationLockView.swift,
 				Authentication/EmailAuthenticationView.swift,
@@ -242,7 +240,6 @@
 				Authentication/PINSetupView.swift,
 				AuthView.swift,
 				Components/AddToProfileTray.swift,
-				Components/AppStoreComponents.swift,
 				Components/AuthLoadingOverlay.swift,
 				Components/BottomSheet.swift,
 				Components/ConnectionProgressView.swift,
@@ -254,7 +251,6 @@
 				Components/LiquidGlassLoadingOverlay.swift,
 				Components/LiquidGlassWalletScanner.swift,
 				Components/LoadingSkeletons.swift,
-				Components/MiniWalletAuthorizationTray.swift,
 				Components/NativeCodeInput.swift,
 				Components/OAuthProviderIcon.swift,
 				Components/ProfileSelectorCard.swift,
@@ -293,9 +289,6 @@
 				Profile/ProfileHeaderView.swift,
 				Profile/ProfileNotificationsView.swift,
 				Profile/ProfileSecurityView.swift,
-				Profile/SingleLineAddressView.swift,
-				"Profile/StandardTray 2.swift",
-				Profile/StandardTray.swift,
 				ProfileCreationTray.swift,
 				ProfileIconPicker.swift,
 				ProfileSelectorTray.swift,
@@ -368,6 +361,8 @@
 				788B6D492E12FAB800EDAAC5 /* c2dkls in Frameworks */,
 				789C7C952E02423600FF5B32 /* GoogleSignIn in Frameworks */,
 				788B6D432E12FAB000EDAAC5 /* c2dkls in Frameworks */,
+				7868079D2E285CFF00FACBA5 /* ReownAppKit in Frameworks */,
+				78AA2A652E2975F400C7E6F9 /* metamask-ios-sdk in Frameworks */,
 				789CF2092E20116C00CDBD72 /* ReownAppKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2737,6 +2732,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		7868079C2E285CFF00FACBA5 /* ReownAppKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownAppKit;
+		};
 		788B6D3E2E12FA7000EDAAC5 /* duo_schnorr */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */;
@@ -2801,6 +2801,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7861E7292E0231CF005D228A /* XCRemoteSwiftPackageReference "reown-swift" */;
 			productName = ReownAppKit;
+		};
+		78AA2A642E2975F400C7E6F9 /* metamask-ios-sdk */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7861E7272E023147005D228A /* XCRemoteSwiftPackageReference "metamask-ios-sdk" */;
+			productName = "metamask-ios-sdk";
 		};
 		78CFACFD2E0DEBD900999473 /* ReownWalletKit */ = {
 			isa = XCSwiftPackageProductDependency;
