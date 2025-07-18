@@ -42,10 +42,11 @@ final class MetaMaskService: WalletProtocol {
         // Initialize MetaMask SDK
         setupMetaMaskSDK()
         
-        // Try to restore session
-        Task {
-            await restoreSession()
-        }
+        // Don't restore session automatically - we want fresh connections
+        // to allow users to select different accounts each time
+        // Task {
+        //     await restoreSession()
+        // }
     }
     
     // MARK: - SDK Setup
@@ -91,6 +92,8 @@ final class MetaMaskService: WalletProtocol {
         context: WalletConnectionContext,
         completion: @escaping (Result<WalletSession, WalletError>) -> Void
     ) {
+        // IMPORTANT: MetaMask always forces fresh connections to allow account selection
+        // This ensures users can link different MetaMask accounts to their SmartProfiles
         // Check if MetaMask is installed
         guard isMetaMaskInstalled() else {
             let error = WalletError.walletNotInstalled
@@ -144,12 +147,24 @@ final class MetaMaskService: WalletProtocol {
             self?.handleTimeout()
         }
         
-        // Check if we have an existing connection that can be reused
+        // Always ensure fresh connection for MetaMask
+        // This allows users to select different accounts each time
         if let sdk = metamaskSDK, !sdk.account.isEmpty {
-            print("🦊 MetaMask: Existing connection found, validating account: \(sdk.account)")
+            print("🦊 MetaMask: Clearing existing connection to allow account selection")
+            print("🦊 MetaMask: Previous account: \(sdk.account)")
             
-            // Validate the account is still valid
-            validateExistingConnection(address: sdk.account, completion: completion)
+            // Clear the existing connection
+            sdk.disconnect()
+            sdk.clearSession()
+            currentSession = nil
+            
+            // Give SDK time to clear, then connect fresh
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                print("🦊 MetaMask: Starting fresh connection after clearing")
+                Task {
+                    await self?.performConnection()
+                }
+            }
             return
         }
         
@@ -188,6 +203,7 @@ final class MetaMaskService: WalletProtocol {
         }
         
         // Store completion handler
+        print("🦊 MetaMask signMessage: Storing completion handler")
         pendingSignMessageCompletion = completion
         
         // Start timeout
@@ -196,8 +212,11 @@ final class MetaMaskService: WalletProtocol {
         }
         
         // Sign message
+        print("🦊 MetaMask signMessage: Starting async task to perform signature")
         Task {
+            print("🦊 MetaMask signMessage: Inside Task, calling performSignMessage")
             await performSignMessage(message, address: session.address)
+            print("🦊 MetaMask signMessage: performSignMessage completed")
         }
     }
     
@@ -271,20 +290,21 @@ final class MetaMaskService: WalletProtocol {
         return UIApplication.shared.canOpenURL(url)
     }
     
-    private func validateExistingConnection(address: String, completion: @escaping (Result<WalletSession, WalletError>) -> Void) {
-        // For existing connections, we can directly proceed if the session is valid
-        if let existingSession = currentSession,
-           existingSession.address.lowercased() == address.lowercased() {
-            print("🦊 MetaMask: Valid session exists, reusing")
-            isConnecting = false
-            pendingConnectCompletion?(.success(existingSession))
-            pendingConnectCompletion = nil
-            cancelTimeout()
-        } else {
-            // Create a new session for the existing connection
-            handleConnectionSuccess(address: address)
-        }
-    }
+    // DEPRECATED: We now always force fresh connections for account selection
+    // private func validateExistingConnection(address: String, completion: @escaping (Result<WalletSession, WalletError>) -> Void) {
+    //     // For existing connections, we can directly proceed if the session is valid
+    //     if let existingSession = currentSession,
+    //        existingSession.address.lowercased() == address.lowercased() {
+    //         print("🦊 MetaMask: Valid session exists, reusing")
+    //         isConnecting = false
+    //         pendingConnectCompletion?(.success(existingSession))
+    //         pendingConnectCompletion = nil
+    //         cancelTimeout()
+    //     } else {
+    //         // Create a new session for the existing connection
+    //         handleConnectionSuccess(address: address)
+    //     }
+    // }
     
     private func restoreSession() async {
         do {
@@ -313,12 +333,16 @@ final class MetaMaskService: WalletProtocol {
             return
         }
         
-        // For fresh authentication, ensure clean state
+        // Always ensure clean state for fresh connection
         if !sdk.account.isEmpty {
             print("🦊 MetaMask: Clearing existing connection for fresh authentication")
+            print("🦊 MetaMask: Previous account was: \(sdk.account)")
             sdk.disconnect()
             sdk.clearSession()
+            currentSession = nil
+            connectionState.send(.disconnected)
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            print("🦊 MetaMask: Connection cleared, ready for fresh account selection")
         }
         
         print("🦊 MetaMask: Initiating connection...")
@@ -389,7 +413,11 @@ final class MetaMaskService: WalletProtocol {
                     address: self.normalizeAddress(address),
                     message: message
                 )
+                
+                print("🦊 MetaMask: Calling pendingSignMessageCompletion on main thread")
                 self.pendingSignMessageCompletion?(.success(walletSignature))
+                print("🦊 MetaMask: pendingSignMessageCompletion called successfully")
+                
             case .failure(let error):
                 print("❌ MetaMask: Signature failed: \(error)")
                 if error.localizedDescription.contains("User rejected") ||
@@ -400,6 +428,7 @@ final class MetaMaskService: WalletProtocol {
                 }
             }
             
+            print("🦊 MetaMask: Clearing pendingSignMessageCompletion")
             self.pendingSignMessageCompletion = nil
         }
     }
@@ -436,6 +465,7 @@ final class MetaMaskService: WalletProtocol {
         }
         
         // Call completion
+        print("🦊 MetaMask: Calling pendingConnectCompletion with success")
         pendingConnectCompletion?(.success(session))
         pendingConnectCompletion = nil
         
@@ -542,10 +572,18 @@ extension MetaMaskService {
         statement: String = "Sign in with Ethereum to Interspace",
         completion: @escaping (Result<(session: WalletSession, signature: WalletSignature), WalletError>) -> Void
     ) {
+        print("🦊🔐 MetaMask connectAndSignSIWE: Starting one-click connect flow")
+        print("🦊🔐 MetaMask connectAndSignSIWE: Nonce: \(nonce)")
+        
         // First connect
         connect(context: .default) { [weak self] connectResult in
+            print("🦊🔐 MetaMask connectAndSignSIWE: Connect result received")
+            
             switch connectResult {
             case .success(let session):
+                print("🦊🔐 MetaMask connectAndSignSIWE: Connection successful")
+                print("🦊🔐 MetaMask connectAndSignSIWE: Session address: \(session.address)")
+                
                 // Create SIWE message using the standardized builder
                 let message = SIWEMessageBuilder.buildSimpleMessage(
                     address: session.address,
@@ -553,17 +591,28 @@ extension MetaMaskService {
                     chainId: 1
                 )
                 
+                print("🦊🔐 MetaMask connectAndSignSIWE: SIWE message created, length: \(message.count)")
+                print("🦊🔐 MetaMask connectAndSignSIWE: Now requesting signature...")
+                
                 // Sign the message
                 self?.signMessage(message, session: session) { signResult in
+                    print("🦊🔐 MetaMask connectAndSignSIWE: Sign result received")
+                    
                     switch signResult {
                     case .success(let signature):
+                        print("🦊🔐 MetaMask connectAndSignSIWE: Signature successful")
+                        print("🦊🔐 MetaMask connectAndSignSIWE: Calling completion handler with success")
                         completion(.success((session: session, signature: signature)))
+                        print("🦊🔐 MetaMask connectAndSignSIWE: Completion handler called")
+                        
                     case .failure(let error):
+                        print("❌ MetaMask connectAndSignSIWE: Signature failed: \(error)")
                         completion(.failure(error))
                     }
                 }
                 
             case .failure(let error):
+                print("❌ MetaMask connectAndSignSIWE: Connection failed: \(error)")
                 completion(.failure(error))
             }
         }
