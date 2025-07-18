@@ -136,6 +136,7 @@
 		785509932E098AD400EDDF1C /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				AppStoreModels.swift,
 				AuthModels.swift,
 				Environment.swift,
 				ErrorWrapper.swift,
@@ -144,12 +145,14 @@
 				OAuthConfiguration.swift,
 				OAuthProviderIcons.swift,
 				OAuthProviderInfo.swift,
+				SIWEMessageBuilder.swift,
 				SIWEModels.swift,
 				SmartProfileModels.swift,
 				SocialAccount.swift,
 				WalletConfiguration.swift,
 				WalletErrors.swift,
 				WalletModels.swift,
+				WalletProtocol.swift,
 				WalletType.swift,
 			);
 			target = 13B07F861A680F5B00A75B9A /* Interspace */;
@@ -159,7 +162,9 @@
 			membershipExceptions = (
 				AccountLinkingService.swift,
 				APIService.swift,
+				AppKitService.swift,
 				AppleSignInService.swift,
+				AppStoreAPI.swift,
 				AuthAPI.swift,
 				AuthenticationManagerV2.swift,
 				AuthService.swift,
@@ -188,8 +193,10 @@
 				ProfileAPI.swift,
 				"ProfileAPI+MPC.swift",
 				ProfileIconGenerator.swift,
+				ReownWalletService.swift,
 				ServiceInitializer.swift,
 				SessionCoordinator.swift,
+				TransactionApprovalService.swift,
 				UserAPI.swift,
 				UserCacheManager.swift,
 				WalletAPI.swift,
@@ -197,7 +204,12 @@
 				WalletConnect/WalletConnectSessionManager.swift,
 				WalletConnectionManager.swift,
 				WalletDeepLinkGenerator.swift,
+				Wallets/MetaMask/MetaMaskConfiguration.swift,
+				Wallets/MetaMask/MetaMaskService.swift,
+				Wallets/WalletFactory.swift,
+				Wallets/WalletSessionStorage.swift,
 				WalletService.swift,
+				WalletServiceV2.swift,
 			);
 			target = 13B07F861A680F5B00A75B9A /* Interspace */;
 		};
@@ -231,6 +243,7 @@
 				AddAccountView.swift,
 				AddAppView.swift,
 				AddSocialAccountView.swift,
+				AppStoreView.swift,
 				AppsView.swift,
 				Authentication/AuthenticationLockView.swift,
 				Authentication/EmailAuthenticationView.swift,
@@ -240,6 +253,7 @@
 				Authentication/PINSetupView.swift,
 				AuthView.swift,
 				Components/AddToProfileTray.swift,
+				Components/AppStoreComponents.swift,
 				Components/AuthLoadingOverlay.swift,
 				Components/BottomSheet.swift,
 				Components/ConnectionProgressView.swift,
@@ -251,6 +265,7 @@
 				Components/LiquidGlassLoadingOverlay.swift,
 				Components/LiquidGlassWalletScanner.swift,
 				Components/LoadingSkeletons.swift,
+				Components/MiniWalletAuthorizationTray.swift,
 				Components/NativeCodeInput.swift,
 				Components/OAuthProviderIcon.swift,
 				Components/ProfileSelectorCard.swift,
@@ -289,6 +304,8 @@
 				Profile/ProfileHeaderView.swift,
 				Profile/ProfileNotificationsView.swift,
 				Profile/ProfileSecurityView.swift,
+				Profile/SingleLineAddressView.swift,
+				Profile/StandardTray.swift,
 				ProfileCreationTray.swift,
 				ProfileIconPicker.swift,
 				ProfileSelectorTray.swift,
