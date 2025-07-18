@@ -150,6 +150,25 @@ struct WalletTransaction {
     let gasPrice: String?
     let nonce: String?
     let chainId: Int
+    
+    /// Create a WalletTransaction from web3 params
+    static func from(web3Params params: [String: Any]) -> WalletTransaction? {
+        guard let from = params["from"] as? String,
+              let to = params["to"] as? String else {
+            return nil
+        }
+        
+        return WalletTransaction(
+            from: from,
+            to: to,
+            value: params["value"] as? String,
+            data: params["data"] as? String,
+            gasLimit: params["gas"] as? String ?? params["gasLimit"] as? String,
+            gasPrice: params["gasPrice"] as? String,
+            nonce: params["nonce"] as? String,
+            chainId: (params["chainId"] as? Int) ?? 1
+        )
+    }
 }
 
 // MARK: - Wallet Factory Protocol

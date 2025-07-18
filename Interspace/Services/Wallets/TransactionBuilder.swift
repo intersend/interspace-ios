@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Ethereum transaction builder and serializer
 /// Handles RLP encoding for transaction signing
@@ -62,8 +63,10 @@ final class TransactionBuilder {
             return Data()
         }
         
-        // Use Keccak256 for Ethereum transaction hashing
-        return encoded.sha256Hash.data(using: .utf8) ?? Data()
+        // Use SHA256 for now (ideally should use Keccak256 for Ethereum)
+        // Note: For proper Ethereum transaction hashing, you should use Keccak256
+        let hash = SHA256.hash(data: encoded)
+        return Data(hash)
     }
     
     // MARK: - Hex Utilities

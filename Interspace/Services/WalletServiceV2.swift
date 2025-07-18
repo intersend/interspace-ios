@@ -395,25 +395,80 @@ extension WalletServiceV2 {
     /// Helper to migrate from old WalletService
     /// Maps old connection methods to new architecture
     func connectWallet(_ walletType: WalletType) async throws -> WalletConnectionResult {
+        print("🔄 WalletServiceV2.connectWallet: Starting connection for \(walletType.displayName)")
+        
         // For MetaMask, use one-click connect with SIWE if available
         if walletType == .metamask,
            let metamaskService = factory.createWallet(for: .metamask) as? MetaMaskService {
             
+            print("🔄 WalletServiceV2.connectWallet: Using MetaMask one-click connect flow")
+            
             // Get SIWE nonce first
+            print("🔄 WalletServiceV2.connectWallet: Getting SIWE nonce...")
             let nonce = try await getSIWENonce()
+            print("🔄 WalletServiceV2.connectWallet: Got nonce: \(nonce)")
             
             // Use one-click connect with SIWE
-            let result = try await withCheckedThrowingContinuation { continuation in
-                metamaskService.connectAndSignSIWE(nonce: nonce) { result in
-                    continuation.resume(with: result)
+            print("🔄 WalletServiceV2.connectWallet: Starting withCheckedThrowingContinuation...")
+            
+            // Add timeout protection
+            let timeoutSeconds: TimeInterval = 120.0 // 2 minutes
+            var continuationResumed = false
+            
+            let result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(session: WalletSession, signature: WalletSignature), Error>) in
+                print("🔄 WalletServiceV2.connectWallet: Inside continuation, calling connectAndSignSIWE")
+                
+                // Create timeout task
+                let timeoutTask = Task {
+                    try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+                    if !continuationResumed {
+                        print("⏱ WalletServiceV2.connectWallet: Timeout reached after \(timeoutSeconds) seconds")
+                        continuationResumed = true
+                        continuation.resume(throwing: WalletError.timeout())
+                    }
                 }
+                
+                // Ensure we capture the continuation properly
+                metamaskService.connectAndSignSIWE(nonce: nonce) { result in
+                    print("🔄 WalletServiceV2.connectWallet: connectAndSignSIWE completed with result")
+                    
+                    // Cancel timeout task
+                    timeoutTask.cancel()
+                    
+                    // Resume on any thread is safe for continuations
+                    guard !continuationResumed else {
+                        print("⚠️ WalletServiceV2.connectWallet: Continuation already resumed, ignoring result")
+                        return
+                    }
+                    
+                    continuationResumed = true
+                    
+                    switch result {
+                    case .success(let data):
+                        print("🔄 WalletServiceV2.connectWallet: Success! Address: \(data.session.address)")
+                        print("🔄 WalletServiceV2.connectWallet: Signature: \(data.signature.signature)")
+                        print("🔄 WalletServiceV2.connectWallet: Resuming continuation with success")
+                        continuation.resume(returning: data)
+                        print("🔄 WalletServiceV2.connectWallet: Continuation resumed successfully")
+                        
+                    case .failure(let error):
+                        print("❌ WalletServiceV2.connectWallet: Failed: \(error)")
+                        print("🔄 WalletServiceV2.connectWallet: Resuming continuation with error")
+                        continuation.resume(throwing: error)
+                        print("🔄 WalletServiceV2.connectWallet: Continuation resumed with error")
+                    }
+                }
+                
+                print("🔄 WalletServiceV2.connectWallet: connectAndSignSIWE call initiated")
             }
+            
+            print("🔄 WalletServiceV2.connectWallet: Continuation completed, updating state")
             
             // Update active wallet
             activeWallet = metamaskService
             connectionState = .connected(result.session)
             
-            return WalletConnectionResult(
+            let connectionResult = WalletConnectionResult(
                 address: result.session.address,
                 signature: result.signature.normalizedSignature,
                 message: result.signature.message,
@@ -421,6 +476,12 @@ extension WalletServiceV2 {
                 walletIcon: result.session.walletMetadata?.icon,
                 walletType: walletType
             )
+            
+            print("🔄 WalletServiceV2.connectWallet: Returning connection result")
+            print("🔄 WalletServiceV2.connectWallet: Address: \(connectionResult.address)")
+            print("🔄 WalletServiceV2.connectWallet: Signature length: \(connectionResult.signature.count)")
+            
+            return connectionResult
         }
         
         // For other wallets, use standard flow
