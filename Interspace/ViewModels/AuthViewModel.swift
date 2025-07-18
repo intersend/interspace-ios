@@ -23,7 +23,7 @@ final class AuthViewModel: ObservableObject {
     
     // Services
     let authManager = AuthenticationManagerV2.shared
-    private let walletService = WalletService.shared
+    private let walletService = WalletServiceV2.shared
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -175,8 +175,14 @@ final class AuthViewModel: ObservableObject {
                 // Let WalletService handle connection state management
                 // Don't force disconnect here as it causes ping-pong with MetaMask
                 print("🔗 AuthViewModel: Initiating wallet connection for \(walletType.rawValue)")
+                print("🔗 AuthViewModel: Using WalletServiceV2")
                 
                 let result = try await walletService.connectWallet(walletType)
+                
+                print("🔗 AuthViewModel: Received connection result")
+                print("🔗 AuthViewModel: Address: \(result.address)")
+                print("🔗 AuthViewModel: Signature length: \(result.signature.count)")
+                print("🔗 AuthViewModel: Message length: \(result.message.count)")
                 
                 // For wallet connections during auth flow, we pass the message along with signature
                 let config = WalletConnectionConfig(
@@ -195,10 +201,13 @@ final class AuthViewModel: ObservableObject {
                     shopDomain: nil
                 )
                 
+                print("🔗 AuthViewModel: Calling authManager.authenticate")
                 try await authManager.authenticate(with: config)
+                print("🔗 AuthViewModel: Authentication completed successfully")
                 isAuthenticationInProgress = false
             } catch {
-                print("Wallet connection error: \(error)")
+                print("❌ AuthViewModel: Wallet connection error: \(error)")
+                print("❌ AuthViewModel: Error type: \(type(of: error))")
                 isAuthenticationInProgress = false
                 
                 // Handle specific wallet errors with better user feedback
@@ -228,7 +237,7 @@ final class AuthViewModel: ObservableObject {
                 if let walletError = error as? WalletError {
                     if walletError.localizedDescription.contains("account has changed") {
                         // Clear wallet state for retry
-                        await walletService.disconnect()
+                        try? await walletService.disconnect()
                     }
                 }
             }
@@ -399,6 +408,80 @@ final class AuthViewModel: ObservableObject {
             self.error = AuthenticationError.unknown(error.localizedDescription)
             self.showError = true
             self.isLoading = false
+        }
+    }
+    
+    // MARK: - Generic Wallet Auth Handling
+    
+    @MainActor
+    func handleWalletAuth(address: String, signature: String, message: String, walletType: WalletType) async {
+        print("🔗 AuthViewModel: handleWalletAuth called")
+        print("🔗 AuthViewModel: WalletType: \(walletType.displayName)")
+        print("🔗 AuthViewModel: Address: \(address)")
+        print("🔗 AuthViewModel: Signature length: \(signature.count)")
+        print("🔗 AuthViewModel: Message length: \(message.count)")
+        
+        isAuthenticationInProgress = true
+        
+        do {
+            // Create wallet connection config
+            let config = WalletConnectionConfig(
+                strategy: .wallet,
+                walletType: walletType.rawValue,
+                email: nil,
+                verificationCode: nil,
+                walletAddress: address,
+                signature: signature,
+                message: message,
+                socialProvider: nil,
+                socialProfile: nil,
+                oauthCode: nil,
+                idToken: nil,
+                accessToken: nil,
+                shopDomain: nil
+            )
+            
+            print("🔗 AuthViewModel: Calling authManager.authenticate")
+            try await authManager.authenticate(with: config)
+            print("🔗 AuthViewModel: Authentication completed successfully")
+            
+            isAuthenticationInProgress = false
+            
+            // Success feedback handled by AuthenticationManagerV2
+        } catch let authError as AuthenticationError {
+            print("❌ AuthViewModel: Authentication error: \(authError)")
+            isAuthenticationInProgress = false
+            
+            self.error = authError
+            self.showError = true
+            self.isLoading = false
+            
+            switch authError {
+            case .invalidCredentials:
+                errorMessage = "Invalid credentials. Please try again."
+            case .networkError(let message):
+                errorMessage = "Network error: \(message)"
+            case .walletConnectionFailed(let message):
+                errorMessage = "Wallet connection failed: \(message)"
+            case .emailVerificationFailed:
+                errorMessage = "Email verification failed. Please try again."
+            case .invalidVerificationCode:
+                errorMessage = "Invalid verification code. Please try again."
+            case .tokenExpired:
+                errorMessage = "Your session has expired. Please sign in again."
+            case .notAuthenticated:
+                errorMessage = "You are not authenticated. Please sign in."
+            default:
+                errorMessage = authError.localizedDescription
+            }
+        } catch {
+            print("❌ AuthViewModel: Unexpected error: \(error)")
+            isAuthenticationInProgress = false
+            
+            self.error = AuthenticationError.unknown(error.localizedDescription)
+            self.showError = true
+            self.isLoading = false
+            errorMessage = "An unexpected error occurred. Please try again."
         }
     }
     
