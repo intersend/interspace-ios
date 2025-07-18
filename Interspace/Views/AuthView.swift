@@ -129,8 +129,8 @@ struct AuthView: View {
     // MARK: - Authentication Methods
     
     private func connectMetaMask() async {
-        // TODO: Implement wallet connections when ready
-        print("🔗 AuthView: MetaMask connection - coming soon")
+        print("🔗 AuthView: MetaMask connection requested")
+        viewModel.connectWithMetaMask()
     }
     
     private func connectCoinbaseWallet() async {

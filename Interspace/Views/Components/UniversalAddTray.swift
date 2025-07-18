@@ -34,6 +34,8 @@ struct UniversalAddTray: View {
     @State private var processingProviderId: String?
     @State private var showFarcasterAuth = false
     @State private var showWalletConnectOptions = false
+    @State private var errorMessage: String?
+    @State private var showError = false
     
     private let walletService = WalletServiceV2.shared
     private let oauthService = OAuthProviderService.shared
@@ -77,6 +79,14 @@ struct UniversalAddTray: View {
             }
             .onChange(of: authManager.isAuthenticated) { newValue in
                 onAuthenticationChange(newValue)
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK") {
+                    showError = false
+                    errorMessage = nil
+                }
+            } message: {
+                Text(errorMessage ?? "An unexpected error occurred")
             }
     }
     
@@ -132,32 +142,111 @@ struct UniversalAddTray: View {
     private func handleWalletAuthorization(_ walletType: WalletType) async {
         do {
             if isForAuthentication {
-                // Authentication flow - use standard WalletConnect for ALL wallets
-                try await walletService.connectWallet(walletType)
+                // Authentication flow - connect wallet and get signature
+                print("🔐 UniversalAddTray: Starting wallet authentication for \(walletType.displayName)")
+                let result = try await walletService.connectWallet(walletType)
                 
-                // The authentication will be handled by the wallet service
-                // and the UI will update automatically when authentication succeeds
+                print("🔐 UniversalAddTray: Wallet connected successfully")
+                print("🔐 UniversalAddTray: Address: \(result.address)")
+                print("🔐 UniversalAddTray: Signature length: \(result.signature.count)")
+                
+                // Use the appropriate AuthViewModel instance
+                let viewModel = authViewModel ?? localAuthViewModel
+                
+                // Pass the result to AuthViewModel for authentication
+                print("🔐 UniversalAddTray: Passing result to AuthViewModel for authentication")
+                await viewModel.handleWalletAuth(
+                    address: result.address,
+                    signature: result.signature,
+                    message: result.message,
+                    walletType: walletType
+                )
+                
+                print("🔐 UniversalAddTray: Authentication initiated")
+                
+                // Dismiss the tray on success
+                await MainActor.run {
+                    isPresented = false
+                    HapticManager.notification(.success)
+                }
             } else {
                 // Account linking flow - ensure profile exists first
-                if sessionCoordinator.activeProfile == nil {
-                    print("No active profile found, ensuring profile exists before linking wallet")
-                    await sessionCoordinator.ensureActiveProfile()
-                }
-                
-                // Verify profile exists after ensuring
-                guard sessionCoordinator.activeProfile != nil else {
+                guard let profile = sessionCoordinator.activeProfile else {
+                    print("❌ UniversalAddTray: No active profile for wallet linking")
                     throw AuthenticationError.notAuthenticated
                 }
                 
-                // Link wallet to existing account using standard WalletConnect
-                _ = try await walletService.connectWallet(walletType)
+                // Link wallet to existing account
+                let result = try await walletService.connectWallet(walletType)
+                
+                print("🔐 UniversalAddTray: Got wallet signature, now linking to profile")
+                print("🔐 UniversalAddTray: Address: \(result.address)")
+                print("🔐 UniversalAddTray: Wallet type: \(result.walletType.rawValue)")
+                
+                // Get active profile first
+                guard let activeProfile = sessionCoordinator.activeProfile else {
+                    print("❌ UniversalAddTray: No active profile found")
+                    throw AuthenticationError.notAuthenticated
+                }
+                
+                // Check if this wallet is already linked to the current profile
+                let normalizedAddress = result.address.lowercased()
+                
+                // Get profile's linked accounts
+                let profileAccounts = try await ProfileAPI.shared.getLinkedAccounts(profileId: activeProfile.id)
+                
+                if profileAccounts.contains(where: { account in
+                    account.address.lowercased() == normalizedAddress
+                }) {
+                    print("⚠️ UniversalAddTray: Wallet already linked to this profile: \(normalizedAddress)")
+                    await MainActor.run {
+                        HapticManager.notification(.error)
+                    }
+                    throw WalletError.connectionFailed("This wallet is already linked to your profile")
+                }
+                
+                // Link the wallet to the specific profile using ProfileAPI
+                let linkRequest = LinkAccountRequest(
+                    address: result.address,
+                    walletType: result.walletType.rawValue,
+                    customName: nil,
+                    isPrimary: false,
+                    signature: result.signature,
+                    message: result.message,
+                    chainId: 1
+                )
+                
+                let linkedAccount = try await ProfileAPI.shared.linkAccount(
+                    profileId: activeProfile.id,
+                    request: linkRequest
+                )
+                
+                print("✅ UniversalAddTray: Wallet linked successfully to profile")
+                print("✅ UniversalAddTray: Linked account ID: \(linkedAccount.id)")
+                print("✅ UniversalAddTray: Linked address: \(linkedAccount.address)")
+                
+                // Refresh profile data to show the new linked account
+                await ProfileViewModel.shared.refreshProfile()
+                
+                await MainActor.run {
+                    isPresented = false
+                    HapticManager.notification(.success)
+                }
             }
-            
-            // Success feedback is handled by the respective services
         } catch {
-            print("Wallet authorization error: \(error)")
+            print("❌ UniversalAddTray: Wallet authorization error: \(error)")
             await MainActor.run {
                 HapticManager.notification(.error)
+                
+                // Set error message based on error type
+                if let walletError = error as? WalletError {
+                    errorMessage = walletError.localizedDescription
+                } else if let authError = error as? AuthenticationError {
+                    errorMessage = authError.localizedDescription
+                } else {
+                    errorMessage = error.localizedDescription
+                }
+                showError = true
             }
         }
     }
