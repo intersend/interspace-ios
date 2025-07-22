@@ -98,5 +98,29 @@ struct MiniWalletAuthorizationTray: View {
         .background(Material.regularMaterial)
         .preferredColorScheme(.dark)
         .presentationDragIndicator(.visible)
+        .onDisappear {
+            // Cancel any pending wallet connections when tray is dismissed
+            if hasInitiatedConnection && isLoading {
+                print("🚫 MiniWalletAuthorizationTray: Cancelling pending connection for \(walletType.displayName)")
+                
+                // Reset state
+                isLoading = false
+                hasInitiatedConnection = false
+                
+                // Cancel the connection
+                Task {
+                    let factory = WalletFactory.shared
+                    if let wallet = factory.wallet(for: walletType) {
+                        if walletType == .coinbase,
+                           let coinbaseService = wallet as? CoinbaseService {
+                            coinbaseService.cancelConnection()
+                        } else if walletType == .metamask,
+                                  let metamaskService = wallet as? MetaMaskService {
+                            // MetaMask doesn't have cancelConnection yet, but we can add it if needed
+                        }
+                    }
+                }
+            }
+        }
     }
 }
