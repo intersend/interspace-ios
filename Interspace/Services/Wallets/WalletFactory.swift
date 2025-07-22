@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import CoinbaseWalletSDK
 
 /// Factory for creating wallet service instances
 final class WalletFactory: WalletFactoryProtocol {
@@ -25,10 +26,15 @@ final class WalletFactory: WalletFactoryProtocol {
     // MARK: - WalletFactoryProtocol
     
     func createWallet(for type: WalletType) -> WalletProtocol? {
+        print("🏭 WalletFactory: createWallet called for type: \(type.displayName)")
+        
         // Check cache first
         if let cached = getCachedWallet(for: type) {
+            print("🏭 WalletFactory: Returning cached instance for \(type.displayName)")
             return cached
         }
+        
+        print("🏭 WalletFactory: Creating new instance for \(type.displayName)")
         
         // Create new instance
         let wallet: WalletProtocol?
@@ -51,9 +57,27 @@ final class WalletFactory: WalletFactoryProtocol {
         case .argent:
             wallet = ReownWalletService(walletType: type)
             
-        // Add more wallet implementations here as they're created
-        // case .coinbase:
-        //     wallet = CoinbaseWalletService() // Uses SDK
+        case .coinbase:
+            // Use native Coinbase SDK for better UX
+            print("🏭 WalletFactory: Creating Coinbase wallet...")
+            
+            // Check if CoinbaseWalletSDK is available
+            #if canImport(CoinbaseWalletSDK)
+                print("🏭 WalletFactory: CoinbaseWalletSDK package is installed ✓")
+                // Use native CoinbaseService if SDK is available
+                wallet = CoinbaseService(sessionStorage: sessionStorage)
+                print("🏭 WalletFactory: Coinbase wallet created successfully")
+            #else
+                print("❌ WalletFactory: CoinbaseWalletSDK package not installed")
+                print("❌ WalletFactory: Add package: https://github.com/MobileWalletProtocol/wallet-mobile-sdk")
+                wallet = ReownWalletService(walletType: type)
+            #endif
+            
+            if let wallet = wallet {
+                print("🏭 WalletFactory: Created wallet type: \(Swift.type(of: wallet))")
+            } else {
+                print("🏭 WalletFactory: Failed to create wallet")
+            }
             
         default:
             // Wallet not yet implemented
@@ -70,9 +94,9 @@ final class WalletFactory: WalletFactoryProtocol {
     }
     
     func isSupported(_ type: WalletType) -> Bool {
-        // List of currently supported wallets via Reown
+        // List of currently supported wallets
         switch type {
-        case .phantom, .metamask, .rainbow, .trust, .argent:
+        case .phantom, .metamask, .rainbow, .trust, .argent, .coinbase:
             return true
         default:
             return false
@@ -158,3 +182,4 @@ extension WalletFactory {
         }
     }
 }
+

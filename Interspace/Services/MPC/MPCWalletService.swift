@@ -66,12 +66,18 @@ final class MPCWalletService: ObservableObject {
             try await biometricAuth.authenticate(reason: "Generate MPC Wallet")
             
             // Step 2: Get cloud public key from backend
-            let cloudPublicKey = try await fetchCloudPublicKey(for: profileId)
+            let cloudKeyResponse = try await fetchCloudPublicKeyWithAlgorithm(for: profileId)
+            let cloudPublicKey = cloudKeyResponse.cloudPublicKey
+            let algorithm: MPCAlgorithm = cloudKeyResponse.algorithm == "eddsa" ? .eddsa : .ecdsa
             
             // Step 3: Initialize session
+            print("🔵 MPC: Initializing session with algorithm: \(algorithm)")
+            print("   Cloud public key: \(cloudPublicKey)")
+            print("   Key prefix: \(cloudPublicKey.prefix(2))")
+            
             try await sessionManager.connect()
             try await keyShareManager.initializeSession(
-                algorithm: .ecdsa,
+                algorithm: algorithm,
                 cloudPublicKey: cloudPublicKey
             )
             
@@ -296,6 +302,15 @@ final class MPCWalletService: ObservableObject {
         // Call backend API to get cloud public key
         let response = try await ProfileAPI.shared.getCloudPublicKey(profileId: profileId)
         return response.data.cloudPublicKey
+    }
+    
+    private func fetchCloudPublicKeyWithAlgorithm(for profileId: String) async throws -> (cloudPublicKey: String, algorithm: String) {
+        // Call backend API to get cloud public key with algorithm
+        let response = try await ProfileAPI.shared.getCloudPublicKey(profileId: profileId)
+        return (
+            cloudPublicKey: response.data.cloudPublicKey,
+            algorithm: response.data.algorithm ?? "ecdsa"
+        )
     }
     
     private func notifyBackendOfKeyGeneration(

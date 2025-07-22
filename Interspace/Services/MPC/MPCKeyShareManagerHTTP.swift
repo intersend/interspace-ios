@@ -19,159 +19,145 @@ final class MPCKeyShareManagerHTTP {
     
     /// Generate MPC wallet by handling the entire protocol with sigpair
     func generateMPCWallet(algorithm: MPCAlgorithm, cloudPublicKey: String, profileId: String) async throws -> MPCKeyShare {
-        return try await withCheckedThrowingContinuation { continuation in
-            queue.async { [weak self] in
-                do {
-                    let sessionId = UUID().uuidString
-                    
-                    // Create a DuoSession for key generation
-                    // Connect directly to sigpair (Silence Labs Duo Server)
-                    // For local development, sigpair runs on port 8080
-                    // Use the host machine's IP address (not localhost) for iOS simulator/device
-                    let websocketHost = "192.168.2.77" // Your Mac's IP address
-                    
-                    // Build WebsocketConfig without authentication for local dev
-                    let websocketConfig = WebsocketConfigBuilder()
-                        .withBaseUrl(websocketHost)
-                        .withPort("8080")  // sigpair port (direct connection)
-                        .withSecure(false)
-                        .build()
-                    
-                    let duoSession: DuoSession
-                    switch algorithm {
-                    case .ecdsa:
-                        duoSession = SilentShardDuo.ECDSA.createDuoSession(
-                            cloudVerifyingKey: cloudPublicKey,
-                            websocketConfig: websocketConfig
-                        )
-                    case .eddsa:
-                        duoSession = SilentShardDuo.EdDSA.createDuoSession(
-                            cloudVerifyingKey: cloudPublicKey,
-                            websocketConfig: websocketConfig
-                        )
-                    }
-                    
-                    // Perform key generation - SDK handles the entire MPC protocol
-                    Task {
-                        let keygenResult = await duoSession.keygen()
-                        
-                        switch keygenResult {
-                        case .success(let keyShareData):
-                            // Extract public key from the keyShare data using SDK method
-                            let publicKeyResult: Result<String, Error>
-                            switch algorithm {
-                            case .ecdsa:
-                                publicKeyResult = await SilentShardDuo.ECDSA.getKeysharePublicKeyAsHex(keyShareData)
-                            case .eddsa:
-                                publicKeyResult = await SilentShardDuo.EdDSA.getKeysharePublicKeyAsHex(keyShareData)
-                            }
-                            
-                            switch publicKeyResult {
-                            case .success(let publicKeyHex):
-                                let keyId = UUID().uuidString
-                                let address = self?.generateEthereumAddress(from: publicKeyHex) ?? ""
-                                
-                                // Create key share wrapper
-                                let mpcKeyShare = MPCKeyShare(
-                                    shareData: keyShareData,
-                                    publicKey: publicKeyHex,
-                                    address: address,
-                                    algorithm: algorithm,
-                                    createdAt: Date(),
-                                    keyId: keyId
-                                )
-                                
-                                // Store the duo session for future signing
-                                self?.activeKeySessions[keyId] = duoSession
-                                
-                                continuation.resume(returning: mpcKeyShare)
-                                
-                            case .failure(let error):
-                                continuation.resume(throwing: MPCError.keyGenerationFailed("Failed to extract public key: \(error.localizedDescription)"))
-                            }
-                            
-                        case .failure(let error):
-                            continuation.resume(throwing: MPCError.keyGenerationFailed(error.localizedDescription))
-                        }
-                    }
-                } catch {
-                    continuation.resume(throwing: MPCError.sdkInitializationFailed(error.localizedDescription))
-                }
+        let sessionId = UUID().uuidString
+        
+        // Create a DuoSession for key generation
+        // Use MPCWebSocketConfiguration for dynamic host configuration
+        let mpcConfig = MPCWebSocketConfiguration.shared
+        
+        // Build WebsocketConfig without authentication for local dev
+        let websocketConfig = WebsocketConfigBuilder()
+            .withBaseUrl(mpcConfig.duoNodeUrl)
+            .withPort(mpcConfig.duoNodePort)
+            .withSecure(mpcConfig.useSecureConnection)
+            .build()
+        
+        let duoSession: DuoSession
+        switch algorithm {
+        case .ecdsa:
+            duoSession = SilentShardDuo.ECDSA.createDuoSession(
+                cloudVerifyingKey: cloudPublicKey,
+                websocketConfig: websocketConfig
+            )
+        case .eddsa:
+            duoSession = SilentShardDuo.EdDSA.createDuoSession(
+                cloudVerifyingKey: cloudPublicKey,
+                websocketConfig: websocketConfig
+            )
+        }
+        
+        // Perform key generation - SDK handles the entire MPC protocol
+        let keygenResult = await duoSession.keygen()
+        
+        switch keygenResult {
+        case .success(let keyShareData):
+            // Extract public key from the keyShare data using SDK method
+            let publicKeyResult: Result<String, Error>
+            switch algorithm {
+            case .ecdsa:
+                publicKeyResult = await SilentShardDuo.ECDSA.getKeysharePublicKeyAsHex(keyShareData)
+            case .eddsa:
+                publicKeyResult = await SilentShardDuo.EdDSA.getKeysharePublicKeyAsHex(keyShareData)
             }
+            
+            switch publicKeyResult {
+            case .success(let publicKeyHex):
+                let keyId = UUID().uuidString
+                let address = self.generateEthereumAddress(from: publicKeyHex)
+                
+                // Create key share wrapper
+                let mpcKeyShare = MPCKeyShare(
+                    shareData: keyShareData,
+                    publicKey: publicKeyHex,
+                    address: address,
+                    algorithm: algorithm,
+                    createdAt: Date(),
+                    keyId: keyId
+                )
+                
+                // Store the duo session for future signing
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    self.queue.async {
+                        self.activeKeySessions[keyId] = duoSession
+                        continuation.resume()
+                    }
+                }
+                
+                return mpcKeyShare
+                
+            case .failure(let error):
+                throw MPCError.keyGenerationFailed("Failed to extract public key: \(error.localizedDescription)")
+            }
+            
+        case .failure(let error):
+            throw MPCError.keyGenerationFailed(error.localizedDescription)
         }
     }
     
     /// Generate initial P1 messages for key generation (deprecated - for backward compatibility)
     func generateInitialP1Messages(algorithm: MPCAlgorithm, cloudPublicKey: String) async throws -> [[String: Any]] {
-        return try await withCheckedThrowingContinuation { continuation in
-            queue.async { [weak self] in
-                do {
-                    // For HTTP mode with backend proxy, we don't need to establish WebSocket
-                    // The backend will handle the duo-node connection
-                    // We just need to prepare for key generation
-                    
-                    let sessionId = UUID().uuidString
-                    
-                    // Create a DuoSession for key generation
-                    // Connect directly to sigpair (Silence Labs Duo Server)
-                    // For local development, sigpair runs on port 8080
-                    // Use the host machine's IP address (not localhost) for iOS simulator/device
-                    let websocketHost = "192.168.2.77" // Your Mac's IP address
-                    
-                    // Build WebsocketConfig without authentication for local dev
-                    let websocketConfig = WebsocketConfigBuilder()
-                        .withBaseUrl(websocketHost)
-                        .withPort("8080")  // sigpair port (direct connection)
-                        .withSecure(false)
-                        .build()
-                    
-                    let duoSession: DuoSession
-                    switch algorithm {
-                    case .ecdsa:
-                        duoSession = SilentShardDuo.ECDSA.createDuoSession(
-                            cloudVerifyingKey: cloudPublicKey,
-                            websocketConfig: websocketConfig
-                        )
-                    case .eddsa:
-                        duoSession = SilentShardDuo.EdDSA.createDuoSession(
-                            cloudVerifyingKey: cloudPublicKey,
-                            websocketConfig: websocketConfig
-                        )
-                    }
-                    
-                    // Store the session
-                    self?.activeKeySessions[sessionId] = duoSession
-                    
-                    // Generate initial P1 messages using the SDK
-                    // Even in HTTP mode, the client must generate P1 messages
-                    // The backend acts as a proxy to forward them to duo-node
-                    
-                    // Start key generation to get initial P1 messages
-                    Task {
-                        let keygenResult = await duoSession.keygen()
-                        
-                        switch keygenResult {
-                        case .success(let keyData):
-                            // Extract P1 messages from the key generation process
-                            // For now, we'll create a proper P1 message structure
-                            let p1Message: [String: Any] = [
-                                "type": "keyGen",
-                                "round": 1,
-                                "sessionId": sessionId,
-                                "data": keyData.base64EncodedString()
-                            ]
-                            
-                            let p1Messages = [p1Message]
-                            continuation.resume(returning: p1Messages)
-                            
-                        case .failure(let error):
-                            continuation.resume(throwing: MPCError.keyGenerationFailed(error.localizedDescription))
-                        }
-                    }
-                } catch {
-                    continuation.resume(throwing: MPCError.sdkInitializationFailed(error.localizedDescription))
-                }
+        // For HTTP mode with backend proxy, we don't need to establish WebSocket
+        // The backend will handle the duo-node connection
+        // We just need to prepare for key generation
+        
+        let sessionId = UUID().uuidString
+        
+        // Create a DuoSession for key generation
+        // Use MPCWebSocketConfiguration for dynamic host configuration
+        let mpcConfig = MPCWebSocketConfiguration.shared
+        
+        // Build WebsocketConfig without authentication for local dev
+        let websocketConfig = WebsocketConfigBuilder()
+            .withBaseUrl(mpcConfig.duoNodeUrl)
+            .withPort(mpcConfig.duoNodePort)
+            .withSecure(mpcConfig.useSecureConnection)
+            .build()
+        
+        let duoSession: DuoSession
+        switch algorithm {
+        case .ecdsa:
+            duoSession = SilentShardDuo.ECDSA.createDuoSession(
+                cloudVerifyingKey: cloudPublicKey,
+                websocketConfig: websocketConfig
+            )
+        case .eddsa:
+            duoSession = SilentShardDuo.EdDSA.createDuoSession(
+                cloudVerifyingKey: cloudPublicKey,
+                websocketConfig: websocketConfig
+            )
+        }
+        
+        // Store the session on the queue
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.queue.async {
+                self.activeKeySessions[sessionId] = duoSession
+                continuation.resume()
             }
+        }
+        
+        // Generate initial P1 messages using the SDK
+        // Even in HTTP mode, the client must generate P1 messages
+        // The backend acts as a proxy to forward them to duo-node
+        
+        // Start key generation to get initial P1 messages
+        let keygenResult = await duoSession.keygen()
+        
+        switch keygenResult {
+        case .success(let keyData):
+            // Extract P1 messages from the key generation process
+            // For now, we'll create a proper P1 message structure
+            let p1Message: [String: Any] = [
+                "type": "keyGen",
+                "round": 1,
+                "sessionId": sessionId,
+                "data": keyData.base64EncodedString()
+            ]
+            
+            let p1Messages = [p1Message]
+            return p1Messages
+            
+        case .failure(let error):
+            throw MPCError.keyGenerationFailed(error.localizedDescription)
         }
     }
     
@@ -181,21 +167,21 @@ final class MPCKeyShareManagerHTTP {
         p2Messages: [[String: Any]],
         sessionType: MPCSessionType
     ) async throws -> [[String: Any]] {
-        
+        // Process messages on queue
         return try await withCheckedThrowingContinuation { continuation in
-            queue.async { [weak self] in
+            self.queue.async {
                 do {
                     var nextP1Messages: [[String: Any]] = []
                     
                     switch sessionType {
                     case .keyGeneration:
-                        nextP1Messages = try self?.processKeyGenP2Messages(
+                        nextP1Messages = try self.processKeyGenP2Messages(
                             sessionId: sessionId,
                             p2Messages: p2Messages
                         ) ?? []
                         
                     case .signing:
-                        nextP1Messages = try self?.processSigningP2Messages(
+                        nextP1Messages = try self.processSigningP2Messages(
                             sessionId: sessionId,
                             p2Messages: p2Messages
                         ) ?? []
@@ -240,9 +226,9 @@ final class MPCKeyShareManagerHTTP {
         )
         
         // Clean up session
-        await withCheckedContinuation { continuation in
-            queue.async { [weak self] in
-                self?.activeKeySessions.removeValue(forKey: sessionId)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.queue.async {
+                self.activeKeySessions.removeValue(forKey: sessionId)
                 continuation.resume()
             }
         }
@@ -259,10 +245,10 @@ final class MPCKeyShareManagerHTTP {
     ) async throws -> [[String: Any]] {
         
         return try await withCheckedThrowingContinuation { continuation in
-            queue.async { [weak self] in
+            self.queue.async {
                 do {
                     let sessionId = UUID().uuidString
-                    let messageHash = self?.hashMessage(message) ?? Data()
+                    let messageHash = self.hashMessage(message)
                     
                     let p1Messages: [[String: Any]] = [
                         [
@@ -271,10 +257,10 @@ final class MPCKeyShareManagerHTTP {
                             "sessionId": sessionId,
                             "keyId": keyShare.keyId,
                             "messageHash": messageHash.base64EncodedString(),
-                            "data": self?.generateP1SignData(
+                            "data": self.generateP1SignData(
                                 keyShare: keyShare,
                                 messageHash: messageHash
-                            ) ?? [:]
+                            )
                         ]
                     ]
                     
@@ -293,15 +279,15 @@ final class MPCKeyShareManagerHTTP {
     ) async throws -> String {
         
         return try await withCheckedThrowingContinuation { continuation in
-            queue.async { [weak self] in
+            self.queue.async {
                 do {
                     // Extract signature from final messages
-                    guard let signature = self?.extractSignatureFromP2(finalP2Messages) else {
+                    guard let signature = self.extractSignatureFromP2(finalP2Messages) else {
                         throw MPCError.signingFailed("Failed to extract signature")
                     }
                     
                     // Clean up session
-                    self?.activeSignSessions.removeValue(forKey: sessionId)
+                    self.activeSignSessions.removeValue(forKey: sessionId)
                     
                     continuation.resume(returning: signature)
                 } catch {
