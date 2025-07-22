@@ -67,5 +67,7 @@
 	<string>$(WALLETCONNECT_PROJECT_ID)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Face ID is used to secure access to your Interspace account</string>
+	<key>NSTouchIDUsageDescription</key>
+	<string>Touch ID is used to secure access to your Interspace account</string>
 </dict>
 </plist>
