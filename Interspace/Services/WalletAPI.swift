@@ -61,6 +61,48 @@ final class WalletAPI {
         return response.data
     }
     
+    // MARK: - NFT Endpoints
+    
+    /// GET /profiles/:id/nfts
+    func getProfileNFTs(profileId: String) async throws -> NFTData {
+        let response: NFTResponse = try await apiService.performRequest(
+            endpoint: "/profiles/\(profileId)/nfts",
+            method: .GET,
+            responseType: NFTResponse.self
+        )
+        return response.data
+    }
+    
+    /// GET /profiles/:id/nft-collections
+    func getProfileNFTCollections(profileId: String) async throws -> [NFTCollection] {
+        struct CollectionsResponse: Codable {
+            let success: Bool
+            let data: [NFTCollection]
+        }
+        
+        let response: CollectionsResponse = try await apiService.performRequest(
+            endpoint: "/profiles/\(profileId)/nft-collections",
+            method: .GET,
+            responseType: CollectionsResponse.self
+        )
+        return response.data
+    }
+    
+    /// GET /profiles/:id/nfts/:contractAddress/:tokenId
+    func getNFTMetadata(profileId: String, contractAddress: String, tokenId: String, chainId: Int = 1) async throws -> NFTMetadata {
+        struct MetadataResponse: Codable {
+            let success: Bool
+            let data: NFTMetadata
+        }
+        
+        let response: MetadataResponse = try await apiService.performRequest(
+            endpoint: "/profiles/\(profileId)/nfts/\(contractAddress)/\(tokenId)?chainId=\(chainId)",
+            method: .GET,
+            responseType: MetadataResponse.self
+        )
+        return response.data
+    }
+    
     /// POST /profiles/:id/intent
     func createIntent(profileId: String, request: CreateIntentRequest) async throws -> IntentResponse {
         return try await apiService.performRequest(
@@ -343,4 +385,11 @@ struct TokenAllowance: Codable, Identifiable {
     let chainId: Int
     let createdAt: String
     let updatedAt: String
+}
+
+// MARK: - NFT Response Models
+
+struct NFTDataResponse: Codable {
+    let success: Bool
+    let data: NFTData
 }

@@ -1,9 +1,10 @@
 import SwiftUI
 // MetaMask SDK is now handled via WalletServiceV2 and MetaMaskService
-import CoinbaseWalletSDK
 import GoogleSignIn
 import WalletConnectSign
 import AppAuth
+import CoinbaseWalletSDK
+// Coinbase SDK is now handled via custom deep linking
 
 
 public class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -34,11 +35,7 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
     print("📱 AppDelegate: Deferring WalletService initialization")
     _ = WalletService.shared // Just create the instance, don't initialize SDKs
     
-    // Configure Coinbase Wallet SDK
-    print("📱 AppDelegate: Configuring Coinbase Wallet SDK")
-    CoinbaseWalletSDK.configure(
-        callback: URL(string: "interspace://coinbase")!
-    )
+    // Coinbase Wallet now uses WalletConnect instead of native SDK
     
     // Configure Google Sign-In
     print("📱 AppDelegate: Configuring Google Sign-In")
@@ -100,19 +97,20 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         
         // Check if this is a Coinbase callback
-        if url.host == "coinbase" {
+        if url.host == "coinbase-callback" || url.host == "coinbase" {
             print("📱 AppDelegate: This is a Coinbase Wallet callback URL")
-            do {
-                let handled = try CoinbaseWalletSDK.shared.handleResponse(url)
+            
+            // Use WalletServiceV2 for deep link handling (similar to MetaMask)
+            Task { @MainActor in
+                let handled = WalletServiceV2.shared.handleDeepLink(url)
                 if handled {
-                    print("📱 AppDelegate: Successfully handled Coinbase Wallet URL")
-                    return true
+                    print("📱 AppDelegate: Coinbase deep link handled by WalletServiceV2")
                 } else {
-                    print("📱 AppDelegate: Coinbase SDK did not handle URL")
+                    print("📱 AppDelegate: Coinbase deep link not handled by WalletServiceV2")
                 }
-            } catch {
-                print("📱 AppDelegate: Error handling Coinbase URL: \(error)")
             }
+            
+            return true
         }
     }
     
