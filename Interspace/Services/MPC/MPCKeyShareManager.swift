@@ -5,6 +5,7 @@ import silentshardduo
 
 final class MPCKeyShareManager {
     private var duoSession: DuoSession?
+    private var currentAlgorithm: MPCAlgorithm = .ecdsa
     private let queue = DispatchQueue(label: "com.interspace.mpc.keyshare", qos: .userInitiated)
     
     // MARK: - Session Management
@@ -14,7 +15,12 @@ final class MPCKeyShareManager {
             queue.async { [weak self] in
                 do {
                     // Get WebSocket configuration from environment
-                    let config = MPCConfiguration.shared
+                    let config = MPCWebSocketConfiguration.shared
+                    
+                    // Print debug info in development
+                    #if DEBUG
+                  MPCWebSocketConfiguration.printConnectionDebugInfo()
+                    #endif
                     
                     let websocketConfig = WebsocketConfigBuilder()
                         .withBaseUrl(config.duoNodeUrl)
@@ -23,16 +29,31 @@ final class MPCKeyShareManager {
                         .withAuthenticationToken(config.authToken ?? "")
                         .build()
                     
+                    // Store the algorithm for later use
+                    self?.currentAlgorithm = algorithm
+                    
+                    // Workaround: If algorithm is ECDSA but key is EdDSA, modify the key
+                    var actualCloudPublicKey = cloudPublicKey
+                    if algorithm == .ecdsa && cloudPublicKey.hasPrefix("01") {
+                        print("⚠️ MPC: Algorithm mismatch detected - forcing ECDSA with EdDSA key")
+                        print("   Original key prefix: 01 (EdDSA)")
+                        print("   Forced algorithm: ECDSA")
+                        // Change the prefix from 01 (EdDSA) to 02 (ECDSA)
+                        let keyWithoutPrefix = String(cloudPublicKey.dropFirst(2))
+                        actualCloudPublicKey = "02" + keyWithoutPrefix
+                        print("   Modified key prefix: 02 (ECDSA)")
+                    }
+                    
                     // Create DuoSession based on algorithm
                     switch algorithm {
                     case .ecdsa:
                         self?.duoSession = SilentShardDuo.ECDSA.createDuoSession(
-                            cloudVerifyingKey: cloudPublicKey,
+                            cloudVerifyingKey: actualCloudPublicKey,
                             websocketConfig: websocketConfig
                         )
                     case .eddsa:
                         self?.duoSession = SilentShardDuo.EdDSA.createDuoSession(
-                            cloudVerifyingKey: cloudPublicKey,
+                            cloudVerifyingKey: actualCloudPublicKey,
                             websocketConfig: websocketConfig
                         )
                     }
@@ -66,7 +87,7 @@ final class MPCKeyShareManager {
                             shareData: keyShareData,
                             publicKey: publicKeyHex,
                             address: address,
-                            algorithm: .ecdsa,
+                            algorithm: self.currentAlgorithm,
                             createdAt: Date()
                         )
                         
@@ -227,7 +248,14 @@ final class MPCKeyShareManager {
     // MARK: - Private Helpers
     
     private func getPublicKeyHex(from keyShareData: Data) async -> String {
-        let result = await SilentShardDuo.ECDSA.getKeysharePublicKeyAsHex(keyShareData)
+        let result: Result<String, Error>
+        
+        switch currentAlgorithm {
+        case .ecdsa:
+            result = await SilentShardDuo.ECDSA.getKeysharePublicKeyAsHex(keyShareData)
+        case .eddsa:
+            result = await SilentShardDuo.EdDSA.getKeysharePublicKeyAsHex(keyShareData)
+        }
         
         switch result {
         case .success(let publicKey):
@@ -290,10 +318,10 @@ enum MPCAlgorithm: String, Codable {
     case eddsa = "eddsa"
 }
 
-// MARK: - MPC Configuration
+// MARK: - MPC WebSocket Configuration
 
-final class MPCConfiguration {
-    static let shared = MPCConfiguration()
+final class MPCWebSocketConfiguration {
+    static let shared = MPCWebSocketConfiguration()
     
     enum Environment {
         case development
@@ -311,18 +339,29 @@ final class MPCConfiguration {
     
     var duoNodeUrl: String {
         #if DEBUG
-        return "wss://interspace-duo-node-dev.a.run.app"
+        // For local development, connect directly to sigpair
+        // Note: Don't include ws:// prefix - WebsocketConfigBuilder adds it
+        // For iOS simulator: use localhost (will be resolved by the simulator)
+        return "localhost"
         #else
-        return "wss://interspace-duo-node-prod.a.run.app"
+        return "interspace-duo-node-prod.a.run.app"
         #endif
     }
     
     var duoNodePort: String {
+        #if DEBUG
+        return "8080"  // Sigpair local port
+        #else
         return "443"
+        #endif
     }
     
     var useSecureConnection: Bool {
+        #if DEBUG
+        return false  // Local development uses ws://
+        #else
         return true
+        #endif
     }
     
     var authToken: String? {
@@ -337,6 +376,16 @@ final class MPCConfiguration {
     var maxReconnectAttempts: Int {
         return 3
     }
+    
+    #if DEBUG
+    static func printConnectionDebugInfo() {
+        let config = MPCWebSocketConfiguration.shared
+        print("[MPC DEBUG] duoNodeUrl: \(config.duoNodeUrl)")
+        print("[MPC DEBUG] duoNodePort: \(config.duoNodePort)")
+        print("[MPC DEBUG] useSecureConnection: \(config.useSecureConnection)")
+        print("[MPC DEBUG] authToken exists: \(config.authToken != nil)")
+    }
+    #endif
 }
 
 // MARK: - Extensions

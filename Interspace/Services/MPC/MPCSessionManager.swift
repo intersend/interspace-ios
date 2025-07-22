@@ -19,14 +19,14 @@ final class MPCSessionManager: NSObject, ObservableObject {
     private var pendingRequests: [String: CheckedContinuation<MPCMessage, Error>] = [:]
     
     // Configuration
-    private let maxReconnectAttempts = MPCConfiguration.shared.maxReconnectAttempts
+    private let maxReconnectAttempts = MPCWebSocketConfiguration.shared.maxReconnectAttempts
     private let reconnectDelay: TimeInterval = 2.0
     
     override init() {
         super.init()
         
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = MPCConfiguration.shared.websocketTimeout
+        configuration.timeoutIntervalForRequest = MPCWebSocketConfiguration.shared.websocketTimeout
         configuration.waitsForConnectivity = true
         
         self.urlSession = URLSession(
@@ -125,7 +125,7 @@ final class MPCSessionManager: NSObject, ObservableObject {
     // MARK: - Private Methods
     
     private func establishConnection() async throws {
-        let config = MPCConfiguration.shared
+        let config = MPCWebSocketConfiguration.shared
         let urlString = "\(config.duoNodeUrl)/ws/mpc"
         
         guard let url = URL(string: urlString) else {

@@ -15,7 +15,9 @@ struct MPCConfiguration {
         
         // Check if we're in simulator
         #if targetEnvironment(simulator)
-        return "localhost"
+        // For iOS Simulator, use localhost which works better with Docker
+        // iOS Simulator can connect to host machine's localhost
+        return "127.0.0.1" // This should work for local Docker containers
         #else
         // For device, check environment
         if EnvironmentConfiguration.shared.currentEnvironment.apiBaseURL.contains("ngrok") {
@@ -27,7 +29,7 @@ struct MPCConfiguration {
         
         // Fallback to default local network IP
         // Update this to your machine's IP when running locally
-        return "192.168.2.79"
+        return "127.0.0.1"
         #endif
     }
     
