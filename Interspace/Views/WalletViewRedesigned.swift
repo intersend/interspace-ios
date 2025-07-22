@@ -69,7 +69,10 @@ struct WalletViewRedesigned: View {
                         )
                         
                         // NFT Gallery
-                        NFTGallerySection()
+                        NFTGalleryView(
+                            nfts: viewModel.nftData?.nfts ?? [],
+                            isLoading: viewModel.isLoadingNFTs
+                        )
                         
                         // Recent Transactions
                         RecentTransactionsSection(
@@ -133,6 +136,10 @@ struct WalletViewRedesigned: View {
             Task {
                 await ServiceInitializer.shared.wallet.initializeSDKsIfNeeded()
                 await viewModel.loadBalance()
+                // Load NFTs for the active profile
+                if let activeProfile = viewModel.unifiedBalance {
+                    await viewModel.loadNFTs(for: activeProfile.profileId)
+                }
             }
         }
     }
@@ -474,70 +481,6 @@ struct EnhancedTokenCell: View {
     }
 }
 */
-
-// MARK: - NFT Gallery Section
-struct NFTGallerySection: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("NFTs")
-                    .sectionHeaderStyle()
-                
-                Spacer()
-                
-                Button("See All") {
-                    // Navigate to full NFT gallery
-                }
-                .font(WalletDesign.Typography.tokenValue)
-                .foregroundColor(WalletDesign.Colors.actionPrimary)
-                .padding(.trailing, WalletDesign.Spacing.regular)
-            }
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: WalletDesign.Spacing.regular) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        NFTCard()
-                    }
-                }
-                .padding(.horizontal, WalletDesign.Spacing.regular)
-            }
-        }
-    }
-}
-
-// MARK: - NFT Card
-struct NFTCard: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: WalletDesign.Spacing.tight) {
-            // NFT Image Placeholder
-            RoundedRectangle(cornerRadius: 12)
-                .fill(LinearGradient(
-                    colors: [Color(UIColor.systemGray5), Color(UIColor.systemGray4)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-                .frame(width: WalletDesign.Sizing.nftThumbnail, height: WalletDesign.Sizing.nftThumbnail / WalletDesign.Sizing.nftAspectRatio)
-                .overlay(
-                    Image(systemName: WalletSymbols.nft)
-                        .font(.system(size: 30))
-                        .foregroundColor(Color(UIColor.systemGray3))
-                )
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("NFT Name")
-                    .font(WalletDesign.Typography.tokenName)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                
-                Text("Collection")
-                    .font(WalletDesign.Typography.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: WalletDesign.Sizing.nftThumbnail)
-        }
-    }
-}
 
 // MARK: - Recent Transactions Section
 struct RecentTransactionsSection: View {

@@ -427,3 +427,165 @@ struct TransactionHistoryResponse: Codable {
     let success: Bool
     let data: TransactionHistory
 }
+
+// MARK: - NFT Models
+
+struct NFTData: Codable {
+    let totalNFTs: Int
+    let collections: [NFTCollection]
+    let nfts: [NFTItem]
+}
+
+struct NFTCollection: Codable, Identifiable {
+    let contractAddress: String
+    let chainId: Int
+    let name: String
+    let tokenType: String
+    let nfts: [NFTItem]
+    
+    var id: String { "\(chainId):\(contractAddress)" }
+}
+
+struct NFTItem: Codable, Identifiable {
+    let contractAddress: String
+    let tokenId: String
+    let name: String?
+    let tokenType: String
+    let amount: String
+    let metadata: NFTMetadata?
+    let cachedImage: String?
+    let rawMetadata: String?
+    let chainId: Int
+    let ownerAddress: String
+    
+    var id: String { "\(chainId):\(contractAddress):\(tokenId)" }
+    
+    var displayName: String {
+        metadata?.name ?? name ?? "NFT #\(tokenId)"
+    }
+    
+    var chainName: String {
+        switch chainId {
+        case 1: return "Ethereum"
+        case 137: return "Polygon"
+        case 42161: return "Arbitrum"
+        case 10: return "Optimism"
+        case 8453: return "Base"
+        default: return "Chain \(chainId)"
+        }
+    }
+    
+    var imageUrl: String? {
+        // Try cached image first, then metadata image, then generate placeholder
+        if let cached = cachedImage {
+            return cached
+        }
+        if let metadataImage = metadata?.image {
+            // Handle IPFS URLs
+            if metadataImage.hasPrefix("ipfs://") {
+                let ipfsHash = metadataImage.replacingOccurrences(of: "ipfs://", with: "")
+                return "https://ipfs.io/ipfs/\(ipfsHash)"
+            }
+            // Handle Arweave URLs
+            if metadataImage.hasPrefix("ar://") {
+                let arHash = metadataImage.replacingOccurrences(of: "ar://", with: "")
+                return "https://arweave.net/\(arHash)"
+            }
+            return metadataImage
+        }
+        return nil
+    }
+}
+
+struct NFTMetadata: Codable {
+    let name: String?
+    let description: String?
+    let image: String?
+    let attributes: [NFTAttribute]?
+    let external_link: String?
+}
+
+struct NFTAttribute: Codable {
+    let trait_type: String?
+    let value: AnyCodableValue
+    
+    var traitType: String? {
+        trait_type
+    }
+    
+    var displayValue: String {
+        return value.stringValue
+    }
+}
+
+struct AnyCodableValue: Codable {
+    let value: Any
+    
+    var stringValue: String {
+        if let str = value as? String {
+            return str
+        } else if let num = value as? NSNumber {
+            return num.stringValue
+        } else {
+            return String(describing: value)
+        }
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let intVal = try? container.decode(Int.self) {
+            value = intVal
+        } else if let doubleVal = try? container.decode(Double.self) {
+            value = doubleVal
+        } else if let boolVal = try? container.decode(Bool.self) {
+            value = boolVal
+        } else if let stringVal = try? container.decode(String.self) {
+            value = stringVal
+        } else {
+            value = ""
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        if let str = value as? String {
+            try container.encode(str)
+        } else if let int = value as? Int {
+            try container.encode(int)
+        } else if let double = value as? Double {
+            try container.encode(double)
+        } else if let bool = value as? Bool {
+            try container.encode(bool)
+        }
+    }
+}
+
+// MARK: - NFT Response
+
+struct NFTResponse: Codable {
+    let success: Bool
+    let data: NFTData
+}
+
+// MARK: - NFT Extensions
+
+extension Array where Element == NFTItem {
+    func groupedByCollection() -> [NFTCollection] {
+        let grouped = Dictionary(grouping: self) { nft in
+            "\(nft.chainId):\(nft.contractAddress)"
+        }
+        
+        return grouped.compactMap { (key, nfts) in
+            guard let firstNFT = nfts.first else { return nil }
+            
+            // Create a collection from the grouped NFTs
+            return NFTCollection(
+                contractAddress: firstNFT.contractAddress,
+                chainId: firstNFT.chainId,
+                name: firstNFT.metadata?.name ?? firstNFT.name ?? "Unknown Collection",
+                tokenType: firstNFT.tokenType,
+                nfts: nfts
+            )
+        }.sorted { $0.name < $1.name }
+    }
+}

@@ -1,15 +1,81 @@
 import SwiftUI
 
+// MARK: - Icon Content Type
+enum IconContent {
+    case app(BookmarkedApp)
+    case nft(NFTItem)
+    
+    var name: String {
+        switch self {
+        case .app(let app):
+            return app.name
+        case .nft(let nft):
+            return nft.displayName
+        }
+    }
+    
+    var imageUrl: String? {
+        switch self {
+        case .app(let app):
+            return app.iconUrl
+        case .nft(let nft):
+            return nft.imageUrl
+        }
+    }
+    
+    var isNativeApp: Bool {
+        switch self {
+        case .app(let app):
+            return app.isNativeApp
+        case .nft:
+            return false
+        }
+    }
+}
+
 // MARK: - Liquid Glass App Icon (iOS 26 Specification)
 
 struct LiquidGlassAppIcon: View {
-    let app: BookmarkedApp
+    let content: IconContent
     let iconSize: CGFloat
     @Binding var isEditMode: Bool
     let isDragging: Bool
     let isDropTarget: Bool
     let onTap: () -> Void
     let onDelete: () -> Void
+    
+    // Legacy initializer for compatibility
+    init(app: BookmarkedApp, iconSize: CGFloat, isEditMode: Binding<Bool>, isDragging: Bool = false, isDropTarget: Bool = false, onTap: @escaping () -> Void, onDelete: @escaping () -> Void = {}) {
+        self.content = .app(app)
+        self.iconSize = iconSize
+        self._isEditMode = isEditMode
+        self.isDragging = isDragging
+        self.isDropTarget = isDropTarget
+        self.onTap = onTap
+        self.onDelete = onDelete
+    }
+    
+    // New initializer for NFTs
+    init(nft: NFTItem, iconSize: CGFloat, isEditMode: Binding<Bool> = .constant(false), isDragging: Bool = false, isDropTarget: Bool = false, onTap: @escaping () -> Void, onDelete: @escaping () -> Void = {}) {
+        self.content = .nft(nft)
+        self.iconSize = iconSize
+        self._isEditMode = isEditMode
+        self.isDragging = isDragging
+        self.isDropTarget = isDropTarget
+        self.onTap = onTap
+        self.onDelete = onDelete
+    }
+    
+    // Generic initializer
+    init(content: IconContent, iconSize: CGFloat, isEditMode: Binding<Bool> = .constant(false), isDragging: Bool = false, isDropTarget: Bool = false, onTap: @escaping () -> Void, onDelete: @escaping () -> Void = {}) {
+        self.content = content
+        self.iconSize = iconSize
+        self._isEditMode = isEditMode
+        self.isDragging = isDragging
+        self.isDropTarget = isDropTarget
+        self.onTap = onTap
+        self.onDelete = onDelete
+    }
     
     // Animation states
     @State private var isPressed = false
@@ -67,8 +133,8 @@ struct LiquidGlassAppIcon: View {
                 }
             }
             
-            // App name label
-            Text(app.name)
+            // App/NFT name label
+            Text(content.name)
                 .font(.system(size: 11.5, weight: .regular, design: .default))
                 .foregroundStyle(
                     LinearGradient(
@@ -105,7 +171,7 @@ struct LiquidGlassAppIcon: View {
                 .scaleEffect(0.95)
             
             // Multi-layered glass construction
-            if let iconUrl = app.iconUrl, !iconUrl.isEmpty {
+            if let iconUrl = content.imageUrl, !iconUrl.isEmpty {
                 // App icon with enhanced glass layers
                 AsyncImage(url: URL(string: iconUrl)) { phase in
                     switch phase {
@@ -143,13 +209,31 @@ struct LiquidGlassAppIcon: View {
                             y: 1
                         )
                     case .failure(_), .empty:
-                        placeholderIcon
+                        // For NFTs, show nothing if image fails to load
+                        if case .nft = content {
+                            Color.clear
+                                .frame(width: iconSize, height: iconSize)
+                        } else {
+                            placeholderIcon
+                        }
                     @unknown default:
-                        placeholderIcon
+                        // For NFTs, show nothing if image fails to load
+                        if case .nft = content {
+                            Color.clear
+                                .frame(width: iconSize, height: iconSize)
+                        } else {
+                            placeholderIcon
+                        }
                     }
                 }
             } else {
-                placeholderIcon
+                // For NFTs without image URL, show nothing
+                if case .nft = content {
+                    Color.clear
+                        .frame(width: iconSize, height: iconSize)
+                } else {
+                    placeholderIcon
+                }
             }
         }
     }
@@ -169,9 +253,9 @@ struct LiquidGlassAppIcon: View {
                 .fill(
                     LinearGradient(
                         gradient: Gradient(stops: [
-                            .init(color: gradientColors(for: app.name)[0], location: 0),
-                            .init(color: gradientColors(for: app.name)[1], location: 0.5),
-                            .init(color: gradientColors(for: app.name)[1].opacity(0.8), location: 1)
+                            .init(color: gradientColors(for: content.name)[0], location: 0),
+                            .init(color: gradientColors(for: content.name)[1], location: 0.5),
+                            .init(color: gradientColors(for: content.name)[1].opacity(0.8), location: 1)
                         ]),
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -197,7 +281,7 @@ struct LiquidGlassAppIcon: View {
                 )
             
             // App initial with refined typography
-            Text(app.name.prefix(1).uppercased())
+            Text(content.name.prefix(1).uppercased())
                 .font(.system(size: iconSize * 0.38, weight: .medium, design: .rounded))
                 .foregroundStyle(
                     LinearGradient(

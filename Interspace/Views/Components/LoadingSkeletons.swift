@@ -223,6 +223,112 @@ struct LoadingButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - NFT Skeleton Components
+
+struct NFTSkeletonView: View {
+    let itemCount: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section Header
+            HStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(white: 0.15))
+                    .frame(width: 60, height: 22)
+                    .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 4)))
+                
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(white: 0.15))
+                    .frame(width: 32, height: 20)
+                    .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 12)))
+                
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            
+            // NFT Grid
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(0..<itemCount, id: \.self) { _ in
+                    NFTGridItemSkeleton()
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+}
+
+struct NFTGridItemSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // NFT Image
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(white: 0.15))
+                .aspectRatio(1, contentMode: .fit)
+                .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 12)))
+            
+            // NFT Info
+            VStack(alignment: .leading, spacing: 4) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(white: 0.15))
+                    .frame(height: 14)
+                    .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 4)))
+                
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(white: 0.15))
+                    .frame(width: 60, height: 12)
+                    .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 4)))
+            }
+        }
+    }
+}
+
+struct NFTCollectionSkeletonRow: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Collection Header
+            HStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(white: 0.15))
+                    .frame(width: 120, height: 18)
+                    .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 4)))
+                
+                Spacer()
+                
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(white: 0.15))
+                    .frame(width: 50, height: 14)
+                    .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 4)))
+            }
+            
+            // Horizontal NFT Items
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        NFTCollectionItemSkeleton()
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+}
+
+struct NFTCollectionItemSkeleton: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(white: 0.15))
+                .frame(width: 140, height: 140)
+                .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 12)))
+            
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color(white: 0.15))
+                .frame(width: 100, height: 12)
+                .overlay(ShimmerEffect().mask(RoundedRectangle(cornerRadius: 4)))
+        }
+    }
+}
+
 // MARK: - Preview
 
 struct LoadingSkeletons_Previews: PreviewProvider {
@@ -253,6 +359,10 @@ struct LoadingSkeletons_Previews: PreviewProvider {
                 
                 // Native loading
                 NativeLoadingView(message: "Loading profiles...")
+                
+                // NFT skeletons
+                NFTSkeletonView(itemCount: 4)
+                    .padding(.top)
             }
         }
         .preferredColorScheme(.dark)

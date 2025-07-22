@@ -9,8 +9,10 @@ final class WalletViewModel: ObservableObject {
     
     @Published var unifiedBalance: UnifiedBalance?
     @Published var transactionHistory: TransactionHistory?
+    @Published var nftData: NFTData?
     @Published var isLoading = false
     @Published var isRefreshing = false
+    @Published var isLoadingNFTs = false
     @Published var error: WalletViewError?
     @Published var showError = false
     
@@ -71,12 +73,55 @@ final class WalletViewModel: ObservableObject {
                     policy: .networkFirst
                 )
                 
+                // Load NFTs in parallel
+                Task {
+                    await loadNFTs(for: targetProfileId)
+                }
+                
             } catch {
                 handleError(error)
             }
         }
         
         isLoading = false
+    }
+    
+    func loadNFTs(for profileId: String? = nil) async {
+        guard !isLoadingNFTs else { return }
+        
+        isLoadingNFTs = true
+        
+        // Check if user is a guest
+        if AuthenticationManagerV2.shared.currentUser?.isGuest == true {
+            nftData = nil
+        } else {
+            do {
+                let targetProfileId: String
+                if let profileId = profileId {
+                    targetProfileId = profileId
+                } else {
+                    // Get active profile
+                    let profilesResponse: ProfilesResponse = try await dataSyncManager.fetch(
+                        type: ProfilesResponse.self,
+                        endpoint: "profiles",
+                        policy: .cacheFirst
+                    )
+                    guard let activeProfile = profilesResponse.data.first(where: { $0.isActive }) else {
+                        throw WalletViewError.noBalance
+                    }
+                    targetProfileId = activeProfile.id
+                }
+                
+                // Fetch NFT data from API
+                nftData = try await walletAPI.getProfileNFTs(profileId: targetProfileId)
+                
+            } catch {
+                // Don't show NFT errors, just log them
+                print("❌ Failed to load NFTs: \(error)")
+            }
+        }
+        
+        isLoadingNFTs = false
     }
     
     func refreshBalance() async {
@@ -108,6 +153,11 @@ final class WalletViewModel: ObservableObject {
                     policy: .networkOnly,
                     forceRefresh: true
                 )
+                
+                // Refresh NFTs in parallel
+                Task {
+                    await loadNFTs(for: activeProfile.id)
+                }
                 
                 // Add haptic feedback for successful refresh
                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -279,6 +329,7 @@ final class WalletViewModel: ObservableObject {
                     // Clear current data immediately for smooth transition
                     self.unifiedBalance = nil
                     self.transactionHistory = nil
+                    self.nftData = nil
                     
                     // Show loading state
                     self.isLoading = true
@@ -289,6 +340,92 @@ final class WalletViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
+    
+    #if DEBUG
+    // Commented out - now using real API data
+    /*
+    private func mockNFTData() -> NFTData {
+        let mockNFTs = [
+            NFTItem(
+                contractAddress: "0x248139aFB8d3A2e16154FbE4Fb528A3a214fd8E7",
+                tokenId: "937",
+                name: "Boki",
+                tokenType: "ERC721",
+                amount: "1",
+                metadata: NFTMetadata(
+                    name: "Boki #937",
+                    description: "A community-focused NFT project",
+                    image: "https://i.seadn.io/gcs/files/7b9e89dc9f7b3586b8f23b6cf90e5512.jpg",
+                    attributes: nil,
+                    external_link: nil
+                ),
+                cachedImage: nil,
+                rawMetadata: nil,
+                chainId: 1,
+                ownerAddress: "0x0000000000000000000000000000000000000000"
+            ),
+            NFTItem(
+                contractAddress: "0x1485297e942ce64E0870EcE60179dFda34b4C625",
+                tokenId: "1234",
+                name: "Moonrunners",
+                tokenType: "ERC721",
+                amount: "1",
+                metadata: NFTMetadata(
+                    name: "Moonrunner #1234",
+                    description: "Protect the Moonrunners at all costs",
+                    image: "https://i.seadn.io/gcs/files/b2024e2b23e3b14e4201c7e9f0de0f46.jpg",
+                    attributes: nil,
+                    external_link: nil
+                ),
+                cachedImage: nil,
+                rawMetadata: nil,
+                chainId: 1,
+                ownerAddress: "0x0000000000000000000000000000000000000000"
+            ),
+            NFTItem(
+                contractAddress: "0x248139aFB8d3A2e16154FbE4Fb528A3a214fd8E7",
+                tokenId: "2023",
+                name: "Boki",
+                tokenType: "ERC721",
+                amount: "1",
+                metadata: NFTMetadata(
+                    name: "Boki #2023",
+                    description: "A community-focused NFT project",
+                    image: "https://i.seadn.io/gcs/files/5f2c3f15dc19c2e5e8f33e2a6e0f3d45.jpg",
+                    attributes: nil,
+                    external_link: nil
+                ),
+                cachedImage: nil,
+                rawMetadata: nil,
+                chainId: 1,
+                ownerAddress: "0x0000000000000000000000000000000000000000"
+            )
+        ]
+        
+        let collection1 = NFTCollection(
+            contractAddress: "0x248139aFB8d3A2e16154FbE4Fb528A3a214fd8E7",
+            chainId: 1,
+            name: "Boki",
+            tokenType: "ERC721",
+            nfts: mockNFTs.filter { $0.contractAddress == "0x248139aFB8d3A2e16154FbE4Fb528A3a214fd8E7" }
+        )
+        
+        let collection2 = NFTCollection(
+            contractAddress: "0x1485297e942ce64E0870EcE60179dFda34b4C625",
+            chainId: 1,
+            name: "Moonrunners",
+            tokenType: "ERC721",
+            nfts: mockNFTs.filter { $0.contractAddress == "0x1485297e942ce64E0870EcE60179dFda34b4C625" }
+        )
+        
+        return NFTData(
+            totalNFTs: mockNFTs.count,
+            collections: [collection1, collection2],
+            nfts: mockNFTs
+        )
+    }
+    */
+    #endif
 }
 
 // MARK: - WalletView Error
