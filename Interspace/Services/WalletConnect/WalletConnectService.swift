@@ -692,23 +692,24 @@ final class WalletConnectService: ObservableObject {
                 print("📱 Processing required namespace: \(key)")
                 
                 let chains = requiredNamespace.chains ?? []
-                var accounts: [Account] = []
+                var accounts: [WalletConnectSign.Account] = []
                 
                 // Create accounts for each chain
                 if chains.isEmpty && key == "eip155" {
                     // Default to mainnet if no chains specified
-                    if let account = Account(blockchain: Blockchain("eip155:1")!, address: walletAddress) {
+                    if let account = WalletConnectSign.Account(chainIdentifier: "eip155:1", address: walletAddress) {
                         accounts.append(account)
                     }
                 } else {
                     for chain in chains {
-                        if let account = Account(blockchain: chain, address: walletAddress) {
+                        if let account = WalletConnectSign.Account(chainIdentifier: chain.absoluteString, address: walletAddress) {
                             accounts.append(account)
                         }
                     }
                 }
                 
                 sessionNamespaces[key] = SessionNamespace(
+                    chains: chains.isEmpty ? nil : chains,
                     accounts: accounts,
                     methods: requiredNamespace.methods,
                     events: requiredNamespace.events
@@ -721,23 +722,24 @@ final class WalletConnectService: ObservableObject {
                     print("📱 Processing optional namespace: \(key)")
                     
                     let chains = optionalNamespace.chains ?? []
-                    var accounts: [Account] = []
+                    var accounts: [WalletConnectSign.Account] = []
                     
                     // Create accounts for requested chains
                     for chain in chains {
-                        if let account = Account(blockchain: chain, address: walletAddress) {
+                        if let account = WalletConnectSign.Account(chainIdentifier: chain.absoluteString, address: walletAddress) {
                             accounts.append(account)
                         }
                     }
                     
                     // If no specific chains, use mainnet
                     if accounts.isEmpty && key == "eip155" {
-                        if let account = Account(blockchain: Blockchain("eip155:1")!, address: walletAddress) {
+                        if let account = WalletConnectSign.Account(chainIdentifier: "eip155:1", address: walletAddress) {
                             accounts.append(account)
                         }
                     }
                     
                     sessionNamespaces[key] = SessionNamespace(
+                        chains: chains.isEmpty ? nil : chains,
                         accounts: accounts,
                         methods: optionalNamespace.methods,
                         events: optionalNamespace.events

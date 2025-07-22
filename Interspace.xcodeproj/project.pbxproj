@@ -204,6 +204,8 @@
 				WalletConnect/WalletConnectSessionManager.swift,
 				WalletConnectionManager.swift,
 				WalletDeepLinkGenerator.swift,
+				Wallets/Coinbase/CoinbaseConfiguration.swift,
+				Wallets/Coinbase/CoinbaseService.swift,
 				Wallets/MetaMask/MetaMaskConfiguration.swift,
 				Wallets/MetaMask/MetaMaskService.swift,
 				Wallets/WalletFactory.swift,
@@ -328,7 +330,6 @@
 				Wallet/TransactionHistoryView.swift,
 				WalletAuthenticationView.swift,
 				WalletConnectionView.swift,
-				WalletView.swift,
 				WalletViewRedesigned.swift,
 				WebBrowserView.swift,
 			);
