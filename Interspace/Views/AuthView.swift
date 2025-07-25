@@ -1,6 +1,4 @@
 import SwiftUI
-import metamask_ios_sdk
-import CoinbaseWalletSDK
 import AVFoundation
 
 struct AuthView: View {

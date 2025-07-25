@@ -587,6 +587,7 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    
     func unlinkAccount(_ account: LinkedAccount) async {
         guard let profileId = activeProfile?.id else {
             await MainActor.run {

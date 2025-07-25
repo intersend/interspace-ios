@@ -319,6 +319,8 @@ struct AppleUserInfo: Codable {  // Kept name for backward compatibility, but re
 enum MetadataValue: Codable {
     case string(String)
     case bool(Bool)
+    case int(Int)
+    case double(Double)
     case null
     
     init(from decoder: Decoder) throws {
@@ -327,10 +329,14 @@ enum MetadataValue: Codable {
             self = .null
         } else if let boolValue = try? container.decode(Bool.self) {
             self = .bool(boolValue)
+        } else if let intValue = try? container.decode(Int.self) {
+            self = .int(intValue)
+        } else if let doubleValue = try? container.decode(Double.self) {
+            self = .double(doubleValue)
         } else if let stringValue = try? container.decode(String.self) {
             self = .string(stringValue)
         } else {
-            throw DecodingError.typeMismatch(MetadataValue.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected String, Bool, or null"))
+            throw DecodingError.typeMismatch(MetadataValue.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected String, Bool, Int, Double, or null"))
         }
     }
     
@@ -340,6 +346,10 @@ enum MetadataValue: Codable {
         case .string(let value):
             try container.encode(value)
         case .bool(let value):
+            try container.encode(value)
+        case .int(let value):
+            try container.encode(value)
+        case .double(let value):
             try container.encode(value)
         case .null:
             try container.encodeNil()
@@ -351,6 +361,8 @@ enum MetadataValue: Codable {
         switch self {
         case .string(let value): return value
         case .bool(let value): return String(value)
+        case .int(let value): return String(value)
+        case .double(let value): return String(value)
         case .null: return nil
         }
     }
@@ -359,6 +371,28 @@ enum MetadataValue: Codable {
         switch self {
         case .bool(let value): return value
         case .string(let value): return Bool(value)
+        case .int(let value): return value != 0
+        case .double(let value): return value != 0
+        case .null: return nil
+        }
+    }
+    
+    var intValue: Int? {
+        switch self {
+        case .int(let value): return value
+        case .double(let value): return Int(value)
+        case .string(let value): return Int(value)
+        case .bool(let value): return value ? 1 : 0
+        case .null: return nil
+        }
+    }
+    
+    var doubleValue: Double? {
+        switch self {
+        case .double(let value): return value
+        case .int(let value): return Double(value)
+        case .string(let value): return Double(value)
+        case .bool(let value): return value ? 1.0 : 0.0
         case .null: return nil
         }
     }
@@ -433,7 +467,7 @@ struct UserV2: Codable {  // Legacy compatibility - represents account in flat i
 struct AuthResponseV2: Codable {
     let success: Bool
     let account: AccountV2
-    let user: UserV2
+    let user: UserV2  // Legacy field - will be removed in future
     let profiles: [ProfileSummaryV2]
     let activeProfile: ProfileSummaryV2?
     let tokens: AuthTokensV2

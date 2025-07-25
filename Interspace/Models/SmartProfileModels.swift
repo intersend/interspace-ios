@@ -91,6 +91,11 @@ struct LinkedAccount: Codable, Identifiable, Hashable {
         
         switch authStrategy {
         case "wallet":
+            // Use wallet name from metadata if available
+            if let walletName = walletDisplayName, !walletName.isEmpty {
+                return walletName
+            }
+            // Fall back to WalletType enum
             return WalletType(rawValue: walletType ?? "")?.displayName ?? walletType?.capitalized ?? "Wallet"
         case "email":
             return "Email"
@@ -117,6 +122,24 @@ struct LinkedAccount: Codable, Identifiable, Hashable {
             return shortAddress // Wallet addresses are shortened
         }
     }
+    
+    // Parse metadata JSON
+    var parsedMetadata: [String: Any]? {
+        guard let metadata = metadata,
+              let data = metadata.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json
+    }
+    
+    var walletIconURL: String? {
+        return parsedMetadata?["icon"] as? String
+    }
+    
+    var walletDisplayName: String? {
+        return parsedMetadata?["name"] as? String
+    }
 }
 
 // MARK: - Link Account Request
@@ -129,6 +152,7 @@ struct LinkAccountRequest: Codable {
     let signature: String?
     let message: String?
     let chainId: Int?
+    let metadata: String?
 }
 
 // MARK: - Update Account Request
