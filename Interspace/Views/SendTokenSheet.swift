@@ -22,6 +22,8 @@ struct SendTokenSheetBase: View {
     @State private var showTransactionReview = false
     @State private var showMPCApproval = false
     @State private var pendingTransaction: MPCTransaction?
+    @State private var pendingTransactionToSign: TransactionToSign?
+    @State private var showTransactionComplete = false
     
     @FocusState private var amountFieldFocused: Bool
     @FocusState private var addressFieldFocused: Bool
@@ -69,6 +71,9 @@ struct SendTokenSheetBase: View {
         .sheet(isPresented: $showMPCApproval) {
             mpcApprovalSheet
         }
+        .sheet(isPresented: $showTransactionComplete) {
+            transactionCompleteSheet
+        }
         .alert("Error", isPresented: .constant(viewModel.error != nil)) {
             Button("OK") {
                 viewModel.error = nil
@@ -86,6 +91,12 @@ struct SendTokenSheetBase: View {
         }
         .onChange(of: showTokenSelection) { _ in
             handleTokenSelectionChange()
+        }
+        .onChange(of: viewModel.transactionCompleted) { completed in
+            if completed {
+                showTransactionComplete = true
+                viewModel.transactionCompleted = false // Reset for next time
+            }
         }
         .onChange(of: selectedToken?.id) { _ in
             handleSelectedTokenChange()
@@ -490,10 +501,25 @@ struct SendTokenSheetBase: View {
                 gasToken: viewModel.selectedGasToken,
                 fromAddress: profileViewModel.activeProfile?.sessionWalletAddress ?? "",
                 viewModel: viewModel,
-                onConfirm: { transaction in
+                onConfirm: { transaction, transactionToSign in
                     pendingTransaction = transaction
-                    showMPCApproval = true
-                    showTransactionReview = false
+                    pendingTransactionToSign = transactionToSign
+                    
+                    // Check if user has external wallet
+                    if profileViewModel.linkedAccounts.first(where: { $0.authStrategy == "wallet" }) != nil {
+                        // External wallet flow - directly execute
+                        Task {
+                            await viewModel.executeTransaction(transaction, transactionToSign: transactionToSign)
+                            if viewModel.error == nil {
+                                showTransactionReview = false
+                                showTransactionComplete = true
+                            }
+                        }
+                    } else {
+                        // MPC wallet flow
+                        showMPCApproval = true
+                        showTransactionReview = false
+                    }
                 }
             )
         }
@@ -507,14 +533,56 @@ struct SendTokenSheetBase: View {
                 transaction: transaction,
                 onApprove: {
                     Task {
-                        await viewModel.executeTransaction(transaction)
+                        await viewModel.executeTransaction(transaction, transactionToSign: pendingTransactionToSign)
                         if viewModel.error == nil {
                             HapticManager.shared.notification(type: .success)
-                            dismiss()
+                            showTransactionComplete = true
                         }
                     }
                 }
             )
+        }
+    }
+    
+    private var transactionCompleteSheet: some View {
+        NavigationStack {
+            VStack(spacing: DesignTokens.Spacing.xl) {
+                Spacer()
+                
+                // Success animation
+                SuccessAnimationView(onComplete: {})
+                    .frame(width: 120, height: 120)
+                
+                Text("Transaction Sent!")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text("Your transaction has been submitted successfully")
+                    .font(.system(size: 16))
+                    .foregroundColor(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, DesignTokens.Spacing.lg)
+                
+                Spacer()
+                
+                Button {
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text("Done")
+                            .font(.system(size: 17, weight: .semibold))
+                    }
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(DesignTokens.Colors.primary)
+                    .cornerRadius(16)
+                }
+                .padding(.horizontal, DesignTokens.Spacing.md)
+                .padding(.bottom, DesignTokens.Spacing.lg)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black)
         }
     }
     
@@ -578,6 +646,7 @@ class SendTokenViewModel: ObservableObject {
     @Published var isBuilding = false
     @Published var isProcessing = false
     @Published var error: String?
+    @Published var transactionCompleted = false
     
     private let walletAPI = WalletAPI.shared
     
@@ -604,7 +673,7 @@ class SendTokenViewModel: ObservableObject {
         recipientAddress: String,
         amount: String,
         fromAddress: String
-    ) async throws -> MPCTransaction {
+    ) async throws -> (MPCTransaction, TransactionToSign?) {
         isBuilding = true
         defer { isBuilding = false }
         
@@ -618,7 +687,7 @@ class SendTokenViewModel: ObservableObject {
                 token: token.symbol.lowercased(),
                 chainId: chainId,
                 amount: amountInSmallestUnit,
-                address: nil
+                address: nil // Let Orby decide based on cluster
             ),
             to: CreateIntentRequest.TokenEndpoint(
                 token: nil,
@@ -636,21 +705,23 @@ class SendTokenViewModel: ObservableObject {
         let response = try await walletAPI.createIntent(profileId: activeProfile.id, request: request)
         
         // Create MPC transaction from the response
-        return MPCTransaction(
+        let transaction = MPCTransaction(
             id: response.data.operationSetId,
             type: .send,
             status: .pending,
-            from: fromAddress,
+            from: response.data.transactionToSign?.from ?? fromAddress,
             to: recipientAddress,
             value: amount,
             tokenSymbol: token.symbol,
-            chainId: chainId,
-            unsignedData: response.data.unsignedOperations.intents.first?.data ?? "",
+            chainId: response.data.transactionToSign?.chainId ?? chainId,
+            unsignedData: response.data.transactionToSign?.data ?? "",
             timestamp: Date()
         )
+        
+        return (transaction, response.data.transactionToSign)
     }
     
-    func executeTransaction(_ transaction: MPCTransaction) async {
+    func executeTransaction(_ transaction: MPCTransaction, transactionToSign: TransactionToSign?) async {
         isProcessing = true
         error = nil
         defer { isProcessing = false }
@@ -661,34 +732,137 @@ class SendTokenViewModel: ObservableObject {
                 throw WalletTransactionError.profileNotFound
             }
             
-            // Sign transaction with MPC
-            let txRequest = TransactionRequest(
-                hash: Data(hex: transaction.unsignedData) ?? Data(),
-                chainPath: "m/44'/60'/0'/0/0",
-                value: transaction.value,
-                to: transaction.to,
-                data: transaction.unsignedData
-            )
+            // Get linked accounts from the active profile
+            let profileAPI = ProfileAPI.shared
+            let linkedAccounts = try await profileAPI.getLinkedAccounts(profileId: activeProfile.id)
             
-            let signedData = try await MPCWalletService.shared.signTransaction(
-                profileId: activeProfile.id,
-                transaction: txRequest
-            )
-            
-            // Submit signed operation
-            // TODO: Need to get the proper index from the unsigned operation
-            let signedOp = SignedOperation(
-                index: 0, // First operation
-                signature: signedData
-            )
-            
-            try await walletAPI.submitSignedOperations(
-                operationSetId: transaction.id,
-                signedOperations: [signedOp]
-            )
+            // Check if we have a linked external wallet (MetaMask)
+            if let primaryLinkedAccount = linkedAccounts.first(where: { $0.authStrategy == "wallet" }),
+               let transactionToSign = transactionToSign {
+                
+                // External wallet flow (MetaMask)
+                await handleExternalWalletTransaction(
+                    transaction: transaction,
+                    transactionToSign: transactionToSign,
+                    linkedAccount: primaryLinkedAccount
+                )
+                
+            } else {
+                // MPC wallet flow
+                let txRequest = TransactionRequest(
+                    hash: Data(hex: transaction.unsignedData) ?? Data(),
+                    chainPath: "m/44'/60'/0'/0/0",
+                    value: transaction.value,
+                    to: transaction.to,
+                    data: transaction.unsignedData
+                )
+                
+                let signedData = try await MPCWalletService.shared.signTransaction(
+                    profileId: activeProfile.id,
+                    transaction: txRequest
+                )
+                
+                // Submit signed operation
+                let signedOp = SignedOperation(
+                    index: 0,
+                    signature: signedData
+                )
+                
+                _ = try await walletAPI.submitSignedOperations(
+                    operationSetId: transaction.id,
+                    signedOperations: [signedOp]
+                )
+            }
         } catch {
             self.error = error.localizedDescription
         }
+    }
+    
+    private func handleExternalWalletTransaction(
+        transaction: MPCTransaction,
+        transactionToSign: TransactionToSign,
+        linkedAccount: LinkedAccount
+    ) async {
+        do {
+            // Determine wallet type from linked account metadata
+            let walletType = detectWalletType(from: linkedAccount)
+            
+            // Create wallet transaction that matches what Orby expects
+            let walletTx = WalletTransaction(
+                from: transactionToSign.from,
+                to: transactionToSign.to,
+                value: transactionToSign.value,
+                data: transactionToSign.data,
+                gasLimit: transactionToSign.gasLimit,
+                gasPrice: nil,
+                maxFeePerGas: transactionToSign.maxFeePerGas,
+                maxPriorityFeePerGas: transactionToSign.maxPriorityFeePerGas,
+                nonce: transactionToSign.nonce,
+                chainId: transactionToSign.chainId
+            )
+            
+            // Sign transaction through external wallet (don't send it)
+            let walletService = WalletServiceV2.shared
+            
+            // Connect to the wallet if not already connected
+            if walletService.activeWallet?.walletType != walletType {
+                _ = try await walletService.connect(walletType: walletType)
+            }
+            
+            // Sign the transaction (MetaMask will not broadcast it)
+            let signature = try await walletService.signTransaction(walletTx, walletType: walletType)
+            
+            // Submit the signature to Orby for execution
+            // Orby will handle broadcasting the transaction with proper gas management
+            let signedOp = SignedOperation(
+                index: 0,
+                signature: signature,
+                signedData: nil  // Only signature is needed for EOA wallets
+            )
+            
+            _ = try await walletAPI.submitSignedOperations(
+                operationSetId: transaction.id,
+                signedOperations: [signedOp]
+            )
+            
+            // Show success
+            transactionCompleted = true
+            
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+    
+    private func detectWalletType(from linkedAccount: LinkedAccount) -> WalletType {
+        // Use the walletType property from LinkedAccount
+        if let walletType = linkedAccount.walletType {
+            switch walletType.lowercased() {
+            case "metamask": return .metamask
+            case "phantom": return .phantom
+            case "rainbow": return .rainbow
+            case "trust": return .trust
+            case "coinbase": return .coinbase
+            default: break
+            }
+        }
+        
+        // If walletType is not set, try to parse from metadata JSON string
+        if let metadataString = linkedAccount.metadata,
+           let data = metadataString.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let walletProvider = json["walletProvider"] as? String {
+            switch walletProvider.lowercased() {
+            case "metamask": return .metamask
+            case "phantom": return .phantom
+            case "rainbow": return .rainbow
+            case "trust": return .trust
+            case "coinbase": return .coinbase
+            default: break
+            }
+        }
+        
+        // Default to MetaMask if we can't determine
+        return .metamask
     }
 }
 
@@ -846,7 +1020,7 @@ struct TransactionReviewSheet: View {
     let gasToken: GasToken?
     let fromAddress: String
     @ObservedObject var viewModel: SendTokenViewModel
-    let onConfirm: (MPCTransaction) async -> Void
+    let onConfirm: (MPCTransaction, TransactionToSign?) async -> Void
     
     @Environment(\.dismiss) private var dismiss
     @State private var isProcessing = false
@@ -953,7 +1127,7 @@ struct TransactionReviewSheet: View {
                 
                 do {
                     // Build transaction with Orby
-                    let transaction = try await viewModel.buildTransaction(
+                    let (transaction, transactionToSign) = try await viewModel.buildTransaction(
                         token: token,
                         chainId: chainId,
                         recipientAddress: recipientAddress,
@@ -961,8 +1135,8 @@ struct TransactionReviewSheet: View {
                         fromAddress: fromAddress
                     )
                     
-                    // Trigger MPC approval
-                    await onConfirm(transaction)
+                    // Pass both transaction and transactionToSign
+                    await onConfirm(transaction, transactionToSign)
                 } catch {
                     errorMessage = error.localizedDescription
                     showError = true

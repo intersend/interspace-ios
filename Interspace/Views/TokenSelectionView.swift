@@ -346,21 +346,26 @@ struct TokenChainBalanceRow: View {
 struct TokenIcon: View {
     let symbol: String
     
+    private var initials: String {
+        let chars = Array(symbol.prefix(2))
+        return String(chars).uppercased()
+    }
+    
     var body: some View {
+        let baseHue = Double(abs(symbol.hashValue % 360)) / 360.0
         ZStack {
             Circle()
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(hue: Double(symbol.hashValue % 360) / 360, saturation: 0.5, brightness: 0.7),
-                            Color(hue: Double(symbol.hashValue % 360) / 360, saturation: 0.7, brightness: 0.5)
+                            Color(hue: baseHue, saturation: 0.5, brightness: 0.7),
+                            Color(hue: baseHue, saturation: 0.7, brightness: 0.5)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-            
-            Text(String(symbol.prefix(2).uppercased()))
+            Text(initials)
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
         }
