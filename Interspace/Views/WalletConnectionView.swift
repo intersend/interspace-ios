@@ -156,7 +156,7 @@ struct WalletConnectionView: View {
     }
     
     private var otherWallets: [WalletType] {
-        [.argent, .phantom, .zerion, .oneInch, .imToken, .walletConnect]
+        [.argent, .phantom, .zerion, .oneInch, .imToken]
             .filter { walletService.isWalletAvailable($0) || WalletConfiguration.configuration(for: $0).universalLinkDomain != nil }
     }
     

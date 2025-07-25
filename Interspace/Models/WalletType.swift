@@ -11,7 +11,6 @@ struct WalletAppInfo {
 enum WalletType: String, Codable, CaseIterable, Identifiable {
     case metamask = "metamask"
     case coinbase = "coinbase"
-    case walletConnect = "walletconnect"
     case rainbow = "rainbow"
     case trust = "trust"
     case argent = "argent"
@@ -40,8 +39,6 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "MetaMask"
         case .coinbase:
             return "Coinbase Wallet"
-        case .walletConnect:
-            return "WalletConnect"
         case .rainbow:
             return "Rainbow"
         case .trust:
@@ -89,8 +86,6 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "fox"
         case .coinbase:
             return "c.circle.fill"
-        case .walletConnect:
-            return "link.circle.fill"
         case .rainbow:
             return "rainbow"
         case .trust:
@@ -138,8 +133,6 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "metamask"
         case .coinbase:
             return "coinbase"
-        case .walletConnect:
-            return "walletconnect"
         case .rainbow:
             return "rainbow"
         case .trust:
@@ -187,8 +180,6 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return DesignTokens.Colors.metamask
         case .coinbase:
             return DesignTokens.Colors.coinbase
-        case .walletConnect:
-            return Color.blue
         case .rainbow:
             return Color(red: 0.4, green: 0.6, blue: 1.0)
         case .trust:
@@ -236,8 +227,6 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return "metamask"
         case .coinbase:
             return "cbwallet"
-        case .walletConnect:
-            return "wc"
         case .rainbow:
             return "rainbow"
         case .trust:
@@ -285,8 +274,6 @@ enum WalletType: String, Codable, CaseIterable, Identifiable {
             return URL(string: "https://apps.apple.com/app/metamask/id1438144202")
         case .coinbase:
             return URL(string: "https://apps.apple.com/app/coinbase-wallet/id1278383455")
-        case .walletConnect:
-            return nil
         case .rainbow:
             return URL(string: "https://apps.apple.com/app/rainbow-ethereum-wallet/id1457119021")
         case .trust:

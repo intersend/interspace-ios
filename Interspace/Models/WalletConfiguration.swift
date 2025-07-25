@@ -172,7 +172,7 @@ extension WalletConfiguration {
         case .family:
             return WalletConfiguration(
                 walletType: .family,
-                deepLinkFormat: .standard,
+                deepLinkFormat: .custom(pattern: "family://wc?uri={encodedUri}"),
                 universalLinkDomain: nil,
                 supportsWalletConnect: true,
                 connectionTimeout: 30,
@@ -239,16 +239,16 @@ extension WalletConfiguration {
                 customParameters: [:]
             )
             
-        case .walletConnect:
-            // Generic WalletConnect (for unknown wallets)
-            return WalletConfiguration(
-                walletType: .walletConnect,
-                deepLinkFormat: .standard,
-                universalLinkDomain: nil,
-                supportsWalletConnect: true,
-                connectionTimeout: 30,
-                customParameters: [:]
-            )
+//        case .walletConnect:
+//            // Generic WalletConnect (for unknown wallets)
+//            return WalletConfiguration(
+//                walletType: .walletConnect,
+//                deepLinkFormat: .standard,
+//                universalLinkDomain: nil,
+//                supportsWalletConnect: true,
+//                connectionTimeout: 30,
+//                customParameters: [:]
+//            )
             
         default:
             // For safe, ledger, trezor, google, apple, mpc, unknown

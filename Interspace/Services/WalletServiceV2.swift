@@ -76,35 +76,19 @@ final class WalletServiceV2: ObservableObject {
         // Store for deep link handling
         pendingDeepLinkHandler = wallet
         
-        // Check if this is a Reown wallet and expose the URI
-        if let reownWallet = wallet as? ReownWalletService {
-            return try await withCheckedThrowingContinuation { continuation in
-                // Connect will generate the pairing URI
-                wallet.connect(context: context) { [weak self] result in
-                    Task { @MainActor in
-                        // Expose the pairing URI for display
-                        self?.currentPairingURI = reownWallet.currentPairingURI
-                        
-                        self?.isConnecting = false
-                        self?.isWalletFlowActive = false
-                        self?.pendingDeepLinkHandler = nil
-                        
-                        switch result {
-                        case .success(let session):
-                            self?.handleConnectionSuccess(session, wallet: wallet)
-                            self?.currentPairingURI = nil // Clear after success
-                            continuation.resume(returning: session)
-                            
-                        case .failure(let error):
-                            self?.handleConnectionError(error)
-                            self?.currentPairingURI = nil // Clear after error
-                            continuation.resume(throwing: error)
-                        }
-                    }
-                }
-            }
+        // Check if wallet should be handled by AppKit
+        if wallet == nil {
+            // AppKit handles these wallet connections
+            print("🔄 WalletServiceV2: Using AppKit modal for \(walletType.displayName)")
+            
+            // Present AppKit modal
+            let appKitService = AppKitService.shared
+            appKitService.presentModal()
+            
+            // Wait for connection
+            throw WalletError.connectionFailed("Please complete wallet connection in AppKit modal")
         } else {
-            // Non-Reown wallets use the original flow
+            // Non-AppKit wallets use the original flow (e.g., Coinbase native SDK)
             return try await withCheckedThrowingContinuation { continuation in
                 wallet.connect(context: context) { [weak self] result in
                     Task { @MainActor in
@@ -163,9 +147,14 @@ final class WalletServiceV2: ObservableObject {
         }
         
         // Sign message
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<WalletSignature, Error>) in
             wallet.signMessage(message, session: session) { result in
-                continuation.resume(with: result)
+                switch result {
+                case .success(let signature):
+                    continuation.resume(returning: signature)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
             }
         }
     }
@@ -191,9 +180,14 @@ final class WalletServiceV2: ObservableObject {
             throw WalletError.noSession
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             wallet.signTransaction(transaction, session: session) { result in
-                continuation.resume(with: result)
+                switch result {
+                case .success(let signature):
+                    continuation.resume(returning: signature)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
             }
         }
     }
@@ -218,12 +212,18 @@ final class WalletServiceV2: ObservableObject {
             throw WalletError.noSession
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             wallet.sendTransaction(transaction, session: session) { result in
-                continuation.resume(with: result)
+                switch result {
+                case .success(let txHash):
+                    continuation.resume(returning: txHash)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
             }
         }
     }
+    
     
     /// Get SIWE nonce from backend
     func getSIWENonce() async throws -> String {
@@ -251,8 +251,6 @@ final class WalletServiceV2: ObservableObject {
             return UIApplication.shared.canOpenURL(URL(string: "metamask://")!)
         case .coinbase:
             return UIApplication.shared.canOpenURL(URL(string: "cbwallet://")!)
-        case .walletConnect:
-            return true // WalletConnect is always available
         default:
             return false
         }
@@ -397,94 +395,18 @@ extension WalletServiceV2 {
     func connectWallet(_ walletType: WalletType) async throws -> WalletConnectionResult {
         print("🔄 WalletServiceV2.connectWallet: Starting connection for \(walletType.displayName)")
         
-        // For MetaMask, use one-click connect with SIWE if available
-        if walletType == .metamask,
-           let metamaskService = factory.createWallet(for: .metamask) as? MetaMaskService {
+        // Check if wallet is handled by AppKit
+        if factory.createWallet(for: walletType) == nil {
+            print("🔄 WalletServiceV2.connectWallet: \(walletType.displayName) is handled by AppKit")
             
-            print("🔄 WalletServiceV2.connectWallet: Using MetaMask one-click connect flow")
+            // Present AppKit modal
+            let appKitService = AppKitService.shared
+            appKitService.presentModal()
             
-            // Get SIWE nonce first
-            print("🔄 WalletServiceV2.connectWallet: Getting SIWE nonce...")
-            let nonce = try await getSIWENonce()
-            print("🔄 WalletServiceV2.connectWallet: Got nonce: \(nonce)")
-            
-            // Use one-click connect with SIWE
-            print("🔄 WalletServiceV2.connectWallet: Starting withCheckedThrowingContinuation...")
-            
-            // Add timeout protection
-            let timeoutSeconds: TimeInterval = 120.0 // 2 minutes
-            var continuationResumed = false
-            
-            let result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(session: WalletSession, signature: WalletSignature), Error>) in
-                print("🔄 WalletServiceV2.connectWallet: Inside continuation, calling connectAndSignSIWE")
-                
-                // Create timeout task
-                let timeoutTask = Task {
-                    try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
-                    if !continuationResumed {
-                        print("⏱ WalletServiceV2.connectWallet: Timeout reached after \(timeoutSeconds) seconds")
-                        continuationResumed = true
-                        continuation.resume(throwing: WalletError.timeout())
-                    }
-                }
-                
-                // Ensure we capture the continuation properly
-                metamaskService.connectAndSignSIWE(nonce: nonce) { result in
-                    print("🔄 WalletServiceV2.connectWallet: connectAndSignSIWE completed with result")
-                    
-                    // Cancel timeout task
-                    timeoutTask.cancel()
-                    
-                    // Resume on any thread is safe for continuations
-                    guard !continuationResumed else {
-                        print("⚠️ WalletServiceV2.connectWallet: Continuation already resumed, ignoring result")
-                        return
-                    }
-                    
-                    continuationResumed = true
-                    
-                    switch result {
-                    case .success(let data):
-                        print("🔄 WalletServiceV2.connectWallet: Success! Address: \(data.session.address)")
-                        print("🔄 WalletServiceV2.connectWallet: Signature: \(data.signature.signature)")
-                        print("🔄 WalletServiceV2.connectWallet: Resuming continuation with success")
-                        continuation.resume(returning: data)
-                        print("🔄 WalletServiceV2.connectWallet: Continuation resumed successfully")
-                        
-                    case .failure(let error):
-                        print("❌ WalletServiceV2.connectWallet: Failed: \(error)")
-                        print("🔄 WalletServiceV2.connectWallet: Resuming continuation with error")
-                        continuation.resume(throwing: error)
-                        print("🔄 WalletServiceV2.connectWallet: Continuation resumed with error")
-                    }
-                }
-                
-                print("🔄 WalletServiceV2.connectWallet: connectAndSignSIWE call initiated")
-            }
-            
-            print("🔄 WalletServiceV2.connectWallet: Continuation completed, updating state")
-            
-            // Update active wallet
-            activeWallet = metamaskService
-            connectionState = .connected(result.session)
-            
-            let connectionResult = WalletConnectionResult(
-                address: result.session.address,
-                signature: result.signature.normalizedSignature,
-                message: result.signature.message,
-                walletName: result.session.walletMetadata?.name ?? walletType.displayName,
-                walletIcon: result.session.walletMetadata?.icon,
-                walletType: walletType
-            )
-            
-            print("🔄 WalletServiceV2.connectWallet: Returning connection result")
-            print("🔄 WalletServiceV2.connectWallet: Address: \(connectionResult.address)")
-            print("🔄 WalletServiceV2.connectWallet: Signature length: \(connectionResult.signature.count)")
-            
-            return connectionResult
+            throw WalletError.connectionFailed("Please complete wallet connection in AppKit modal")
         }
         
-        // For other wallets, use standard flow
+        // For wallets with custom implementations (like Coinbase), use standard flow
         let session = try await connect(walletType: walletType)
         
         // Get SIWE nonce and create message
@@ -503,6 +425,7 @@ extension WalletServiceV2 {
             walletType: walletType
         )
     }
+  
     
     /// Get connected address
     var connectedAddress: String? {
