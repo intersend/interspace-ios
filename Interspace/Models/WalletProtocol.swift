@@ -148,6 +148,8 @@ struct WalletTransaction {
     let data: String?
     let gasLimit: String?
     let gasPrice: String?
+    let maxFeePerGas: String?
+    let maxPriorityFeePerGas: String?
     let nonce: String?
     let chainId: Int
     
@@ -165,6 +167,8 @@ struct WalletTransaction {
             data: params["data"] as? String,
             gasLimit: params["gas"] as? String ?? params["gasLimit"] as? String,
             gasPrice: params["gasPrice"] as? String,
+            maxFeePerGas: params["maxFeePerGas"] as? String,
+            maxPriorityFeePerGas: params["maxPriorityFeePerGas"] as? String,
             nonce: params["nonce"] as? String,
             chainId: (params["chainId"] as? Int) ?? 1
         )

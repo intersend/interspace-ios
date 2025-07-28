@@ -288,6 +288,19 @@ struct GasTokenPreferenceResponse: Codable {
     let message: String
 }
 
+struct TransactionToSign: Codable {
+    let from: String
+    let to: String
+    let data: String
+    let value: String
+    let chainId: Int
+    let gasLimit: String?
+    let maxFeePerGas: String?
+    let maxPriorityFeePerGas: String?
+    let nonce: String?
+    let type: String
+}
+
 struct IntentResponse: Codable {
     let success: Bool
     let data: IntentData
@@ -298,6 +311,7 @@ struct IntentResponse: Codable {
         let type: String
         let status: String
         let estimatedTimeMs: Int
+        let transactionToSign: TransactionToSign?
         let unsignedOperations: UnsignedOperations
         let summary: IntentSummary
         

@@ -59,6 +59,8 @@ final class TransactionApprovalService: ObservableObject {
             data: transaction.data,
             gasLimit: transaction.gasLimit,
             gasPrice: transaction.gasPrice,
+            maxFeePerGas: transaction.maxFeePerGas,
+            maxPriorityFeePerGas: transaction.maxPriorityFeePerGas,
             nonce: transaction.nonce,
             chainId: transaction.chainId
         )

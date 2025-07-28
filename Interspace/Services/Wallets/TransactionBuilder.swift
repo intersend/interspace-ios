@@ -35,6 +35,8 @@ final class TransactionBuilder {
             data: data ?? "0x",
             gasLimit: gasLimit ?? "0x5208", // 21000 for simple transfer
             gasPrice: gasPrice,
+            maxFeePerGas: maxFeePerGas,
+            maxPriorityFeePerGas: maxPriorityFeePerGas,
             nonce: nonce,
             chainId: chainId
         )
@@ -189,6 +191,8 @@ extension WalletTransaction {
             data: params["data"] as? String,
             gasLimit: params["gas"] as? String ?? params["gasLimit"] as? String,
             gasPrice: params["gasPrice"] as? String,
+            maxFeePerGas: params["maxFeePerGas"] as? String,
+            maxPriorityFeePerGas: params["maxPriorityFeePerGas"] as? String,
             nonce: params["nonce"] as? String,
             chainId: chainId
         )
