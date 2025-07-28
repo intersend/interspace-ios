@@ -1,12 +1,9 @@
 import Foundation
 import UIKit
-import ReownAppKit
 
 /// Service responsible for generating and handling wallet deep links
 class WalletDeepLinkGenerator {
     static let shared = WalletDeepLinkGenerator()
-    
-    private let appKitService = AppKitService.shared
     
     private init() {}
     
@@ -162,45 +159,6 @@ class WalletDeepLinkGenerator {
         return false
     }
     
-    /// Generate AppKit-compatible deep link for supported wallets
-    func generateAppKitDeepLink(for walletType: WalletType, uri: String) -> String? {
-        // Map wallet types to AppKit wallet IDs
-        let walletIds: [WalletType: String] = [
-            .trust: "4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0",
-            .family: "0b415a746fb9ee99cce155c2ceca0c6f6061b1dbca2d722b3ba16381d0562150",
-            .phantom: "a797aa35c0fadbfc1a53e7f675162ed5226968b44a19ee3d24385c64d1d3c393",
-            .zerion: "ecc4036f814562b41a5268adc86270fba1365471402006302e70169465b7ac18"
-        ]
-        
-        guard let walletId = walletIds[walletType] else { return nil }
-        
-        // Use existing deeplink generation with AppKit URI
-        let encodedUri = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
-        
-        switch walletType {
-        case .trust:
-            return "trust://wc?uri=\(encodedUri)"
-        case .family:
-            return "family://wc?uri=\(encodedUri)"
-        case .phantom:
-            return "phantom://wc?uri=\(encodedUri)"
-        case .zerion:
-            return "zerion://wc?uri=\(encodedUri)"
-        default:
-            return nil
-        }
-    }
-    
-    /// Open wallet using AppKit if available
-    func openWalletWithAppKit(_ walletType: WalletType) async throws {
-        do {
-            // Use standard WalletConnect flow for all wallets
-            try await WalletService.shared.connectWallet(walletType)
-        } catch {
-            print("WalletDeepLinkGenerator: Failed to connect wallet: \(error)")
-            throw error
-        }
-    }
     
     /// Generate transaction deeplink for a wallet
     func generateTransactionDeepLink(
@@ -341,19 +299,6 @@ extension WalletDeepLinkGenerator {
         // Extract wallet type from URL if possible
         if url.scheme == "interspace" {
             // Handle different callback paths
-            if url.host == "walletconnect" || url.host == "auth" {
-                // WalletConnect/AppKit callback
-                Task { @MainActor in
-                    appKitService.handleDeeplink(url)
-                }
-                
-                NotificationCenter.default.post(
-                    name: .walletConnectCallback,
-                    object: nil,
-                    userInfo: ["url": url]
-                )
-                return true
-            }
         }
         
         return false

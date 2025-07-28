@@ -1,6 +1,5 @@
 import Foundation
 import Combine
-import CoinbaseWalletSDK
 import UIKit
 
 final class WalletService: ObservableObject {
@@ -11,15 +10,6 @@ final class WalletService: ObservableObject {
     @Published var walletAddress: String?
     @Published var error: WalletError?
     
-    // Note: MetaMask SDK is now handled via WalletServiceV2 and MetaMaskService
-    
-    // Coinbase SDK - temporarily disabled
-    // private lazy var coinbaseSDK = CoinbaseWalletSDK.shared
-    
-    // WalletConnect SDK
-    private var isWalletKitConfigured = false
-    internal let walletConnectService = WalletConnectService.shared
-    private let walletConnectSessionManager = WalletConnectSessionManager.shared
     
     // Connection state management
     private(set) var isConnectionInProgress = false
@@ -61,15 +51,6 @@ final class WalletService: ObservableObject {
             // Set up observers first
             setupNotificationObservers()
             
-            // Initialize SDKs asynchronously
-            // Note: MetaMask SDK is now handled via WalletServiceV2 and MetaMaskService
-            async let coinbaseSetup: Void = setupCoinbaseSDKAsync()
-            
-            // Wait for SDK to complete
-            _ = await coinbaseSetup
-            
-            // Setup WalletConnect
-            setupWalletConnect()
             
             isInitialized = true
             let duration = CFAbsoluteTimeGetCurrent() - startTime
@@ -80,10 +61,6 @@ final class WalletService: ObservableObject {
     }
     
     
-    /// Setup Coinbase SDK asynchronously
-    private func setupCoinbaseSDKAsync() async {
-        setupCoinbaseSDK()
-    }
     
     private func setupNotificationObservers() {
         // Add notification observer for debugging
@@ -191,39 +168,7 @@ final class WalletService: ObservableObject {
     }
     
     
-    // MARK: - Coinbase Wallet Setup
     
-    private func setupCoinbaseSDK() {
-        // Coinbase SDK is configured in AppDelegate
-        print("💰 WalletService: Coinbase SDK ready (configured in AppDelegate)")
-    }
-    
-    // MARK: - WalletConnect Setup
-    
-    private func setupWalletConnect() {
-        // Get project ID from Info.plist or environment
-        var projectId = Bundle.main.object(forInfoDictionaryKey: "WALLETCONNECT_PROJECT_ID") as? String ?? ""
-        
-        print("💰 WalletService: WalletConnect Project ID from Info.plist: '\(projectId)'")
-        
-        // Fallback to hardcoded value if not configured properly
-        if projectId.isEmpty || projectId == "$(WALLETCONNECT_PROJECT_ID)" {
-            print("⚠️ WalletService: Info.plist not configured, using hardcoded project ID")
-            // This is the project ID from BuildConfiguration.xcconfig
-            projectId = "936ce227c0152a29bdeef7d68794b0ac"
-        }
-        
-        guard !projectId.isEmpty && projectId != "YOUR_PROJECT_ID" else {
-            print("⚠️ WalletService: WalletConnect Project ID not properly configured")
-            return
-        }
-        
-        // WalletConnectService handles its own initialization
-        // Just mark as configured if project ID exists
-        isWalletKitConfigured = true
-        
-        print("✅ WalletService: WalletConnect configured with project ID: \(projectId)")
-    }
     
     // MARK: - Debug Methods
     
@@ -314,10 +259,11 @@ final class WalletService: ObservableObject {
                 print("💰 WalletService: Redirecting MetaMask to WalletServiceV2")
                 result = try await WalletServiceV2.shared.connectWallet(.metamask)
             case .coinbase:
-                result = try await connectCoinbaseWallet()
-            case .walletConnect, .rainbow, .trust, .argent, .gnosisSafe, .family, .phantom, .oneInch, .zerion, .imToken, .tokenPocket, .spot, .omni:
-                // All WalletConnect-compatible wallets use the same connection method
-                result = try await connectWalletConnectType(walletType)
+                // Coinbase now uses AppKit modal
+                throw WalletError.connectionFailed("Please use the Connect Wallet option for Coinbase Wallet")
+            case .rainbow, .trust, .argent, .gnosisSafe, .family, .phantom, .oneInch, .zerion, .imToken, .tokenPocket, .spot, .omni:
+                // These wallets are no longer supported without WalletConnect
+                throw WalletError.connectionFailed("This wallet type requires WalletConnect which has been removed")
             case .google, .apple:
                 throw WalletError.unsupportedWallet("Social authentication should use AuthenticationManagerV2")
             case .mpc:
@@ -424,249 +370,6 @@ final class WalletService: ObservableObject {
         return message
     }
     
-    // MARK: - Coinbase Wallet Connection
-    
-    private func connectCoinbaseWallet() async throws -> WalletConnectionResult {
-        print("💰 WalletService: Starting Coinbase Wallet connection")
-        
-        // Check if Coinbase Wallet is installed
-        if !canOpenCoinbaseWallet() {
-            print("💰 WalletService: Coinbase Wallet app not installed")
-            throw WalletError.connectionFailed("Coinbase Wallet app is not installed. Please install Coinbase Wallet from the App Store.")
-        }
-        
-        // Get SIWE nonce from backend
-        let nonce = try await getSIWENonce()
-        print("💰 WalletService: Got SIWE nonce: \(nonce)")
-        
-        // Create SIWE message (address will be updated after we get it)
-        let message = createSIWEMessage(
-            address: "pending", // Will be replaced with actual address
-            nonce: nonce,
-            chainId: 1 // Ethereum mainnet
-        )
-        
-        // Create a personal sign request that includes both account request and signing
-        let request = Request(actions: [
-            Action(jsonRpc: .eth_requestAccounts),
-            Action(jsonRpc: .personal_sign(address: "", message: message))
-        ])
-        
-        print("💰 WalletService: Making request to Coinbase Wallet...")
-        
-        // Make the request using continuation for async/await
-        let response = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<BaseMessage<[ActionResult]>, Error>) in
-            CoinbaseWalletSDK.shared.makeRequest(request) { result in
-                switch result {
-                case .success(let response):
-                    continuation.resume(returning: response)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
-        
-        print("💰 WalletService: Received response from Coinbase Wallet")
-        
-        // Check we have both responses
-        guard response.content.count >= 2 else {
-            print("💰 WalletService: Invalid response count: \(response.content.count)")
-            throw WalletError.connectionFailed("Invalid response from Coinbase Wallet")
-        }
-        
-        // Extract account from first response
-        let accountResult = response.content[0]
-        guard case .success(let accountJSON) = accountResult else {
-            if case .failure(let error) = accountResult {
-                print("💰 WalletService: Account request failed: \(error.message)")
-                if error.code == 4001 { // User rejected
-                    throw WalletError.userCancelled
-                }
-            }
-            throw WalletError.noAccountsFound
-        }
-        
-        // Decode the JSON response to get addresses
-        struct AccountResponse: Codable {
-            let result: [String]
-        }
-        
-        let accountResponse = try? accountJSON.decode(as: AccountResponse.self)
-        guard let addresses = accountResponse?.result, !addresses.isEmpty else {
-            print("💰 WalletService: Failed to decode addresses from response")
-            throw WalletError.noAccountsFound
-        }
-        
-        let address = addresses[0]
-        print("💰 WalletService: Got address: \(address)")
-        
-        // Update SIWE message with actual address
-        let finalMessage = createSIWEMessage(
-            address: address,
-            nonce: nonce,
-            chainId: 1
-        )
-        
-        // Extract signature from second response
-        let signResult = response.content[1]
-        guard case .success(let signJSON) = signResult else {
-            if case .failure(let error) = signResult {
-                print("💰 WalletService: Sign request failed: \(error.message)")
-                if error.code == 4001 { // User rejected
-                    throw WalletError.userCancelled
-                }
-            }
-            throw WalletError.signatureFailed("Failed to get signature")
-        }
-        
-        // Decode the signature response
-        struct SignResponse: Codable {
-            let result: String
-        }
-        
-        let signResponse = try? signJSON.decode(as: SignResponse.self)
-        guard let signature = signResponse?.result else {
-            print("💰 WalletService: Failed to decode signature from response")
-            throw WalletError.signatureFailed("Failed to decode signature")
-        }
-        
-        print("💰 WalletService: Got signature: \(signature.prefix(20))...")
-        
-        let connectionResult = WalletConnectionResult(
-            address: address,
-            signature: signature,
-            message: finalMessage,
-            walletName: "Coinbase Wallet",
-            walletIcon: nil,
-            walletType: .coinbase
-        )
-        
-        print("💰 WalletService: Coinbase Wallet connection successful")
-        return connectionResult
-    }
-    
-    // MARK: - WalletConnect Connection
-    
-    private func connectWalletConnect() async throws -> WalletConnectionResult {
-        guard isWalletKitConfigured else {
-            throw WalletError.sdkNotInitialized
-        }
-        
-        // Use the new deep linking approach, passing the specific wallet type
-        return try await handleWalletConnected(walletType: connectedWallet ?? .walletConnect)
-    }
-    
-    private func connectWalletConnectType(_ walletType: WalletType) async throws -> WalletConnectionResult {
-        guard isWalletKitConfigured else {
-            throw WalletError.sdkNotInitialized
-        }
-        
-        // Use the new deep linking approach with the specific wallet type
-        return try await handleWalletConnected(walletType: walletType)
-    }
-    
-    // Method to handle scanned WalletConnect URI
-    func connectWithWalletConnectURI(_ uri: String) async throws -> WalletConnectionResult {
-        print("💰 WalletService: connectWithWalletConnectURI called for SIWE auth")
-        
-        // Initialize SDKs if needed
-        await initializeSDKsIfNeeded()
-        
-        print("💰 WalletService: isWalletKitConfigured = \(isWalletKitConfigured)")
-        
-        guard isWalletKitConfigured else {
-            print("❌ WalletService: WalletConnect SDK not initialized - throwing error")
-            throw WalletError.sdkNotInitialized
-        }
-        
-        print("💰 WalletService: Connecting with WalletConnect URI for SIWE")
-        
-        // Connect using WalletConnectService for authentication
-        try await walletConnectService.connectForAuth(uri: uri)
-        
-        // Wait for session to be established
-        var attempts = 0
-        while await walletConnectService.sessions.isEmpty && attempts < 30 {
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            attempts += 1
-        }
-        
-        guard let session = await walletConnectService.sessions.first else {
-            throw WalletError.connectionFailed("Failed to establish WalletConnect session")
-        }
-        
-        // Get wallet address from the connected session
-        guard let address = await walletConnectService.getConnectedAddress() else {
-            throw WalletError.noAccountsFound
-        }
-        
-        print("💰 WalletService: Connected wallet address: \(address)")
-        
-        // Get SIWE nonce and create message
-        let nonce = try await getSIWENonce()
-        let message = createSIWEMessage(address: address, nonce: nonce, chainId: 1)
-        
-        // Sign SIWE message via WalletConnect
-        print("💰 WalletService: Requesting SIWE signature via WalletConnect")
-        let signature = try await walletConnectService.signSIWEMessage(message, address: address, session: session)
-        
-        // Clean up the temporary WalletConnect session after getting signature
-        await walletConnectService.cleanupAuthSession()
-        
-        // Create connection result
-        let result = WalletConnectionResult(
-            address: address,
-            signature: signature,
-            message: message,
-            walletName: "WalletConnect",
-            walletIcon: nil,
-            walletType: .walletConnect
-        )
-        
-        // Update UI state
-        await MainActor.run {
-            self.connectionStatus = .connected
-            self.connectedWallet = .walletConnect
-            self.walletAddress = address
-        }
-        
-        print("💰 WalletService: WalletConnect SIWE authentication successful")
-        return result
-    }
-    
-    // Method to handle session proposals (would be called from AppDelegate/SceneDelegate)
-    // TODO: Implement proper WalletConnect integration with reown-swift
-    /*
-    func handleSessionProposal(_ proposal: Session.Proposal) async throws -> WalletConnectionResult {
-        // Auto-approve the session for simplicity
-        // In production, you'd show a UI to let the user approve/reject
-        
-        // For now, we'll create a mock implementation
-        // The correct API should be researched from the reown-swift documentation
-        
-        // try await WalletKit.instance.approve(proposalId: proposal.id, namespaces: sessionNamespaces)
-        
-        // For now, we'll use a mock address
-        let address = "0x_mock_address"
-        
-        // Create a message to sign for authentication
-        let message = "Welcome to Interspace! Sign this message to authenticate.\n\nTimestamp: \(Date().timeIntervalSince1970)"
-        
-        // For now, we'll return a mock signature
-        // In production, you'd need to implement the actual signing flow
-        let result = WalletConnectionResult(
-            address: address,
-            signature: "0x_mock_signature", // This should be actual signature
-            message: message,
-            walletName: "WalletConnect",
-            walletIcon: nil,
-            walletType: .walletConnect
-        )
-        
-        return result
-    }
-    */
-    
     // MARK: - Disconnect
     
     func disconnect() async {
@@ -691,14 +394,6 @@ final class WalletService: ObservableObject {
         // print("💰 WalletService: Resetting Coinbase session")
         // coinbaseSDK.resetSession()
         
-        // Disconnect WalletConnect sessions
-        if isWalletKitConfigured {
-            Task {
-                await walletConnectService.disconnect()
-                // No need to refresh sessions for SIWE-only implementation
-            }
-        }
-        
         print("💰 WalletService: Disconnect completed")
     }
     
@@ -709,9 +404,8 @@ final class WalletService: ObservableObject {
         case .metamask:
             return canOpenMetaMask()
         case .coinbase:
-            return canOpenCoinbaseWallet()
-        case .walletConnect:
-            return true // Always available as it uses QR codes
+            // Coinbase now uses AppKit modal
+            return false
         case .google, .apple:
             return true // Social authentication is always available
         case .mpc:
@@ -739,14 +433,6 @@ final class WalletService: ObservableObject {
         return false
     }
     
-    private func canOpenCoinbaseWallet() -> Bool {
-        if let url = URL(string: "cbwallet://"), UIApplication.shared.canOpenURL(url) {
-            print("💰 WalletService: Coinbase Wallet is installed")
-            return true
-        }
-        print("💰 WalletService: Coinbase Wallet is not installed")
-        return false
-    }
     
     private func canOpenWallet(scheme: String) -> Bool {
         if let url = URL(string: scheme), UIApplication.shared.canOpenURL(url) {
@@ -830,24 +516,7 @@ final class WalletService: ObservableObject {
         let deepLinkGenerator = WalletDeepLinkGenerator.shared
         let deepLinkResult = deepLinkGenerator.generateDeepLinks(for: walletType, uri: uri)
         
-        // Handle generic WalletConnect type
-        if walletType == .walletConnect {
-            let walletApps = getAvailableWalletApps()
-            if walletApps.isEmpty {
-                print("❌ WalletService: No compatible wallet apps found")
-                showNoWalletInstalledAlert()
-                return
-            }
-            // For generic WalletConnect, we already have logic in getAvailableWalletApps
-            // Just use the first available wallet
-        }
         
-        // Check if wallet supports WalletConnect
-        if !WalletConfiguration.supportsWalletConnect(walletType) {
-            print("❌ WalletService: \(walletType.displayName) does not support WalletConnect")
-            showWalletOpenFailedAlert(walletType: walletType)
-            return
-        }
         
         // Open wallet using the deep link generator
         deepLinkGenerator.openWallet(with: deepLinkResult) { success in
@@ -986,89 +655,6 @@ final class WalletService: ObservableObject {
         }
     }
     
-    /// Handle wallet connection for WalletConnect with deep linking
-    func handleWalletConnected(walletType: WalletType = .walletConnect) async throws -> WalletConnectionResult {
-        print("📱 WalletService: Handling WalletConnect connection for \(walletType.displayName)")
-        
-        // Clean up any existing sessions before creating a new one
-        await walletConnectService.disconnect()
-        
-        // Small delay to ensure cleanup is complete
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
-        // Store the actual wallet type for later use
-        self.connectedWallet = walletType
-        
-        // Check if wallet supports Link Mode
-        let supportsLinkMode = [WalletType.trust, .family, .phantom, .zerion].contains(walletType)
-        
-        if supportsLinkMode && walletConnectService.useLinkMode {
-            print("🔗 WalletService: Using Link Mode for \(walletType.displayName)")
-            
-            // Use Link Mode connection
-            let linkModeURI = try await walletConnectService.connectWithLinkMode(walletType: walletType)
-            
-            // Open wallet app with Link Mode deep link
-            await openWalletWithDeepLink(walletType: walletType, uri: linkModeURI)
-            
-            // For Link Mode, we wait for the response via deep link callback
-            // The session will be established through the Link Mode response
-            return try await waitForLinkModeResponse()
-        } else {
-            // Use standard WalletConnect flow
-            print("📱 WalletService: Using standard WalletConnect for \(walletType.displayName)")
-            
-            // Generate WalletConnect URI
-            let uri = try await walletConnectService.connectToWallet()
-            
-            // Open wallet app with deep link (must be on main thread)
-            await openWalletWithDeepLink(walletType: walletType, uri: uri)
-        }
-        
-        // Wait for session to be established
-        var attempts = 0
-        while await walletConnectService.sessions.isEmpty && attempts < 60 { // 30 seconds timeout
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            attempts += 1
-        }
-        
-        guard let session = await walletConnectService.sessions.first else {
-            throw WalletError.connectionFailed("Failed to establish WalletConnect session")
-        }
-        
-        // Get wallet address
-        guard let address = await walletConnectService.getConnectedAddress() else {
-            throw WalletError.noAccountsFound
-        }
-        
-        print("📱 WalletService: Connected to wallet: \(address)")
-        
-        // Create SIWE message
-        let nonce = try await getSIWENonce()
-        let message = createSIWEMessage(address: address, nonce: nonce, chainId: 1)
-        
-        // Sign SIWE message
-        let signature = try await walletConnectService.signSIWEMessage(message, address: address, session: session)
-        
-        // Clean up session after authentication
-        await walletConnectService.cleanupAuthSession()
-        
-        // Update UI state
-        await MainActor.run {
-            self.connectionStatus = .connected
-            self.connectedWallet = .walletConnect
-            self.walletAddress = address
-        }
-        
-        return WalletConnectionResult(
-            address: address,
-            signature: signature,
-            message: message,
-            walletName: "WalletConnect",
-            walletIcon: nil,
-            walletType: .walletConnect
-        )
-    }
     
     // MARK: - Transaction Methods
     
@@ -1123,79 +709,6 @@ final class WalletService: ObservableObject {
         }
     }
     
-    /// Wait for Link Mode response
-    private func waitForLinkModeResponse() async throws -> WalletConnectionResult {
-        print("🔗 WalletService: Waiting for Link Mode response...")
-        
-        // Set up a timeout for Link Mode response
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-            throw WalletError.timeout("Link Mode connection timed out")
-        }
-        
-        // Wait for Link Mode response notification
-        return try await withCheckedThrowingContinuation { continuation in
-            var observer: NSObjectProtocol?
-            
-            observer = NotificationCenter.default.addObserver(
-                forName: .linkModeAuthCompleted,
-                object: nil,
-                queue: .main
-            ) { notification in
-                timeoutTask.cancel()
-                
-                if let userInfo = notification.userInfo,
-                   let address = userInfo["address"] as? String,
-                   let signature = userInfo["signature"] as? String,
-                   let message = userInfo["message"] as? String {
-                    
-                    // Remove observer
-                    if let obs = observer {
-                        NotificationCenter.default.removeObserver(obs)
-                    }
-                    
-                    let result = WalletConnectionResult(
-                        address: address,
-                        signature: signature,
-                        message: message,
-                        walletName: (self.connectedWallet ?? .walletConnect).displayName,
-                        walletIcon: nil,
-                        walletType: self.connectedWallet ?? .walletConnect
-                    )
-                    
-                    continuation.resume(returning: result)
-                } else if let error = notification.userInfo?["error"] as? Error {
-                    // Remove observer
-                    if let obs = observer {
-                        NotificationCenter.default.removeObserver(obs)
-                    }
-                    
-                    continuation.resume(throwing: error)
-                } else {
-                    // Remove observer
-                    if let obs = observer {
-                        NotificationCenter.default.removeObserver(obs)
-                    }
-                    
-                    continuation.resume(throwing: WalletError.connectionFailed("Invalid Link Mode response"))
-                }
-            }
-            
-            // Handle timeout
-            Task {
-                do {
-                    try await timeoutTask.value
-                    // If we reach here, it means timeout occurred
-                    if let obs = observer {
-                        NotificationCenter.default.removeObserver(obs)
-                    }
-                    continuation.resume(throwing: WalletError.timeout("Link Mode response timed out"))
-                } catch {
-                    // Task was cancelled, which means we got a response
-                }
-            }
-        }
-    }
     
     /// Determine wallet type from linked account
     private func determineWalletType(from account: LinkedAccount) -> WalletType {
@@ -1219,12 +732,12 @@ final class WalletService: ObservableObject {
             case "argent":
                 return .argent
             default:
-                return .walletConnect
+                return .unknown
             }
         }
         
-        // Default to WalletConnect
-        return .walletConnect
+        // Default to unknown
+        return .unknown
     }
 }
 

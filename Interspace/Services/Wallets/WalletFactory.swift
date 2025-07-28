@@ -1,6 +1,5 @@
 import Foundation
 import UIKit
-import CoinbaseWalletSDK
 
 /// Factory for creating wallet service instances
 final class WalletFactory: WalletFactoryProtocol {
@@ -40,44 +39,11 @@ final class WalletFactory: WalletFactoryProtocol {
         let wallet: WalletProtocol?
         
         switch type {
-        case .phantom:
-            // Use Reown for Phantom Ethereum support
-            wallet = ReownWalletService(walletType: type)
-            
-        case .metamask:
-            // Use native MetaMask SDK for better UX
-            wallet = MetaMaskService(sessionStorage: sessionStorage)
-            
-        case .rainbow:
-            wallet = ReownWalletService(walletType: type)
-            
-        case .trust:
-            wallet = ReownWalletService(walletType: type)
-            
-        case .argent:
-            wallet = ReownWalletService(walletType: type)
-            
-        case .coinbase:
-            // Use native Coinbase SDK for better UX
-            print("🏭 WalletFactory: Creating Coinbase wallet...")
-            
-            // Check if CoinbaseWalletSDK is available
-            #if canImport(CoinbaseWalletSDK)
-                print("🏭 WalletFactory: CoinbaseWalletSDK package is installed ✓")
-                // Use native CoinbaseService if SDK is available
-                wallet = CoinbaseService(sessionStorage: sessionStorage)
-                print("🏭 WalletFactory: Coinbase wallet created successfully")
-            #else
-                print("❌ WalletFactory: CoinbaseWalletSDK package not installed")
-                print("❌ WalletFactory: Add package: https://github.com/MobileWalletProtocol/wallet-mobile-sdk")
-                wallet = ReownWalletService(walletType: type)
-            #endif
-            
-            if let wallet = wallet {
-                print("🏭 WalletFactory: Created wallet type: \(Swift.type(of: wallet))")
-            } else {
-                print("🏭 WalletFactory: Failed to create wallet")
-            }
+        case .phantom, .metamask, .rainbow, .trust, .argent, .gnosisSafe, .family, 
+             .oneInch, .zerion, .imToken, .tokenPocket, .spot, .omni, .coinbase:
+            // AppKit handles all these wallet connections through its modal
+            print("🏭 WalletFactory: \(type.displayName) will be handled by AppKit modal")
+            wallet = nil
             
         default:
             // Wallet not yet implemented

@@ -17,6 +17,9 @@ enum WalletConnectionError: LocalizedError, Identifiable, Equatable {
     case noSession
     case invalidAccount
     case walletNotInstalled
+    case transactionFailed(String)
+    case signingInProgress(String)
+    case signatureRejected
     
     var id: String {
         switch self {
@@ -46,6 +49,12 @@ enum WalletConnectionError: LocalizedError, Identifiable, Equatable {
             return "invalidAccount"
         case .walletNotInstalled:
             return "walletNotInstalled"
+        case .transactionFailed(let message):
+            return "transactionFailed_\(message)"
+        case .signingInProgress(let message):
+            return "signingInProgress_\(message)"
+        case .signatureRejected:
+            return "signatureRejected"
         }
     }
     
@@ -77,6 +86,12 @@ enum WalletConnectionError: LocalizedError, Identifiable, Equatable {
             return "Invalid wallet account format"
         case .walletNotInstalled:
             return "The selected wallet is not installed"
+        case .transactionFailed(let message):
+            return "Transaction failed: \(message)"
+        case .signingInProgress(let message):
+            return message
+        case .signatureRejected:
+            return "Signature request was rejected"
         }
     }
 }

@@ -68,18 +68,6 @@ struct AddAccountView: View {
                                 Divider()
                                     .padding(.leading, 72)
                                 
-                                // WalletConnect
-                                WalletOptionRow(
-                                    walletType: .walletConnect,
-                                    title: "WalletConnect",
-                                    subtitle: "Connect any WalletConnect wallet",
-                                    isFirst: false,
-                                    isLast: false,
-                                    onTap: {
-                                        HapticManager.impact(.light)
-                                        selectedWalletType = .walletConnect
-                                    }
-                                )
                                 
                                 Divider()
                                     .padding(.leading, 72)

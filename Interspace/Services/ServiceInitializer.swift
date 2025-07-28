@@ -20,11 +20,11 @@ class ServiceInitializer: ObservableObject {
     private var _authenticationManagerV2: AuthenticationManagerV2?
     private var _sessionCoordinator: SessionCoordinator?
     private var _walletService: WalletService?
-    private var _appKitService: AppKitService?
     private var _profileIconGenerator: ProfileIconGenerator?
     private var _googleSignInService: GoogleSignInService?
 //    private var _appleSignInService: AppleSignInService?
     private var _passkeyService: PasskeyService?
+    private var _appKitService: AppKitService?
     
     // MARK: - Critical Services (Required at launch)
     
@@ -53,11 +53,6 @@ class ServiceInitializer: ObservableObject {
             
             group.addTask { @MainActor in
                 self.initializeWalletService()
-            }
-            
-            // AppKitService for WalletConnect/Reown
-            group.addTask { @MainActor in
-                self.initializeAppKitService()
             }
         }
         
@@ -90,6 +85,10 @@ class ServiceInitializer: ObservableObject {
                 
                 group.addTask { @MainActor in
                     self.initializePasskeyService()
+                }
+                
+                group.addTask { @MainActor in
+                    self.initializeAppKitService()
                 }
             }
             
@@ -127,14 +126,6 @@ class ServiceInitializer: ObservableObject {
         recordInitTime("WalletService", start: start)
     }
     
-    // AppKitService for WalletConnect/Reown
-    private func initializeAppKitService() {
-        let start = CFAbsoluteTimeGetCurrent()
-        _appKitService = AppKitService.shared
-        _appKitService?.configure()
-        recordInitTime("AppKitService", start: start)
-    }
-    
     private func initializeProfileIconGenerator() {
         let start = CFAbsoluteTimeGetCurrent()
         _profileIconGenerator = ProfileIconGenerator()
@@ -158,6 +149,20 @@ class ServiceInitializer: ObservableObject {
         let start = CFAbsoluteTimeGetCurrent()
         _passkeyService = PasskeyService.shared
         recordInitTime("PasskeyService", start: start)
+    }
+    
+    private func initializeAppKitService() {
+        print("🚀 ServiceInitializer: Initializing AppKitService...")
+        let start = CFAbsoluteTimeGetCurrent()
+        _appKitService = AppKitService.shared
+        print("🚀 ServiceInitializer: AppKitService instance created")
+        
+        // Configure AppKit during initialization
+        print("🚀 ServiceInitializer: Configuring AppKit...")
+        _appKitService?.configure()
+        print("🚀 ServiceInitializer: AppKit configuration complete")
+        
+        recordInitTime("AppKitService", start: start)
     }
     
     // MARK: - Service Accessors
@@ -188,14 +193,6 @@ class ServiceInitializer: ObservableObject {
             initializeWalletService()
         }
         return _walletService!
-    }
-    
-    // AppKitService for WalletConnect/Reown
-    var appKit: AppKitService {
-        if _appKitService == nil {
-            initializeAppKitService()
-        }
-        return _appKitService!
     }
     
     // MARK: - Lazy Service Getters
@@ -233,6 +230,18 @@ class ServiceInitializer: ObservableObject {
                 _passkeyService = PasskeyService.shared
             }
             return _passkeyService!
+        }
+    }
+    
+    func getAppKitService() -> AppKitService {
+        servicesQueue.sync(flags: .barrier) {
+            if _appKitService == nil {
+                print("🔧 ServiceInitializer: Lazy-loading AppKitService...")
+                _appKitService = AppKitService.shared
+                _appKitService?.configure()
+                print("🔧 ServiceInitializer: AppKitService lazy-loaded and configured")
+            }
+            return _appKitService!
         }
     }
     
@@ -276,6 +285,7 @@ class ServiceInitializer: ObservableObject {
                 _ = getPasskeyService()
             case .wallet:
                 await wallet.initializeSDKsIfNeeded()
+                _ = getAppKitService()
             case .profile:
                 _ = getProfileIconGenerator()
             }
@@ -291,11 +301,11 @@ class ServiceInitializer: ObservableObject {
             _authenticationManagerV2 = nil
             _sessionCoordinator = nil
             _walletService = nil
-            _appKitService = nil
             _profileIconGenerator = nil
             _googleSignInService = nil
 //            _appleSignInService = nil
             _passkeyService = nil
+            _appKitService = nil
             
             isInitialized = false
             initializationProgress = 0.0

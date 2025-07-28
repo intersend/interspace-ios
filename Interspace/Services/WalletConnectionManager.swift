@@ -134,9 +134,9 @@ class WalletConnectionManager: ObservableObject {
     }
     
     private func attemptConnection(walletType: WalletType, configuration: WalletConfiguration) async throws -> WalletConnectionResult {
-        // This would integrate with WalletService/WalletConnectService
-        // For now, throw an error to indicate this needs implementation
-        throw WalletConnectionError.connectionFailed("Connection implementation needed")
+        // This would integrate with WalletService/AppKitService
+        // AppKit handles the connection through its modal UI
+        throw WalletConnectionError.connectionFailed("Use AppKit modal for wallet connections")
     }
     
     private func shouldRetry(error: WalletConnectionError) -> Bool {
@@ -208,6 +208,24 @@ class WalletConnectionManager: ObservableObject {
             case .connectionComplete:
                 updateProgress(.completing, message: "Completing connection...", progress: 1.0)
             }
+        }
+    }
+    
+    /// Handle AppKit connection events
+    func handleAppKitConnection(address: String, walletType: WalletType) {
+        Task { @MainActor in
+            connectionState = .connected(walletType, address)
+            connectionProgress = nil
+        }
+    }
+    
+    /// Handle AppKit connection error
+    func handleAppKitError(_ error: Error) {
+        Task { @MainActor in
+            let walletError = error as? WalletConnectionError ?? WalletConnectionError.connectionFailed(error.localizedDescription)
+            connectionState = .failed(walletError)
+            connectionProgress = nil
+            connectionError = walletError
         }
     }
 }
