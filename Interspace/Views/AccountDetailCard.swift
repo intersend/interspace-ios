@@ -161,8 +161,6 @@ struct AccountDetailCard: View {
             return "fox.fill"
         case .coinbase:
             return "c.square.fill"
-        case .walletConnect:
-            return "link"
         case .ledger:
             return "square.stack.3d.up.fill"
         case .safe:
@@ -177,8 +175,6 @@ struct AccountDetailCard: View {
         case .metamask:
             return .orange
         case .coinbase:
-            return .blue
-        case .walletConnect:
             return .blue
         case .ledger:
             return .black

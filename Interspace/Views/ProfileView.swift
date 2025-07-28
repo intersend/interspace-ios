@@ -327,10 +327,24 @@ struct LinkedAccountRow: View {
             Group {
                 switch account.authStrategy {
                 case "wallet":
-                    Image(walletIcon)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
+                    // Use icon from metadata if available
+                    if let iconURL = account.walletIconURL, !iconURL.isEmpty, let url = URL(string: iconURL) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        } placeholder: {
+                            Image(walletIcon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        }
                         .frame(width: 32, height: 32)
+                    } else {
+                        Image(walletIcon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 32, height: 32)
+                    }
                 case "email":
                     Image(systemName: "envelope.fill")
                         .font(.system(size: 20))

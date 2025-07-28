@@ -377,39 +377,6 @@ final class AuthViewModel: ObservableObject {
         }
     }
     
-    // MARK: - WalletConnect Auth Handling
-    
-    @MainActor
-    func handleWalletConnectAuth(address: String, signature: String, message: String) async {
-        do {
-            // Create wallet connection result
-            let connectionResult = WalletConnectionResult(
-                address: address,
-                signature: signature,
-                message: message,
-                walletName: "WalletConnect",
-                walletIcon: nil,
-                walletType: .walletConnect
-            )
-            
-            // Authenticate using the authentication manager with wallet result
-            try await authManager.authenticateWithWallet(
-                address: connectionResult.address,
-                signature: connectionResult.signature,
-                message: connectionResult.message,
-                walletType: connectionResult.walletType.rawValue
-            )
-            
-        } catch let authError as AuthenticationError {
-            self.error = authError
-            self.showError = true
-            self.isLoading = false
-        } catch {
-            self.error = AuthenticationError.unknown(error.localizedDescription)
-            self.showError = true
-            self.isLoading = false
-        }
-    }
     
     // MARK: - Generic Wallet Auth Handling
     
@@ -485,14 +452,4 @@ final class AuthViewModel: ObservableObject {
         }
     }
     
-    @MainActor
-    func handleWalletConnectError(_ error: Error) async {
-        if let authError = error as? AuthenticationError {
-            self.error = authError
-        } else {
-            self.error = AuthenticationError.unknown(error.localizedDescription)
-        }
-        self.showError = true
-        self.isLoading = false
-    }
 }

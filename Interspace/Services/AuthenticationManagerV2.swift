@@ -144,8 +144,59 @@ final class AuthenticationManagerV2: ObservableObject {
                 shopDomain: config.shopDomain
             )
             
-            // Call V2 authentication endpoint
-            let response = try await authAPI.authenticateV2(request: request)
+            // Log client timestamp before making request
+            let clientTimestamp = Date()
+            print("🕐 AuthenticationManagerV2: Client timestamp before auth: \(clientTimestamp)")
+            print("🕐 AuthenticationManagerV2: Client timestamp (Unix): \(Int(clientTimestamp.timeIntervalSince1970))")
+            
+            // Call V2 authentication endpoint with detailed error logging
+            let response: AuthResponseV2
+            do {
+                response = try await authAPI.authenticateV2(request: request)
+            } catch {
+                print("🔴 AuthenticationManagerV2: API call failed")
+                print("🔴 AuthenticationManagerV2: Error type: \(type(of: error))")
+                print("🔴 AuthenticationManagerV2: Error: \(error)")
+                
+                if let apiError = error as? APIError {
+                    switch apiError {
+                    case .decodingFailed(let decodingError):
+                        print("🔴 AuthenticationManagerV2: Decoding error details: \(decodingError)")
+                        if let decodingError = decodingError as? DecodingError {
+                            switch decodingError {
+                            case .keyNotFound(let key, let context):
+                                print("🔴 AuthenticationManagerV2: Missing key: \(key.stringValue)")
+                                print("🔴 AuthenticationManagerV2: Context: \(context.debugDescription)")
+                                print("🔴 AuthenticationManagerV2: Coding path: \(context.codingPath)")
+                            case .typeMismatch(let type, let context):
+                                print("🔴 AuthenticationManagerV2: Type mismatch: expected \(type)")
+                                print("🔴 AuthenticationManagerV2: Context: \(context.debugDescription)")
+                                print("🔴 AuthenticationManagerV2: Coding path: \(context.codingPath)")
+                            case .valueNotFound(let type, let context):
+                                print("🔴 AuthenticationManagerV2: Value not found: \(type)")
+                                print("🔴 AuthenticationManagerV2: Context: \(context.debugDescription)")
+                                print("🔴 AuthenticationManagerV2: Coding path: \(context.codingPath)")
+                            case .dataCorrupted(let context):
+                                print("🔴 AuthenticationManagerV2: Data corrupted")
+                                print("🔴 AuthenticationManagerV2: Context: \(context.debugDescription)")
+                                print("🔴 AuthenticationManagerV2: Coding path: \(context.codingPath)")
+                            @unknown default:
+                                print("🔴 AuthenticationManagerV2: Unknown decoding error")
+                            }
+                        }
+                    case .requestFailed(let underlyingError):
+                        print("🔴 AuthenticationManagerV2: Request failed with underlying error: \(underlyingError)")
+                    default:
+                        print("🔴 AuthenticationManagerV2: API Error: \(apiError)")
+                    }
+                }
+                throw error
+            }
+            
+            // Log server response time
+            let responseTime = Date()
+            print("🕐 AuthenticationManagerV2: Response received at: \(responseTime)")
+            print("🕐 AuthenticationManagerV2: Request duration: \(responseTime.timeIntervalSince(clientTimestamp)) seconds")
             
             // Process response
             await processAuthResponse(response)
@@ -184,6 +235,42 @@ final class AuthenticationManagerV2: ObservableObject {
     
     /// Process authentication response
     private func processAuthResponse(_ response: AuthResponseV2) async {
+        // Log full authentication response for debugging
+        print("🔐 AuthenticationManagerV2: ========== AUTH RESPONSE DEBUG ==========")
+        print("🔐 AuthenticationManagerV2: Account ID: \(response.account.id)")
+        print("🔐 AuthenticationManagerV2: User ID: \(response.user.id)")
+        print("🔐 AuthenticationManagerV2: Session ID: \(response.sessionId)")
+        print("🔐 AuthenticationManagerV2: Is New Account: \(response.isNewAccount)")
+        print("🔐 AuthenticationManagerV2: Token Details:")
+        print("  - Access Token Length: \(response.tokens.accessToken.count)")
+        print("  - Access Token Preview: \(String(response.tokens.accessToken.prefix(20)))...")
+        print("  - Refresh Token Length: \(response.tokens.refreshToken.count)")
+        print("  - Expires In: \(response.tokens.expiresIn ?? 900) seconds")
+        
+        // Calculate and log token expiration time
+        let expiresIn = response.tokens.expiresIn ?? 900
+        let currentTime = Date()
+        let expirationTime = currentTime.addingTimeInterval(TimeInterval(expiresIn))
+        print("🔐 AuthenticationManagerV2: Token Timeline:")
+        print("  - Current Time: \(currentTime)")
+        print("  - Expiration Time: \(expirationTime)")
+        print("  - Time Until Expiry: \(expiresIn) seconds (\(expiresIn/60) minutes)")
+        
+        // Check for suspiciously short expiration times
+        if expiresIn < 60 {
+            print("⚠️ AuthenticationManagerV2: WARNING - Token expires in less than 1 minute!")
+        }
+        
+        // Check if token expiration makes sense
+        if expiresIn <= 0 {
+            print("❌ AuthenticationManagerV2: ERROR - Token already expired! ExpiresIn: \(expiresIn)")
+        }
+        
+        // Note: Server doesn't currently return timestamp in response
+        // We can only infer clock sync issues from token behavior
+        print("🕐 AuthenticationManagerV2: Token issued at client time: \(currentTime)")
+        print("🕐 AuthenticationManagerV2: If auth fails immediately, check server clock sync")
+        
         // Save tokens
         do {
             try keychainManager.saveTokens(
@@ -191,12 +278,14 @@ final class AuthenticationManagerV2: ObservableObject {
                 refresh: response.tokens.refreshToken,
                 expiresIn: response.tokens.expiresIn ?? 900 // Default to 15 minutes
             )
+            print("✅ AuthenticationManagerV2: Tokens saved to keychain")
         } catch {
-            print("🔐 AuthenticationManagerV2: Failed to save tokens: \(error)")
+            print("❌ AuthenticationManagerV2: Failed to save tokens: \(error)")
         }
         
         // Update API service
         APIService.shared.setAccessToken(response.tokens.accessToken)
+        print("✅ AuthenticationManagerV2: Access token set in API service")
         
         // Update state
         currentAccount = response.account
@@ -208,11 +297,23 @@ final class AuthenticationManagerV2: ObservableObject {
         sessionToken = response.sessionId
         isAuthenticated = true
         
+        print("🔐 AuthenticationManagerV2: State updated:")
+        print("  - Profiles count: \(profiles.count)")
+        print("  - Active profile: \(activeProfile?.id ?? "nil")")
+        print("  - Is authenticated: \(isAuthenticated)")
+        print("🔐 AuthenticationManagerV2: ========== END AUTH RESPONSE ==========")
+        
         // Check if profile creation is required
         if let requiresProfile = response.requiresProfile, requiresProfile {
             print("🔐 AuthenticationManagerV2: Profile creation required")
             isNewUser = true
-            // iOS should show profile creation UI
+            
+            // Post notification to show profile creation UI
+            NotificationCenter.default.post(
+                name: .authenticationRequiresProfile,
+                object: nil
+            )
+            print("🔐 AuthenticationManagerV2: Posted authenticationRequiresProfile notification")
         }
         
         // Load additional data if needed
@@ -544,6 +645,15 @@ final class AuthenticationManagerV2: ObservableObject {
         // Clear tokens
         keychainManager.clearTokens()
         APIService.shared.clearAccessToken()
+        
+        // Disconnect AppKit session if connected
+        if AppKitService.shared.isConnected {
+            print("🔐 AuthenticationManagerV2: Disconnecting AppKit session")
+            try? await AppKitService.shared.disconnect()
+        }
+        
+        // Reset AppKit authentication flow state
+        AppKitService.shared.resetAuthenticationFlow()
         
         // Reset state
         currentAccount = nil
@@ -1062,5 +1172,6 @@ extension AuthenticationManagerV2 {
 
 extension Notification.Name {
     static let accountsUpdated = Notification.Name("accountsUpdated")
+    static let authenticationRequiresProfile = Notification.Name("authenticationRequiresProfile")
 }
 
