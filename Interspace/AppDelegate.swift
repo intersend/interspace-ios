@@ -1,10 +1,6 @@
 import SwiftUI
-// MetaMask SDK is now handled via WalletServiceV2 and MetaMaskService
 import GoogleSignIn
-import WalletConnectSign
 import AppAuth
-import CoinbaseWalletSDK
-// Coinbase SDK is now handled via custom deep linking
 
 
 public class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -35,7 +31,6 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
     print("📱 AppDelegate: Deferring WalletService initialization")
     _ = WalletService.shared // Just create the instance, don't initialize SDKs
     
-    // Coinbase Wallet now uses WalletConnect instead of native SDK
     
     // Configure Google Sign-In
     print("📱 AppDelegate: Configuring Google Sign-In")
@@ -75,9 +70,20 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
     print("📱 AppDelegate: Query: \(url.query ?? "none")")
     print("📱 AppDelegate: Fragment: \(url.fragment ?? "none")")
     
-    // Check for MetaMask URLs - handle multiple patterns
+    // Check for interspace:// URLs
     if url.scheme == "interspace" {
         print("📱 AppDelegate: Detected interspace:// URL")
+        
+        // Try AppKit handling first
+        print("📱 AppDelegate: Getting AppKitService for deep link handling...")
+        let appKitService = ServiceInitializer.shared.getAppKitService()
+        print("📱 AppDelegate: Attempting AppKit deep link handling...")
+        if appKitService.handleDeepLink(url) {
+            print("✅ AppDelegate: AppKit successfully handled the deep link")
+            return true
+        } else {
+            print("⚠️ AppDelegate: AppKit did not handle the deep link")
+        }
         
         // Check if this is a MetaMask callback
         if url.host == "mmsdk" || url.absoluteString.contains("metamask") || url.host == "metamask-callback" {
@@ -121,23 +127,6 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
          return true
      }
     
-    // Check for WalletConnect/Reown URLs
-    if url.scheme == "interspace" && (url.host == "walletconnect" || url.host == "wc" || url.host == "auth") {
-        print("📱 AppDelegate: Handling WalletConnect/Reown deep link")
-        // TODO: Implement Reown SDK deep link handling
-        // For now, use WalletDeepLinkGenerator for handling
-        let handled = WalletDeepLinkGenerator.shared.handleWalletReturn(url: url)
-        if handled {
-            print("📱 AppDelegate: WalletConnect/Reown callback handled successfully")
-        }
-        return true
-    }
-    
-    // Check for WalletConnect universal links
-    if url.absoluteString.contains("walletconnect") {
-        print("📱 AppDelegate: Detected WalletConnect universal link")
-        return true
-    }
     
     // Check for OAuth redirect URLs (both custom scheme variants)
     if (url.scheme == "com.interspace.ios" || url.scheme == "interspace") && url.host == "oauth2redirect" {
@@ -158,18 +147,6 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
         if let url = userActivity.webpageURL {
             print("📱 AppDelegate: Universal link URL: \(url.absoluteString)")
             
-            // Handle Coinbase Wallet universal links
-            do {
-                let handled = try CoinbaseWalletSDK.shared.handleResponse(url)
-                if handled {
-                    print("📱 AppDelegate: Successfully handled Coinbase universal link")
-                    return true
-                } else {
-                    print("📱 AppDelegate: Coinbase SDK did not handle universal link")
-                }
-            } catch {
-                print("📱 AppDelegate: Error handling Coinbase universal link: \(error)")
-            }
             
             // Handle wallet universal links (Trust, Rainbow, Phantom, etc.)
             let universalLinkDomains = [
@@ -187,33 +164,9 @@ public class AppDelegate: UIResponder, UIApplicationDelegate {
                 if url.absoluteString.contains(domain) {
                     print("📱 AppDelegate: Detected \(walletType.displayName) universal link")
                     
-                    // Check if this is a return from wallet after SIWE signing
-                    if url.absoluteString.contains("wc") || url.absoluteString.contains("walletconnect") {
-                        // This is likely a WalletConnect/Reown callback
-                        if [WalletType.trust, WalletType.family, WalletType.phantom, WalletType.zerion].contains(walletType) {
-                            ServiceInitializer.shared.appKit.handleDeeplink(url)
-                        }
-                        
-                        NotificationCenter.default.post(
-                            name: .walletConnectCallback,
-                            object: nil,
-                            userInfo: ["url": url, "walletType": walletType]
-                        )
-                        return true
-                    }
                 }
             }
             
-            // Handle generic WalletConnect universal links
-            if url.absoluteString.contains("wc") || url.absoluteString.contains("walletconnect") {
-                print("📱 AppDelegate: Handling WalletConnect universal link")
-                NotificationCenter.default.post(
-                    name: .walletConnectCallback,
-                    object: nil,
-                    userInfo: ["url": url]
-                )
-                return true
-            }
         }
         print("📱 AppDelegate: Universal link not handled")
         return false
