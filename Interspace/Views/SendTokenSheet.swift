@@ -535,7 +535,7 @@ struct SendTokenSheetBase: View {
                     Task {
                         await viewModel.executeTransaction(transaction, transactionToSign: pendingTransactionToSign)
                         if viewModel.error == nil {
-                            HapticManager.shared.notification(type: .success)
+                            HapticManager.notification(.success)
                             showTransactionComplete = true
                         }
                     }
@@ -1140,7 +1140,7 @@ struct TransactionReviewSheet: View {
                 } catch {
                     errorMessage = error.localizedDescription
                     showError = true
-                    HapticManager.shared.notification(type: .error)
+                    HapticManager.notification(.error)
                 }
             }
         } label: {

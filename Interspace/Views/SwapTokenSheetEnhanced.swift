@@ -201,12 +201,12 @@ struct SwapTokenSheetEnhanced: View {
                     transaction: transaction,
                     onApprove: {
                         try await viewModel.executeTransaction(transaction: transaction)
-                        HapticManager.shared.notification(type: .success)
+                        HapticManager.notification(.success)
                         showSuccessAnimation = true
                     },
                     onReject: {
                         pendingTransaction = nil
-                        HapticManager.shared.notification(type: .warning)
+                        HapticManager.notification(.warning)
                     }
                 )
             }
@@ -1014,7 +1014,7 @@ struct SwapReviewSheetEnhanced: View {
                 } catch {
                     errorMessage = error.localizedDescription
                     showError = true
-                    HapticManager.shared.notification(type: .error)
+                    HapticManager.notification(.error)
                 }
             }
         } label: {

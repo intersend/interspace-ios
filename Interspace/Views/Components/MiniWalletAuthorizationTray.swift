@@ -21,11 +21,6 @@ struct MiniWalletAuthorizationTray: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 60, height: 60)
-                } else if walletType == .coinbase {
-                    Image("coinbase")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 60, height: 60)
                 } else {
                     // For other wallets, use system icon with background
                     ZStack {
@@ -107,19 +102,6 @@ struct MiniWalletAuthorizationTray: View {
                 isLoading = false
                 hasInitiatedConnection = false
                 
-                // Cancel the connection
-                Task {
-                    let factory = WalletFactory.shared
-                    if let wallet = factory.wallet(for: walletType) {
-                        if walletType == .coinbase,
-                           let coinbaseService = wallet as? CoinbaseService {
-                            coinbaseService.cancelConnection()
-                        } else if walletType == .metamask,
-                                  let metamaskService = wallet as? MetaMaskService {
-                            // MetaMask doesn't have cancelConnection yet, but we can add it if needed
-                        }
-                    }
-                }
             }
         }
     }
