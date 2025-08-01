@@ -26,6 +26,10 @@ let package = Package(
         .package(
             url: "https://github.com/essentiaone/HDWallet.git",
             .upToNextMajor(from: "0.3.0")
+        ),
+        .package(
+            url: "https://github.com/lascic/UIOnboarding.git",
+            .upToNextMajor(from: "2.0.0")
         )
     ],
     targets: [
@@ -42,7 +46,8 @@ let package = Package(
                 .product(name: "Web3ContractABI", package: "web3.swift"),
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "Starscream", package: "Starscream"),
-                .product(name: "HDWalletKit", package: "HDWallet")
+                .product(name: "HDWalletKit", package: "HDWallet"),
+                .product(name: "UIOnboarding", package: "UIOnboarding")
             ]
         )
     ]

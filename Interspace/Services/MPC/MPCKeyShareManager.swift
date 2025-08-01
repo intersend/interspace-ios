@@ -1,5 +1,6 @@
 import Foundation
 import silentshardduo
+import CryptoSwift
 
 // MARK: - MPCKeyShareManager
 
@@ -271,7 +272,9 @@ final class MPCKeyShareManager {
         guard let publicKeyData = Data(hex: publicKey) else {
             return "0x0000000000000000000000000000000000000000" // Return zero address if invalid
         }
-        let hash = publicKeyData.sha3(.keccak256)
+        // Use explicit namespace to avoid ambiguity with keccak256
+        let hashBytes = CryptoSwift.SHA3(variant: .keccak256).calculate(for: [UInt8](publicKeyData))
+        let hash = Data(hashBytes)
         let address = "0x" + hash.suffix(20).hexString
         return address
     }
@@ -337,7 +340,7 @@ final class MPCWebSocketConfiguration {
         #endif
     }
     
-    var duoNodeUrl: String {
+      var duoNodeUrl: String {
         #if DEBUG
         // For local development, connect directly to sigpair
         // Note: Don't include ws:// prefix - WebsocketConfigBuilder adds it
