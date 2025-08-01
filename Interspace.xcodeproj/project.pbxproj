@@ -36,6 +36,7 @@
 		78CFC5622E0ED25600999473 /* WalletConnect in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFC5612E0ED25600999473 /* WalletConnect */; };
 		78CFC5642E0ED25600999473 /* WalletConnectVerify in Frameworks */ = {isa = PBXBuildFile; productRef = 78CFC5632E0ED25600999473 /* WalletConnectVerify */; };
 		78DA7D2E2E326F76002B75D7 /* Web3 in Frameworks */ = {isa = PBXBuildFile; productRef = 78DA7D2D2E326F76002B75D7 /* Web3 */; };
+		78E2B7D32E3AC7810057B829 /* UIOnboarding in Frameworks */ = {isa = PBXBuildFile; productRef = 78E2B7D22E3AC7810057B829 /* UIOnboarding */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -208,6 +209,7 @@
 				Wallets/WalletSessionStorage.swift,
 				WalletService.swift,
 				WalletServiceV2.swift,
+				Web3MessageHandler.swift,
 			);
 			target = 13B07F861A680F5B00A75B9A /* Interspace */;
 		};
@@ -230,7 +232,6 @@
 				AppsViewModel.swift,
 				AuthViewModel.swift,
 				ProfileViewModel.swift,
-				SpringboardStateManager.swift,
 				WalletViewModel.swift,
 			);
 			target = 13B07F861A680F5B00A75B9A /* Interspace */;
@@ -262,23 +263,20 @@
 				Components/LiquidGlass/LiquidGlassFolder.swift,
 				Components/LiquidGlass/LiquidGlassMaterial.swift,
 				Components/LiquidGlass/SquircleShape.swift,
+				Components/LiquidGlassComponents.swift,
 				Components/LiquidGlassHelpers.swift,
 				Components/LiquidGlassLoadingOverlay.swift,
+				Components/LiquidGlassTextFieldStyle.swift,
 				Components/LiquidGlassWalletScanner.swift,
 				Components/LoadingSkeletons.swift,
 				Components/MiniWalletAuthorizationTray.swift,
 				Components/NativeCodeInput.swift,
-				Components/NativeSpringboardGrid.swift,
 				Components/OAuthProviderIcon.swift,
 				Components/ProfileSelectorCard.swift,
 				Components/QRCodeScannerView.swift,
 				Components/SafariNavigationBar.swift,
 				Components/SheetAnimations.swift,
 				Components/SocialConnectionTray.swift,
-				Components/Springboard/SpringboardEditMode.swift,
-				Components/SpringboardCollectionView.swift,
-				Components/SpringboardFolderView.swift,
-				Components/SpringboardGrid.swift,
 				Components/StandardToolbarButtons.swift,
 				Components/StatefulAuthorizationTray.swift,
 				Components/UniversalAddTray.swift,
@@ -286,7 +284,6 @@
 				Components/WalletConnectionTray.swift,
 				Components/WebNavigationBar.swift,
 				Components/WebProgressBar.swift,
-				Components/WebSearchOverlay.swift,
 				Components/WebViewTransition.swift,
 				ContentView.swift,
 				DebugOverlay.swift,
@@ -364,6 +361,7 @@
 				78CFC5642E0ED25600999473 /* WalletConnectVerify in Frameworks */,
 				788B6D452E12FAB000EDAAC5 /* duo_schnorr in Frameworks */,
 				789CF20B2E20116C00CDBD72 /* ReownAppKitUI in Frameworks */,
+				78E2B7D32E3AC7810057B829 /* UIOnboarding in Frameworks */,
 				789CF0892E20101000CDBD72 /* ReownAppKit in Frameworks */,
 				78CFAD002E0DEBD900999473 /* WalletConnect in Frameworks */,
 				789CF8FD2E20145500CDBD72 /* ReownAppKit in Frameworks */,
@@ -2248,6 +2246,7 @@
 				788B6D3D2E12FA5100EDAAC5 /* XCRemoteSwiftPackageReference "silentshard-artifacts" */,
 				78950C242E317476006CF6E6 /* XCRemoteSwiftPackageReference "swift-crypto" */,
 				78DA7B9B2E326E4F002B75D7 /* XCRemoteSwiftPackageReference "Web3" */,
+				78E2B7D12E3AC7090057B829 /* XCRemoteSwiftPackageReference "UIOnboarding" */,
 			);
 			preferredProjectObjectVersion = 46;
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
@@ -2766,6 +2765,14 @@
 				minimumVersion = 0.8.8;
 			};
 		};
+		78E2B7D12E3AC7090057B829 /* XCRemoteSwiftPackageReference "UIOnboarding" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/lascic/UIOnboarding";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.5;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -2872,6 +2879,11 @@
 		78DA7D2D2E326F76002B75D7 /* Web3 */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Web3;
+		};
+		78E2B7D22E3AC7810057B829 /* UIOnboarding */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 78E2B7D12E3AC7090057B829 /* XCRemoteSwiftPackageReference "UIOnboarding" */;
+			productName = UIOnboarding;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

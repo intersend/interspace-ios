@@ -120,7 +120,7 @@ class PreflightCheckManager {
     @MainActor
     private func checkWalletAvailability(_ walletType: WalletType) async -> PreflightIssue? {
         // Skip checks for always-available wallets
-        if [.google, .apple, .mpc, .walletConnect].contains(walletType) {
+        if [.google, .apple, .mpc].contains(walletType) {
             return nil
         }
         

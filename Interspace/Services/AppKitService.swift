@@ -614,7 +614,6 @@ final class AppKitService: ObservableObject {
                 print("✅ AppKitService: Session settled!")
                 print("  - Topic: \(session.topic)")
                 print("  - Peer: \(session.peer.name)")
-                print("  - Peer metadata: \(session.peer.metadata)")
                 print("  - Namespaces: \(session.namespaces.keys.joined(separator: ", "))")
                 
                 // Store session for metadata access
@@ -942,8 +941,8 @@ final class AppKitService: ObservableObject {
                 walletName = session.peer.name
                 
                 // Extract icon URL from peer metadata
-                if let icons = session.peer.metadata?.icons, !icons.isEmpty {
-                    walletIcon = icons.first
+                if !session.peer.icons.isEmpty {
+                    walletIcon = session.peer.icons.first
                 }
                 
                 walletMetadata = [
@@ -1131,3 +1130,4 @@ extension AnyCodable {
         return nil
     }
 }
+

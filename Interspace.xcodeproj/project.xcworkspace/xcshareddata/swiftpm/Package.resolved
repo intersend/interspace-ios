@@ -1,5 +1,5 @@
 {
-  "originHash" : "d3f3f148dca4f9ccbd9829b5c1d27e072e841b07a795cae26afe92f4a3843a9e",
+  "originHash" : "a4aa8206f623c4bdc82e3bbaac1bbbfad7847ca3f90cdea36f7fbf3d7c9c971b",
   "pins" : [
     {
       "identity" : "app-check",
@@ -332,6 +332,24 @@
       "state" : {
         "revision" : "5596407d1cf61b953b8e658fa8636a471df3c509",
         "version" : "1.1.6"
+      }
+    },
+    {
+      "identity" : "uionboarding",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/lascic/UIOnboarding",
+      "state" : {
+        "revision" : "52b656c820cdb26e40a261bb2e79e60f847410de",
+        "version" : "2.0.5"
+      }
+    },
+    {
+      "identity" : "wallet-mobile-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/MobileWalletProtocol/wallet-mobile-sdk.git",
+      "state" : {
+        "revision" : "4293df51d3500b8e876ca4bf0d7548adf097569a",
+        "version" : "1.1.2"
       }
     },
     {

@@ -47,19 +47,33 @@ struct interspace_iosApp: App {
                     print("📱 SwiftUI App: URL scheme: \(url.scheme ?? "none")")
                     print("📱 SwiftUI App: URL host: \(url.host ?? "none")")
                     
-                    // Handle MetaMask URLs
-                    if url.scheme == "interspace" && (url.host == "mmsdk" || url.host == "metamask-callback") {
-                        print("📱 SwiftUI App: Detected MetaMask callback URL")
-                        Task { @MainActor in
-                            let handled = WalletServiceV2.shared.handleDeepLink(url)
-                            print("📱 SwiftUI App: MetaMask deep link handled: \(handled)")
+                    // Handle AppKit URLs first
+                    if url.scheme == "interspace" {
+                        print("📱 SwiftUI App: Processing interspace:// URL")
+                        
+                        // Try AppKit handling first
+                        print("📱 SwiftUI App: Getting AppKitService...")
+                        let appKitService = ServiceInitializer.shared.getAppKitService()
+                        print("📱 SwiftUI App: Attempting AppKit deep link handling...")
+                        if appKitService.handleDeepLink(url) {
+                            print("✅ SwiftUI App: AppKit successfully handled the deep link")
+                            return
+                        } else {
+                            print("⚠️ SwiftUI App: AppKit did not handle the deep link")
                         }
-                    }
-                    // Handle WalletConnect/Reown URLs
-                    else if url.scheme == "interspace" && (url.host == "walletconnect" || url.host == "wc" || url.host == "auth") {
-                        print("📱 SwiftUI App: Detected WalletConnect/Reown callback URL")
-                        ServiceInitializer.shared.appKit.handleDeeplink(url)
-                        print("📱 SwiftUI App: AppKit handled deeplink")
+                        
+                        // Handle MetaMask URLs
+                        if url.host == "mmsdk" || url.host == "metamask-callback" {
+                            print("📱 SwiftUI App: Detected MetaMask callback URL")
+                            Task { @MainActor in
+                                let handled = WalletServiceV2.shared.handleDeepLink(url)
+                                print("📱 SwiftUI App: MetaMask deep link handled: \(handled)")
+                            }
+                        } else {
+                            print("⚠️ SwiftUI App: Unknown interspace:// URL host: \(url.host ?? "nil")")
+                        }
+                    } else {
+                        print("⚠️ SwiftUI App: Non-interspace URL scheme: \(url.scheme ?? "nil")")
                     }
                 }
             }
