@@ -17,7 +17,24 @@ struct WalletViewRedesigned: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var expandedTokenId: String?
     @State private var refreshControlHeight: CGFloat = 0
+    @State private var selectedCategory: WalletCategory = .assets
+    @State private var isCategorySwitching = false
+    @State private var categoryScrollPositions: [WalletCategory: CGFloat] = [:]
     @Environment(\.colorScheme) var colorScheme
+    
+    enum WalletCategory: String, CaseIterable {
+        case assets = "Assets"
+        case nfts = "NFTs"
+        case transactions = "Activity"
+        
+        var icon: String {
+            switch self {
+            case .assets: return "bitcoinsign.circle"
+            case .nfts: return "photo.fill"
+            case .transactions: return "clock.arrow.circlepath"
+            }
+        }
+    }
     
     var body: some View {
         ScrollView {
@@ -44,40 +61,31 @@ struct WalletViewRedesigned: View {
                             .padding(.top, WalletDesign.Spacing.regular)
                     }
                     
-                    // Search Bar (appears on scroll)
-                    if isSearching {
+                    // Category Pills
+                    if let balance = viewModel.unifiedBalance {
+                        categoriesSection
+                            .padding(.top, WalletDesign.Spacing.regular)
+                            .padding(.bottom, WalletDesign.Spacing.regular)
+                    }
+                    
+                    // Search Bar (appears on scroll or when searching)
+                    if isSearching || !searchText.isEmpty {
                         SearchBar(text: $searchText)
                             .padding(.horizontal, WalletDesign.Spacing.regular)
                             .padding(.vertical, WalletDesign.Spacing.tight)
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     
-                    // Content Sections
+                    // Content Area with smooth transitions
                     if let balance = viewModel.unifiedBalance {
-                        // Tokens Section
-                        EnhancedTokenSection(
-                            tokens: filteredTokens(balance.unifiedBalance.tokens),
-                            expandedTokenId: $expandedTokenId,
-                            onTokenTap: { token in
-                                selectedToken = token
-                                HapticManager.impact(.light)
-                            },
-                            onSendToken: { token in
-                                selectedToken = token
-                                showSendSheet = true
+                        ZStack {
+                            if isCategorySwitching {
+                                categoryLoadingView
+                            } else {
+                                categoryContentView(balance: balance)
                             }
-                        )
-                        
-                        // NFT Gallery
-                        NFTGalleryView(
-                            nfts: viewModel.nftData?.nfts ?? [],
-                            isLoading: viewModel.isLoadingNFTs
-                        )
-                        
-                        // Recent Transactions
-                        RecentTransactionsSection(
-                            onSeeAll: { showTransactionHistory = true }
-                        )
+                        }
+                        .animation(.easeInOut(duration: 0.3), value: isCategorySwitching)
                     }
                     
                     // Bottom padding
@@ -144,6 +152,179 @@ struct WalletViewRedesigned: View {
         }
     }
     
+    // MARK: - Categories Section
+    private var categoriesSection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(WalletCategory.allCases, id: \.self) { category in
+                    WalletCategoryPill(
+                        category: category,
+                        isSelected: selectedCategory == category,
+                        count: getCategoryCount(for: category)
+                    ) {
+                        Task { await switchToCategory(category) }
+                    }
+                }
+            }
+            .padding(.horizontal, WalletDesign.Spacing.regular)
+        }
+    }
+    
+    // MARK: - Category Content View
+    @ViewBuilder
+    private func categoryContentView(balance: UnifiedBalance) -> some View {
+        switch selectedCategory {
+        case .assets:
+            if filteredTokens(balance.unifiedBalance.tokens).isEmpty {
+                emptyStateView(
+                    icon: "bitcoinsign.circle",
+                    title: "No Assets Yet",
+                    message: "Your tokens will appear here once you receive them"
+                )
+            } else {
+                EnhancedTokenSection(
+                    tokens: filteredTokens(balance.unifiedBalance.tokens),
+                    expandedTokenId: $expandedTokenId,
+                    onTokenTap: { token in
+                        selectedToken = token
+                        HapticManager.impact(.light)
+                    },
+                    onSendToken: { token in
+                        selectedToken = token
+                        showSendSheet = true
+                    }
+                )
+                .padding(.top, WalletDesign.Spacing.regular)
+            }
+            
+        case .nfts:
+            if (viewModel.nftData?.nfts ?? []).isEmpty && !viewModel.isLoadingNFTs {
+                emptyStateView(
+                    icon: "photo.fill",
+                    title: "No NFTs Yet",
+                    message: "Your NFT collection will appear here"
+                )
+            } else {
+                NFTGalleryView(
+                    nfts: viewModel.nftData?.nfts ?? [],
+                    isLoading: viewModel.isLoadingNFTs
+                )
+                .padding(.top, WalletDesign.Spacing.regular)
+            }
+            
+        case .transactions:
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Recent Activity")
+                        .font(WalletDesign.Typography.sectionHeader)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, WalletDesign.Spacing.regular)
+                .padding(.top, WalletDesign.Spacing.regular)
+                .padding(.bottom, WalletDesign.Spacing.tight)
+                
+                // Check if there are transactions
+                if false { // Replace with actual transaction check when available
+                    emptyStateView(
+                        icon: "clock.arrow.circlepath",
+                        title: "No Activity Yet",
+                        message: "Your transaction history will appear here"
+                    )
+                } else {
+                    // Full transaction list
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<10, id: \.self) { index in
+                            TransactionCell(isLast: index == 9)
+                        }
+                    }
+                    .walletCard()
+                    .padding(.horizontal, WalletDesign.Spacing.regular)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Category Loading View
+    @ViewBuilder
+    private var categoryLoadingView: some View {
+        switch selectedCategory {
+        case .assets:
+            TokenSkeletonSection()
+                .padding(.top, WalletDesign.Spacing.regular)
+            
+        case .nfts:
+            NFTSkeletonSection()
+                .padding(.top, WalletDesign.Spacing.regular)
+            
+        case .transactions:
+            TransactionSkeletonSection()
+                .padding(.top, WalletDesign.Spacing.regular)
+        }
+    }
+    
+    // MARK: - Empty State View
+    private func emptyStateView(icon: String, title: String, message: String) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: icon)
+                .font(.system(size: 56))
+                .foregroundColor(Color(UIColor.systemGray3))
+            
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Text(message)
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 80)
+        .padding(.bottom, 100)
+    }
+    
+    // MARK: - Helper Methods
+    private func switchToCategory(_ category: WalletCategory) async {
+        // Start transition
+        withAnimation(.easeInOut(duration: 0.15)) {
+            isCategorySwitching = true
+        }
+        
+        // Haptic feedback
+        HapticManager.selection()
+        
+        // Update selection with animation
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            selectedCategory = category
+        }
+        
+        // Small delay to show loading smoothly
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+        
+        // End transition
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isCategorySwitching = false
+        }
+    }
+    
+    private func getCategoryCount(for category: WalletCategory) -> Int? {
+        guard let balance = viewModel.unifiedBalance else { return nil }
+        
+        switch category {
+        case .assets:
+            return balance.unifiedBalance.tokens.count
+        case .nfts:
+            return viewModel.nftData?.nfts.count ?? 0
+        case .transactions:
+            return nil // Could show transaction count if available
+        }
+    }
+    
     private func filteredTokens(_ tokens: [UnifiedBalance.TokenBalance]) -> [UnifiedBalance.TokenBalance] {
         if searchText.isEmpty {
             return tokens
@@ -166,28 +347,16 @@ struct BalanceDisplaySection: View {
     
     var body: some View {
         VStack(spacing: WalletDesign.Spacing.regular) {
-            // Balance
-            VStack(spacing: WalletDesign.Spacing.micro) {
-                Text(displayBalance.formatAsBalance())
-                    .font(WalletDesign.Typography.balanceDisplay)
-                    .foregroundColor(.primary)
-                    .onAppear {
-                        withAnimation(WalletDesign.Animation.numberTransition) {
-                            displayBalance = Double(balance.unifiedBalance.totalUsdValue) ?? 0
-                        }
+            // Balance - Made larger
+            Text(displayBalance.formatAsBalance())
+                .font(.system(size: 72, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(.primary)
+                .onAppear {
+                    withAnimation(WalletDesign.Animation.numberTransition) {
+                        displayBalance = Double(balance.unifiedBalance.totalUsdValue) ?? 0
                     }
-                
-                // Change Indicator
-                HStack(spacing: WalletDesign.Spacing.micro) {
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 14, weight: .medium))
-                    Text("+$1,234.56")
-                        .font(WalletDesign.Typography.balanceChange)
-                    Text("(+2.4%)")
-                        .font(WalletDesign.Typography.balanceChange)
                 }
-                .foregroundColor(WalletDesign.Colors.positiveChange)
-            }
             
             // Action Buttons - Apple Style
             HStack(spacing: 12) {
@@ -670,6 +839,260 @@ struct SimpleTokenLogo: View {
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundColor(Color(UIColor.label))
             )
+    }
+}
+
+// MARK: - Wallet Category Pill
+struct WalletCategoryPill: View {
+    let category: WalletViewRedesigned.WalletCategory
+    let isSelected: Bool
+    let count: Int?
+    let action: () -> Void
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                // Icon
+                Image(systemName: category.icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(isSelected ? .black : .white)
+                
+                // Name
+                Text(category.rawValue)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(isSelected ? .black : .white)
+                
+                // Count badge
+                if let count = count {
+                    Text("\(count)")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(isSelected ? .black.opacity(0.6) : .white.opacity(0.7))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
+                        )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                ZStack {
+                    if isSelected {
+                        Capsule()
+                            .fill(Color.white)
+                    } else {
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .environment(\.colorScheme, .dark)
+                    }
+                }
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.gray.opacity(0.3), lineWidth: isSelected ? 0 : 0.5)
+            )
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
+// MARK: - Skeleton Views
+struct TokenSkeletonSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Section header skeleton
+            HStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(UIColor.systemGray5))
+                    .frame(width: 80, height: 24)
+                    .shimmerEffect(isLoading: true)
+                
+                Spacer()
+                
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(UIColor.systemGray6))
+                    .frame(width: 30, height: 20)
+                    .shimmerEffect(isLoading: true)
+            }
+            .padding(.horizontal, WalletDesign.Spacing.regular)
+            .padding(.bottom, WalletDesign.Spacing.tight)
+            
+            // Token items skeleton
+            VStack(spacing: 0) {
+                ForEach(0..<4, id: \.self) { index in
+                    HStack(spacing: 16) {
+                        // Token icon
+                        Circle()
+                            .fill(Color(UIColor.systemGray5))
+                            .frame(width: 40, height: 40)
+                            .shimmerEffect(isLoading: true)
+                        
+                        // Token info
+                        VStack(alignment: .leading, spacing: 4) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(UIColor.systemGray5))
+                                .frame(width: 60, height: 18)
+                                .shimmerEffect(isLoading: true)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(UIColor.systemGray6))
+                                .frame(width: 100, height: 14)
+                                .shimmerEffect(isLoading: true)
+                        }
+                        
+                        Spacer()
+                        
+                        // Balance
+                        VStack(alignment: .trailing, spacing: 4) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(UIColor.systemGray5))
+                                .frame(width: 80, height: 18)
+                                .shimmerEffect(isLoading: true)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(UIColor.systemGray6))
+                                .frame(width: 60, height: 14)
+                                .shimmerEffect(isLoading: true)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    
+                    if index < 3 {
+                        Divider()
+                            .padding(.leading, 56)
+                    }
+                }
+            }
+            .background(Color(UIColor.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.horizontal, WalletDesign.Spacing.regular)
+        }
+    }
+}
+
+struct NFTSkeletonSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Section header skeleton
+            HStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(UIColor.systemGray5))
+                    .frame(width: 60, height: 24)
+                    .shimmerEffect(isLoading: true)
+                
+                Spacer()
+                
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(UIColor.systemGray6))
+                    .frame(width: 60, height: 20)
+                    .shimmerEffect(isLoading: true)
+            }
+            .padding(.horizontal, WalletDesign.Spacing.regular)
+            .padding(.bottom, WalletDesign.Spacing.regular)
+            
+            // NFT grid skeleton
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ], spacing: 12) {
+                ForEach(0..<4, id: \.self) { _ in
+                    VStack(spacing: 8) {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(UIColor.systemGray5))
+                            .aspectRatio(1, contentMode: .fit)
+                            .shimmerEffect(isLoading: true)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(UIColor.systemGray5))
+                                .frame(height: 14)
+                                .shimmerEffect(isLoading: true)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(UIColor.systemGray6))
+                                .frame(width: 40, height: 12)
+                                .shimmerEffect(isLoading: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .padding(.horizontal, WalletDesign.Spacing.regular)
+        }
+    }
+}
+
+struct TransactionSkeletonSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Section header skeleton
+            HStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(UIColor.systemGray5))
+                    .frame(width: 140, height: 24)
+                    .shimmerEffect(isLoading: true)
+                
+                Spacer()
+            }
+            .padding(.horizontal, WalletDesign.Spacing.regular)
+            .padding(.bottom, WalletDesign.Spacing.tight)
+            
+            // Transaction items skeleton
+            VStack(spacing: 0) {
+                ForEach(0..<5, id: \.self) { index in
+                    HStack(spacing: WalletDesign.Spacing.regular) {
+                        // Transaction icon
+                        Circle()
+                            .fill(Color(UIColor.systemGray5))
+                            .frame(width: WalletDesign.Sizing.transactionIcon, height: WalletDesign.Sizing.transactionIcon)
+                            .shimmerEffect(isLoading: true)
+                        
+                        // Transaction info
+                        VStack(alignment: .leading, spacing: 2) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(UIColor.systemGray5))
+                                .frame(width: 100, height: 18)
+                                .shimmerEffect(isLoading: true)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(UIColor.systemGray6))
+                                .frame(width: 80, height: 14)
+                                .shimmerEffect(isLoading: true)
+                        }
+                        
+                        Spacer()
+                        
+                        // Amount
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(UIColor.systemGray5))
+                            .frame(width: 80, height: 18)
+                            .shimmerEffect(isLoading: true)
+                    }
+                    .padding(.horizontal, WalletDesign.Spacing.regular)
+                    .padding(.vertical, WalletDesign.Spacing.regular)
+                    
+                    if index < 4 {
+                        Divider()
+                            .padding(.leading, WalletDesign.Sizing.transactionIcon + WalletDesign.Spacing.regular)
+                    }
+                }
+            }
+            .walletCard()
+            .padding(.horizontal, WalletDesign.Spacing.regular)
+        }
     }
 }
 

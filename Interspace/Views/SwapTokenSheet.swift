@@ -174,12 +174,12 @@ struct SwapTokenSheetBase: View {
                     transaction: transaction,
                     onApprove: {
                         try await viewModel.executeTransaction(transaction: transaction)
-                        HapticManager.shared.notification(type: .success)
+                        HapticManager.notification(.success)
                         dismiss()
                     },
                     onReject: {
                         pendingTransaction = nil
-                        HapticManager.shared.notification(type: .warning)
+                        HapticManager.notification(.warning)
                     }
                 )
             }
@@ -1080,7 +1080,7 @@ struct SwapReviewSheet: View {
                 } catch {
                     errorMessage = error.localizedDescription
                     showError = true
-                    HapticManager.shared.notification(type: .error)
+                    HapticManager.notification(.error)
                 }
             }
         } label: {

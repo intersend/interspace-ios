@@ -171,8 +171,8 @@ struct NFTGridPreview: View {
     let onItemTap: (NFTItem) -> Void
     
     let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
+        GridItem(.flexible(minimum: 150)),
+        GridItem(.flexible(minimum: 150))
     ]
     
     var body: some View {
@@ -299,9 +299,9 @@ struct NFTFullGalleryView: View {
     @Environment(\.dismiss) var dismiss
     
     let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
+        GridItem(.flexible(minimum: 100)),
+        GridItem(.flexible(minimum: 100)),
+        GridItem(.flexible(minimum: 100))
     ]
     
     var filteredNFTs: [NFTItem] {
