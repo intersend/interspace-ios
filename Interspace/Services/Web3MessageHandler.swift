@@ -122,7 +122,7 @@ final class Web3MessageHandler: NSObject, WKScriptMessageHandler {
     }
     
     private func handleGetInitialState(body: [String: Any]) async {
-        guard let profile = profileViewModel.profile else {
+        guard let profile = profileViewModel.activeProfile else {
             sendResponse(Web3Response(
                 type: .initialState,
                 id: 0,
@@ -198,7 +198,7 @@ final class Web3MessageHandler: NSObject, WKScriptMessageHandler {
     // MARK: - Web3 Method Handlers
     
     private func handleEthAccounts(id: Int) async {
-        guard let profile = profileViewModel.profile else {
+        guard let profile = profileViewModel.activeProfile else {
             sendResponse(Web3Response(
                 type: .web3Response,
                 id: id,
@@ -236,7 +236,7 @@ final class Web3MessageHandler: NSObject, WKScriptMessageHandler {
     }
     
     private func handleEthSendTransaction(id: Int, params: [Any]) async {
-        guard let profile = profileViewModel.profile,
+        guard let profile = profileViewModel.activeProfile,
               let txParams = params.first as? [String: Any] else {
             sendResponse(Web3Response(
                 type: .web3Response,
@@ -283,7 +283,7 @@ final class Web3MessageHandler: NSObject, WKScriptMessageHandler {
     }
     
     private func handleEthSign(id: Int, params: [Any]) async {
-        guard let profile = profileViewModel.profile,
+        guard let profile = profileViewModel.activeProfile,
               params.count >= 2,
               let address = params[0] as? String,
               let message = params[1] as? String else {

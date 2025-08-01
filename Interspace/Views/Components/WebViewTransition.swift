@@ -1,11 +1,18 @@
 import SwiftUI
 
 // MARK: - Web View Transition
+/// Safari-style transition for opening web views from app icons
 struct WebViewTransition: ViewModifier {
     let isPresented: Bool
     let sourceFrame: CGRect
     
     @State private var animationProgress: Double = 0
+    @State private var cornerRadiusProgress: Double = 0
+    @State private var shadowProgress: Double = 0
+    
+    // Safari-matched timing with performance optimization
+    private let openDuration: Double = 0.45
+    private let closeDuration: Double = 0.25
     
     func body(content: Content) -> some View {
         GeometryReader { geometry in
@@ -13,38 +20,134 @@ struct WebViewTransition: ViewModifier {
                 .scaleEffect(scaleValue(for: geometry))
                 .offset(offsetValue(for: geometry))
                 .opacity(opacityValue)
-                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: animationProgress)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: cornerRadius(for: geometry),
+                        style: .continuous
+                    )
+                )
+                .shadow(
+                    color: Color.black.opacity(shadowOpacity),
+                    radius: shadowRadius,
+                    x: 0,
+                    y: shadowOffset
+                )
+                .animation(
+                    isPresented ?
+                    .spring(response: openDuration * 0.9, dampingFraction: 0.82) :
+                    .spring(response: closeDuration * 0.9, dampingFraction: 0.88),
+                    value: animationProgress
+                )
         }
         .onAppear {
             if isPresented {
+                withAnimation(.easeOut(duration: 0.1)) {
+                    shadowProgress = 1
+                }
                 animationProgress = 1
+                withAnimation(.easeInOut(duration: openDuration * 0.7).delay(openDuration * 0.3)) {
+                    cornerRadiusProgress = 1
+                }
             }
         }
         .onChange(of: isPresented) { newValue in
-            animationProgress = newValue ? 1 : 0
+            if newValue {
+                withAnimation(.easeOut(duration: 0.1)) {
+                    shadowProgress = 1
+                }
+                animationProgress = 1
+                withAnimation(.easeInOut(duration: openDuration * 0.7).delay(openDuration * 0.3)) {
+                    cornerRadiusProgress = 1
+                }
+            } else {
+                withAnimation(.easeIn(duration: 0.1)) {
+                    shadowProgress = 0
+                }
+                withAnimation(.easeInOut(duration: closeDuration * 0.5)) {
+                    cornerRadiusProgress = 0
+                }
+                animationProgress = 0
+            }
         }
     }
     
     private func scaleValue(for geometry: GeometryProxy) -> CGFloat {
-        let startScale = min(sourceFrame.width / geometry.size.width, 
-                             sourceFrame.height / geometry.size.height)
-        return animationProgress == 0 ? startScale : 1.0
+        // Safari uses icon size as starting point with slight overshoot
+        let iconScale = sourceFrame.width / geometry.size.width
+        let progress = animationProgress
+        
+        if progress == 0 {
+            return iconScale
+        } else if progress < 0.7 {
+            // Slight overshoot effect
+            let overshoot = 1.02
+            let t = progress / 0.7
+            return iconScale + (overshoot - iconScale) * easeOutCubic(t)
+        } else {
+            // Settle to final size
+            let t = (progress - 0.7) / 0.3
+            return 1.02 - 0.02 * easeInOutCubic(t)
+        }
     }
     
     private func offsetValue(for geometry: GeometryProxy) -> CGSize {
         guard animationProgress < 1 else { return .zero }
         
+        // Calculate center offset with easing
         let centerX = sourceFrame.midX - geometry.size.width / 2
         let centerY = sourceFrame.midY - geometry.size.height / 2
         
+        // Use cubic easing for smooth motion
+        let easedProgress = easeInOutCubic(animationProgress)
+        
         return CGSize(
-            width: centerX * (1 - animationProgress),
-            height: centerY * (1 - animationProgress)
+            width: centerX * (1 - easedProgress),
+            height: centerY * (1 - easedProgress)
         )
     }
     
     private var opacityValue: Double {
-        return animationProgress
+        // Fade in quickly at the start
+        if animationProgress < 0.3 {
+            return animationProgress / 0.3
+        }
+        return 1.0
+    }
+    
+    private func cornerRadius(for geometry: GeometryProxy) -> CGFloat {
+        // Match app icon corner radius to browser corner radius
+        let iconRadius = sourceFrame.width * 0.225 // iOS app icon radius
+        let browserRadius: CGFloat = 0 // Full screen browser
+        
+        return iconRadius + (browserRadius - iconRadius) * cornerRadiusProgress
+    }
+    
+    private var shadowOpacity: Double {
+        return 0.3 * shadowProgress
+    }
+    
+    private var shadowRadius: CGFloat {
+        return 20 * shadowProgress
+    }
+    
+    private var shadowOffset: CGFloat {
+        return 10 * shadowProgress
+    }
+    
+    // MARK: - Easing Functions
+    
+    private func easeOutCubic(_ t: Double) -> Double {
+        let t1 = t - 1
+        return t1 * t1 * t1 + 1
+    }
+    
+    private func easeInOutCubic(_ t: Double) -> Double {
+        if t < 0.5 {
+            return 4 * t * t * t
+        } else {
+            let t1 = 2 * t - 2
+            return 1 + t1 * t1 * t1 / 2
+        }
     }
 }
 

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web3 Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .test-button {
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px 0;
+            display: block;
+            width: 100%;
+        }
+        .test-button:active {
+            opacity: 0.8;
+        }
+        .result {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: rgba(52, 199, 89, 0.2);
+            color: #34C759;
+        }
+        .error {
+            background-color: rgba(255, 59, 48, 0.2);
+            color: #FF3B30;
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 20px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Web3 Injection Test</h1>
+        
+        <div id="status" class="status">
+            Checking Web3 injection...
+        </div>
+        
+        <h2>Test Functions</h2>
+        
+        <button class="test-button" onclick="testEthereumObject()">
+            Test window.ethereum Object
+        </button>
+        
+        <button class="test-button" onclick="testRequestAccounts()">
+            Request Accounts
+        </button>
+        
+        <button class="test-button" onclick="testChainId()">
+            Get Chain ID
+        </button>
+        
+        <button class="test-button" onclick="testSignMessage()">
+            Sign Test Message
+        </button>
+        
+        <button class="test-button" onclick="testSendTransaction()">
+            Send Test Transaction
+        </button>
+        
+        <h2>Results</h2>
+        <div id="results"></div>
+    </div>
+    
+    <script>
+        // Check if Web3 is injected
+        function checkWeb3Injection() {
+            const statusEl = document.getElementById('status');
+            
+            if (typeof window.ethereum !== 'undefined') {
+                statusEl.className = 'status success';
+                statusEl.textContent = '✅ Web3 successfully injected! window.ethereum is available.';
+                addResult('Web3 Provider', 'Detected: ' + (window.ethereum.isInterspace ? 'Interspace Wallet' : 'Unknown'));
+            } else {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ Web3 not detected. window.ethereum is undefined.';
+                
+                // Try again after a delay
+                setTimeout(checkWeb3Injection, 1000);
+            }
+        }
+        
+        function addResult(test, result, isError = false) {
+            const resultsEl = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result';
+            resultDiv.style.borderLeft = isError ? '3px solid #FF3B30' : '3px solid #34C759';
+            resultDiv.innerHTML = `<strong>${test}:</strong><br>${result}`;
+            resultsEl.insertBefore(resultDiv, resultsEl.firstChild);
+        }
+        
+        async function testEthereumObject() {
+            try {
+                if (!window.ethereum) {
+                    throw new Error('window.ethereum not found');
+                }
+                
+                const properties = [
+                    'isConnected',
+                    'isInterspace',
+                    'request',
+                    'on',
+                    'removeListener'
+                ];
+                
+                const found = properties.filter(prop => prop in window.ethereum);
+                addResult('Ethereum Object', `Properties found: ${found.join(', ')}`);
+            } catch (error) {
+                addResult('Ethereum Object', error.message, true);
+            }
+        }
+        
+        async function testRequestAccounts() {
+            try {
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                addResult('Request Accounts', `Accounts: ${accounts.join(', ')}`);
+            } catch (error) {
+                addResult('Request Accounts', error.message, true);
+            }
+        }
+        
+        async function testChainId() {
+            try {
+                const chainId = await window.ethereum.request({ 
+                    method: 'eth_chainId' 
+                });
+                addResult('Chain ID', `Current chain: ${chainId} (${parseInt(chainId, 16)})`);
+            } catch (error) {
+                addResult('Chain ID', error.message, true);
+            }
+        }
+        
+        async function testSignMessage() {
+            try {
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_accounts' 
+                });
+                
+                if (accounts.length === 0) {
+                    throw new Error('No accounts connected');
+                }
+                
+                const message = 'Hello from Interspace Web3 Test!';
+                const signature = await window.ethereum.request({
+                    method: 'personal_sign',
+                    params: [message, accounts[0]]
+                });
+                
+                addResult('Sign Message', `Signature: ${signature.substring(0, 20)}...`);
+            } catch (error) {
+                addResult('Sign Message', error.message, true);
+            }
+        }
+        
+        async function testSendTransaction() {
+            try {
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_accounts' 
+                });
+                
+                if (accounts.length === 0) {
+                    throw new Error('No accounts connected');
+                }
+                
+                // Test transaction (0 ETH to self)
+                const txParams = {
+                    from: accounts[0],
+                    to: accounts[0],
+                    value: '0x0',
+                    data: '0x'
+                };
+                
+                addResult('Send Transaction', 'Transaction dialog should appear...');
+                
+                const txHash = await window.ethereum.request({
+                    method: 'eth_sendTransaction',
+                    params: [txParams]
+                });
+                
+                addResult('Send Transaction', `TX Hash: ${txHash}`);
+            } catch (error) {
+                addResult('Send Transaction', error.message, true);
+            }
+        }
+        
+        // Listen for Web3 events
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                addResult('Event: accountsChanged', `New accounts: ${accounts.join(', ')}`);
+            });
+            
+            window.ethereum.on('chainChanged', (chainId) => {
+                addResult('Event: chainChanged', `New chain: ${chainId}`);
+            });
+        }
+        
+        // Check injection on load
+        window.addEventListener('load', () => {
+            checkWeb3Injection();
+        });
+        
+        // Also check immediately
+        checkWeb3Injection();
+    </script>
+</body>
+</html>
