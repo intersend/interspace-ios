@@ -282,8 +282,15 @@ class APIService {
             do {
                 #if DEBUG
                 print("🌐 APIService: Attempting to decode response of type: \(T.self)")
-                if let responseString = String(data: data, encoding: .utf8) {
+                if !["ProfilesResponse", "BalanceResponse", "NFTResponse"].contains(String(describing: T.self)),
+                   let responseString = String(data: data, encoding: .utf8) {
                     print("🌐 APIService: Raw response: \(responseString)")
+                }
+                
+                // Always log raw response for AuthResponseV2 to debug authentication issues
+                if String(describing: T.self) == "AuthResponseV2",
+                   let responseString = String(data: data, encoding: .utf8) {
+                    print("🔐 APIService: AuthResponseV2 raw response: \(responseString)")
                 }
                 #endif
                 
@@ -354,3 +361,4 @@ struct APIErrorResponse: Codable {
 struct EmptyResponse: Codable {
     init() {}
 }
+

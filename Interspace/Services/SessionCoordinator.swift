@@ -245,11 +245,9 @@ final class SessionCoordinator: ObservableObject {
                     self.sessionState = biometricLockEnabled ? .locked : .authenticated
                     self.cacheProfile(firstProfile)
                 } else if profiles.isEmpty {
-                    // No cached profiles - automatically create a default profile
-                    print("🔐 SessionCoordinator: No cached profiles found, creating default profile")
-                    Task {
-                        await self.ensureActiveProfile()
-                    }
+                    // No cached profiles - set state to needsProfile for new users
+                    print("🔐 SessionCoordinator: No cached profiles found, user needs to create profile")
+                    sessionState = .needsProfile
                 }
             }
             
@@ -358,56 +356,11 @@ final class SessionCoordinator: ObservableObject {
             if profiles.isEmpty {
                 print("🔐 SessionCoordinator: New user detected - no profiles exist")
                 print("🔐 SessionCoordinator: User email: \(user.email ?? "none")")
+                print("🔐 SessionCoordinator: Setting state to needsProfile to show profile creation UI")
                 
-                // Automatically create a default profile for new users
-                print("🔐 SessionCoordinator: Automatically creating default profile for new user")
-                
-                do {
-                    let newProfile = try await profileAPI.createProfile(
-                        name: "Main"
-                    )
-                    
-                    print("🔐 SessionCoordinator: Default profile created successfully - ID: \(newProfile.id)")
-                    
-                    // If it's a development wallet, store the clientShare locally
-                    if let clientShare = newProfile.clientShare {
-                        try? KeychainManager.shared.saveDevelopmentClientShare(
-                            clientShare: clientShare,
-                            profileId: newProfile.id
-                        )
-                    }
-                    
-                    // Set as active profile and cache it
-                    activeProfile = newProfile
-                    cacheProfile(newProfile)
-                    await cacheManager.cacheActiveProfile(newProfile)
-                    
-                    // Cache the new profile in the profiles list
-                    await cacheManager.cacheProfiles([newProfile])
-                    
-                    // Cache auth state with token
-                    if let token = KeychainManager.shared.getAccessToken() {
-                        cacheManager.cacheAuthState(isAuthenticated: true, token: token)
-                    }
-                    
-                    // Update session state
-                    let biometricLockEnabled = UserDefaults.standard.bool(forKey: "biometricLockEnabled")
-                    sessionState = biometricLockEnabled ? .locked : .authenticated
-                    
-                    // Notify other parts of the app
-                    NotificationCenter.default.post(
-                        name: .profileDidChange,
-                        object: nil,
-                        userInfo: ["profile": newProfile]
-                    )
-                    
-                    return
-                } catch {
-                    print("🔴 SessionCoordinator: Failed to create default profile: \(error)")
-                    // Fall back to needsProfile state if automatic creation fails
-                    sessionState = .needsProfile
-                    return
-                }
+                // Don't auto-create profile - let user choose their profile name
+                sessionState = .needsProfile
+                return
             }
             
             // Find and cache active profile
@@ -708,7 +661,7 @@ final class SessionCoordinator: ObservableObject {
             return
         }
         
-        print("🔐 SessionCoordinator: No active profile found, creating default profile")
+        print("🔐 SessionCoordinator: No active profile found")
         
         do {
             // First, check if user has any profiles at all
@@ -719,40 +672,13 @@ final class SessionCoordinator: ObservableObject {
                 print("🔐 SessionCoordinator: Found existing profiles, activating first profile")
                 try await switchProfile(firstProfile)
             } else {
-                // No profiles exist - create a default one
-                print("🔐 SessionCoordinator: No profiles exist, creating new default profile")
+                // No profiles exist - set state to needsProfile for new users
+                print("🔐 SessionCoordinator: No profiles exist, user needs to create a profile")
                 
-                let newProfile = try await profileAPI.createProfile(
-                    name: "Main"
-                )
+                // Set session state to needsProfile
+                sessionState = .needsProfile
                 
-                print("🔐 SessionCoordinator: Default profile created successfully - ID: \(newProfile.id)")
-                
-                // If it's a development wallet, store the clientShare locally
-                if let clientShare = newProfile.clientShare {
-                    try? KeychainManager.shared.saveDevelopmentClientShare(
-                        clientShare: clientShare,
-                        profileId: newProfile.id
-                    )
-                }
-                
-                // Set as active profile and cache it
-                activeProfile = newProfile
-                cacheProfile(newProfile)
-                await cacheManager.cacheActiveProfile(newProfile)
-                
-                // Cache the new profile in the profiles list
-                await cacheManager.cacheProfiles([newProfile])
-                
-                // Update session state
-                sessionState = .authenticated
-                
-                // Notify other parts of the app
-                NotificationCenter.default.post(
-                    name: .profileDidChange,
-                    object: nil,
-                    userInfo: ["profile": newProfile]
-                )
+                // Don't auto-create profile - let user do it through profile creation UI
             }
         } catch {
             print("🔴 SessionCoordinator: Failed to ensure active profile: \(error)")
@@ -1020,6 +946,7 @@ enum SessionError: LocalizedError {
 // MARK: - Notification Names
 
 extension Notification.Name {
+    static let clearWalletConnections = Notification.Name("clearWalletConnections")
     static let profileDidChange = Notification.Name("profileDidChange")
     static let profileDidDelete = Notification.Name("profileDidDelete")
     static let sessionDidEnd = Notification.Name("sessionDidEnd")

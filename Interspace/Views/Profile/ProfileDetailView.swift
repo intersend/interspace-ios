@@ -6,6 +6,7 @@ struct ProfileDetailView: View {
     @Binding var isAddressHidden: Bool
     private let viewModel = ProfileViewModel.shared
     @State private var showDeleteConfirmation = false
+    @State private var deletedProfileId: String?
     
     var body: some View {
         StandardTray(
@@ -138,29 +139,31 @@ struct ProfileDetailView: View {
                 Text("Are you sure you want to delete this profile? This action cannot be undone.")
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .profileDidDelete)) { notification in
+            // Check if this was the profile we deleted
+            if let profileId = notification.userInfo?["profileId"] as? String,
+               profileId == deletedProfileId {
+                // Profile deletion is complete, dismiss the view
+                dismiss()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sessionDidEnd)) { _ in
+            // If session ends (last profile was deleted), dismiss
+            dismiss()
+        }
     }
     
     // MARK: - Helper Methods
     
     private func handleProfileDeletion(_ profile: SmartProfile) async {
-        // Check if this is the last profile
-        let isLastProfile = viewModel.profiles.count <= 1
+        // Store the profile ID we're deleting
+        deletedProfileId = profile.id
         
         // Delete the profile
         await viewModel.deleteProfile(profile)
         
-        // If it was the last profile, the session coordinator will handle sign out
-        // Otherwise, it should have switched to another profile
-        if !isLastProfile {
-            // Add a small delay to ensure the profile switch completes smoothly
-            // This prevents UI glitches from dismissing the sheet too early
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            
-            // Dismiss the sheet after successful deletion and profile switch
-            dismiss()
-        }
-        // If it's the last profile, SessionCoordinator will handle the sign out
-        // and navigation back to auth screen
+        // Don't dismiss here - wait for the notification that deletion is complete
+        // The notification handler will dismiss after profile switching or sign out completes
     }
 }
 
