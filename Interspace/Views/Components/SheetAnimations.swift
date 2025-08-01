@@ -67,7 +67,7 @@ struct AnimatedButtonStyle: ButtonStyle {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
             .onChange(of: configuration.isPressed) { pressed in
                 if pressed {
-                    HapticManager.shared.impact(style: .light)
+                    HapticManager.impact(.light)
                 }
             }
     }
@@ -144,7 +144,7 @@ struct ExpandableCard<Content: View>: View {
             Button {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     isExpanded.toggle()
-                    HapticManager.shared.impact(style: .light)
+                    HapticManager.impact(.light)
                 }
             } label: {
                 HStack {
@@ -238,7 +238,7 @@ struct FocusTransitionModifier: ViewModifier {
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isFocused)
             .onChange(of: isFocused) { newValue in
                 if newValue {
-                    HapticManager.shared.impact(style: .light)
+                    HapticManager.impact(.light)
                 }
                 onFocusChange(newValue)
             }
@@ -288,7 +288,7 @@ struct SuccessAnimationView: View {
         .onAppear {
             showCircle = true
             showCheckmark = true
-            HapticManager.shared.notification(type: .success)
+            HapticManager.notification(.success)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 onComplete()

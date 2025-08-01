@@ -249,7 +249,7 @@ struct LiquidGlassSheet<Content: View>: View {
                         content
                             .padding(.bottom, 34) // Safe area
                     }
-                    .modifier(LiquidGlassMaterial(intensity: 0.95))
+                    .modifier(LiquidGlassMaterial(intensity: .thick, tintColor: nil, shadowRadius: 10))
                     .clipShape(
                         RoundedRectangle(cornerRadius: 30, style: .continuous)
                             .offset(y: 30)
@@ -266,7 +266,7 @@ struct LiquidGlassSheet<Content: View>: View {
 
 // MARK: - Extensions
 extension View {
-    func liquidGlass(intensity: Double = 0.8, tint: Color = .clear) -> some View {
-        self.modifier(LiquidGlassMaterial(intensity: intensity, tint: tint))
+    func liquidGlassMaterial(intensity: LiquidGlassMaterial.MaterialIntensity = .regular, tintColor: Color? = nil, shadowRadius: CGFloat = 8) -> some View {
+        self.modifier(LiquidGlassMaterial(intensity: intensity, tintColor: tintColor, shadowRadius: shadowRadius))
     }
 }

@@ -34,3 +34,8 @@ extension Color {
     // Accent color
     static let accent = Color.accentColor
 }
+
+// MARK: - Notification Names
+extension Notification.Name {
+    static let appIconTapped = Notification.Name("appIconTapped")
+}

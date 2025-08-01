@@ -396,43 +396,6 @@ struct Shadow {
     }
 }
 
-
-// MARK: - Haptic Feedback Helper
-struct HapticManager {
-    static let shared = HapticManager()
-    
-    func impact(style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
-        guard !UIAccessibility.isReduceMotionEnabled else { return }
-        let impactFeedback = UIImpactFeedbackGenerator(style: style)
-        impactFeedback.impactOccurred()
-    }
-    
-    func notification(type: UINotificationFeedbackGenerator.FeedbackType) {
-        guard !UIAccessibility.isReduceMotionEnabled else { return }
-        let notificationFeedback = UINotificationFeedbackGenerator()
-        notificationFeedback.notificationOccurred(type)
-    }
-    
-    func selection() {
-        guard !UIAccessibility.isReduceMotionEnabled else { return }
-        let selectionFeedback = UISelectionFeedbackGenerator()
-        selectionFeedback.selectionChanged()
-    }
-    
-    // Keep static methods for backwards compatibility
-    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
-        shared.impact(style: style)
-    }
-    
-    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        shared.notification(type: type)
-    }
-    
-    static func selection() {
-        shared.selection()
-    }
-}
-
 // MARK: - Liquid Glass Extensions
 extension View {
     func liquidGlassButton(variant: LiquidGlassButtonVariant, size: LiquidGlassButtonSize) -> some View {
