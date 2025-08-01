@@ -23,38 +23,32 @@ struct AppStoreView: View {
     @State private var isCategorySwitching = false
     // REMOVED: categoryCache was causing stale data issues
     @State private var preloadTask: Task<Void, Never>?
-    
     @FocusState private var isSearchFocused: Bool
     
     var body: some View {
-        ZStack {
-            // Background
-            Color.black.ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Custom header with search
-                customHeader
+        NavigationStack {
+            ZStack {
+                // Background
+                Color.black.ignoresSafeArea()
                 
                 if isLoading && categories.isEmpty {
                     // Initial loading state
-                    Spacer()
                     AppStoreLoadingView()
-                    Spacer()
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
                             if searchText.isEmpty {
-                                // Categories
-                                if !categories.isEmpty {
-                                    categoriesSection
-                                        .padding(.top, 20)
-                                        .padding(.bottom, 20)
-                                }
-                                
-                                // Featured Section
+                                // Featured Section (moved to top)
                                 if !featuredApps.isEmpty {
                                     featuredSection
+                                        .padding(.top, 20)
                                         .padding(.bottom, 30)
+                                }
+                                
+                                // Categories (moved below featured)
+                                if !categories.isEmpty {
+                                    categoriesSection
+                                        .padding(.bottom, 20)
                                 }
                                 
                                 // Apps List with smooth transition
@@ -79,8 +73,46 @@ struct AppStoreView: View {
                     }
                 }
             }
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("")
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "App, Link, ...")
+            .onChange(of: searchText) { _ in
+                // Cancel previous search
+                searchTask?.cancel()
+                
+                if searchText.isEmpty {
+                    categoryApps = []
+                } else {
+                    // Debounced search
+                    searchTask = Task {
+                        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                        if !Task.isCancelled && !searchText.isEmpty {
+                            await searchApps()
+                        }
+                    }
+                }
+            }
+            .onSubmit(of: .search) {
+                Task {
+                    await searchApps()
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        if let onDismiss = onDismiss {
+                            onDismiss()
+                        } else {
+                            dismiss()
+                        }
+                    }) {
+                        Text("Cancel")
+                            .font(.system(size: 17))
+                            .foregroundColor(Color(red: 0.0, green: 0.478, blue: 1.0))
+                    }
+                }
+            }
         }
-        .ignoresSafeArea(.all, edges: .top)
         .preferredColorScheme(.dark)
         .alert("Error", isPresented: $showError) {
             Button("OK") { }
@@ -108,81 +140,6 @@ struct AppStoreView: View {
     }
     
     // MARK: - View Components
-    
-    private var customHeader: some View {
-        VStack(spacing: 0) {
-            // Add safe area top padding
-            Color.clear
-                .frame(height: 0)
-                .padding(.top)
-            
-            HStack(spacing: 12) {
-                // Full-width search field
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(Color(UIColor.systemGray2))
-                        .font(.system(size: 16))
-                    
-                    TextField("App, Link, ...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .foregroundColor(.white)
-                        .autocorrectionDisabled()
-                        .focused($isSearchFocused)
-                        .submitLabel(.search)
-                        .onSubmit {
-                            Task {
-                                await searchApps()
-                            }
-                        }
-                        .onChange(of: searchText) { _ in
-                            // Cancel previous search
-                            searchTask?.cancel()
-                            
-                            // Debounced search
-                            searchTask = Task {
-                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-                                if !Task.isCancelled && !searchText.isEmpty {
-                                    await searchApps()
-                                }
-                            }
-                        }
-                    
-                    if !searchText.isEmpty {
-                        Button(action: {
-                            searchText = ""
-                            isSearchFocused = false
-                            categoryApps = []
-                            searchTask?.cancel()
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(Color(UIColor.systemGray2))
-                                .font(.system(size: 16))
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color(UIColor.systemGray6).opacity(0.12))
-                .cornerRadius(10)
-                
-                // Close button
-                Button(action: { 
-                    if let onDismiss = onDismiss {
-                        onDismiss()
-                    } else {
-                        dismiss()
-                    }
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(Color(UIColor.systemGray2))
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(Color.black.opacity(0.001))
-        }
-    }
     
     private var featuredSection: some View {
         ScrollView(.horizontal, showsIndicators: false) {
