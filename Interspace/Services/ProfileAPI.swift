@@ -75,11 +75,11 @@ final class ProfileAPI {
     }
     
     /// DELETE /profiles/:profileId
-    func deleteProfile(profileId: String) async throws -> DeleteResponse {
+    func deleteProfile(profileId: String) async throws -> ProfileDeleteResponse {
         return try await apiService.performRequest(
             endpoint: "/profiles/\(profileId)",
             method: .DELETE,
-            responseType: DeleteResponse.self
+            responseType: ProfileDeleteResponse.self
         )
     }
     
@@ -137,7 +137,7 @@ final class ProfileAPI {
     
     /// POST /profiles/:profileId/apps/reorder
     func reorderApps(profileId: String, appIds: [String], folderId: String?) async throws -> ReorderResponse {
-        let request = ReorderAppsRequest(appIds: appIds, folderId: folderId)
+        let request = ReorderAppsRequest(profileId: profileId, appIds: appIds, folderId: folderId)
         return try await apiService.performRequest(
             endpoint: "/profiles/\(profileId)/apps/reorder",
             method: .POST,
@@ -255,7 +255,7 @@ final class ProfileAPI {
     
     /// POST /profiles/:profileId/folders/reorder
     func reorderFolders(profileId: String, folderIds: [String]) async throws -> ReorderResponse {
-        let request = ReorderFoldersRequest(folderIds: folderIds)
+        let request = ReorderFoldersRequest(profileId: profileId, folderOrders: folderIds)
         return try await apiService.performRequest(
             endpoint: "/profiles/\(profileId)/folders/reorder",
             method: .POST,
@@ -371,6 +371,13 @@ struct ActivateProfileResponse: Codable {
 struct DeleteResponse: Codable {
     let success: Bool
     let message: String
+}
+
+struct ProfileDeleteResponse: Codable {
+    let success: Bool
+    let isLastProfile: Bool
+    let activeProfile: SmartProfile?
+    let remainingProfiles: [SmartProfile]
 }
 
 struct ReorderResponse: Codable {

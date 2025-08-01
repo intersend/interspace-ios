@@ -304,36 +304,23 @@ class ProfileViewModel: ObservableObject {
         isLoading = true
         
         do {
-            // Check if this is the last profile before deletion
-            let isLastProfile = profiles.count <= 1
             let wasActive = profile.isActive
             
-            // Store other profiles for switching
-            let remainingProfiles = profiles.filter { $0.id != profile.id }
+            // Delete the profile and get response with backend-determined state
+            let response = try await profileAPI.deleteProfile(profileId: profile.id)
             
-            // If deleting active profile, prepare the next profile BEFORE deletion
-            var nextProfile: SmartProfile? = nil
-            if wasActive && !remainingProfiles.isEmpty {
-                // Find the most recently used profile based on updatedAt timestamp
-                nextProfile = remainingProfiles
-                    .sorted { profile1, profile2 in
-                        let dateFormatter = ISO8601DateFormatter()
-                        if let date1 = dateFormatter.date(from: profile1.updatedAt),
-                           let date2 = dateFormatter.date(from: profile2.updatedAt) {
-                            return date1 > date2
-                        }
-                        return profile1.updatedAt > profile2.updatedAt
-                    }
-                    .first ?? remainingProfiles.first!
-                print("🔄 ProfileViewModel: Pre-selected next profile: \(nextProfile?.name ?? "none")")
+            // Use backend response data instead of local calculations
+            let isLastProfile = response.isLastProfile
+            let remainingProfiles = response.remainingProfiles
+            let nextProfile = response.activeProfile
+            
+            if wasActive && nextProfile != nil {
+                print("🔄 ProfileViewModel: Backend selected next profile: \(nextProfile?.name ?? "none")")
             }
             
-            // Delete the profile
-            let _ = try await profileAPI.deleteProfile(profileId: profile.id)
-            
             await MainActor.run {
-                // Remove from local profiles array
-                self.profiles.removeAll { $0.id == profile.id }
+                // Update profiles array with backend response
+                self.profiles = remainingProfiles
                 
                 // If we deleted the active profile, DON'T clear it yet if we have a next profile
                 if self.activeProfile?.id == profile.id {
@@ -362,10 +349,17 @@ class ProfileViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
             
             // Post notification for profile deletion after cache is updated
+            var userInfo: [String: Any] = [
+                "profileId": profile.id,
+                "remainingProfiles": remainingProfiles
+            ]
+            if let activeProfile = nextProfile {
+                userInfo["activeProfile"] = activeProfile
+            }
             NotificationCenter.default.post(
                 name: .profileDidDelete,
                 object: nil,
-                userInfo: ["profileId": profile.id, "remainingProfiles": remainingProfiles]
+                userInfo: userInfo
             )
             
             // Handle post-deletion logic
@@ -468,7 +462,8 @@ class ProfileViewModel: ObservableObject {
                 isPrimary: linkedAccounts.isEmpty, // First account becomes primary
                 signature: nil,
                 message: nil,
-                chainId: nil
+                chainId: nil,
+                metadata: nil,
             )
             
             let newAccount = try await profileAPI.linkAccount(profileId: activeProfile.id, request: request)
@@ -560,7 +555,8 @@ class ProfileViewModel: ObservableObject {
                 isPrimary: linkedAccounts.isEmpty, // First account becomes primary
                 signature: signature,
                 message: message,
-                chainId: nil
+                chainId: nil,
+                metadata: nil,
             )
             
             let newAccount = try await profileAPI.linkAccount(profileId: activeProfile.id, request: request)

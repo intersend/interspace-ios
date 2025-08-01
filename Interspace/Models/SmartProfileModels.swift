@@ -254,8 +254,15 @@ struct UpdateAppRequest: Codable {
 // MARK: - App Reorder Request
 
 struct ReorderAppsRequest: Codable {
+    let profileId: String
     let appIds: [String]
     let folderId: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case profileId = "profileId"
+        case appIds = "appIds"
+        case folderId = "folderId"
+    }
 }
 
 // MARK: - Move App Request
@@ -314,7 +321,13 @@ struct UpdateFolderRequest: Codable {
 // MARK: - Reorder Folders Request
 
 struct ReorderFoldersRequest: Codable {
-    let folderIds: [String]
+    let profileId: String
+    let folderOrders: [String]
+    
+    enum CodingKeys: String, CodingKey {
+        case profileId = "profileId"
+        case folderOrders = "folderOrders"
+    }
 }
 
 // MARK: - Folders Response
