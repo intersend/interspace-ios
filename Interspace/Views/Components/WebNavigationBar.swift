@@ -1,8 +1,9 @@
 import SwiftUI
 
 // MARK: - Web Navigation Bar
+@available(iOS 15.0, *)
 struct WebNavigationBar: View {
-    @ObservedObject var webPage: WebPage
+    @ObservedObject var webPage: Interspace.WebPage  // Custom WebPage model
     let app: BookmarkedApp
     @Binding var searchText: String
     @Binding var isSearchFieldFocused: Bool
