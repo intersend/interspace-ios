@@ -59,7 +59,7 @@ struct AddTrayRow: View {
 
 // MARK: - Wallet Selection View
 struct WalletSelectionView: View {
-    let wallets: [WalletType] = [.metamask, .coinbase, .walletConnect]
+    let wallets: [WalletType] = [.metamask, .coinbase]
     let onSelect: (WalletType) -> Void
     @Environment(\.dismiss) private var dismiss
     

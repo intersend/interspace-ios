@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 // MARK: - Safari Navigation Bar
+@available(iOS 15.0, *)
 struct SafariNavigationBar: View {
     @ObservedObject var webPage: WebPage
     @Binding var searchText: String
@@ -16,13 +17,10 @@ struct SafariNavigationBar: View {
     
     private var displayText: String {
         if let url = webPage.url {
-            // Show page title if available, otherwise show domain
-            if !webPage.title.isEmpty && webPage.title != url.absoluteString {
-                return webPage.title
-            }
+            // Show domain for cleaner look
             return url.host ?? url.absoluteString
         }
-        return searchText.isEmpty ? "Search or enter website name" : searchText
+        return "Search or enter website name"
     }
     
     private var isSecure: Bool {
@@ -30,145 +28,93 @@ struct SafariNavigationBar: View {
     }
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Back Button
-            SafariButton(
-                icon: "chevron.left",
-                isEnabled: webPage.canGoBack,
-                action: { webPage.goBack() }
-            )
-            .frame(width: 44)
+        // Simplified layout matching iOS Safari
+        HStack(spacing: 16) {
+            // Back/Forward buttons group
+            HStack(spacing: 20) {
+                SafariButton(
+                    icon: "chevron.left",
+                    isEnabled: webPage.canGoBack,
+                    action: { webPage.goBack() }
+                )
+                
+                SafariButton(
+                    icon: "chevron.right",
+                    isEnabled: webPage.canGoForward,
+                    action: { webPage.goForward() }
+                )
+            }
             
-            // Forward Button
-            SafariButton(
-                icon: "chevron.right",
-                isEnabled: webPage.canGoForward,
-                action: { webPage.goForward() }
-            )
-            .frame(width: 44)
-            
-            Spacer(minLength: 12)
-            
-            // URL/Search Field
+            // Compact URL Field
             Button(action: {
                 HapticManager.impact(.light)
-                searchText = webPage.url?.absoluteString ?? ""
                 onShowSearch()
             }) {
                 HStack(spacing: 6) {
-                    if webPage.isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: Color.white.opacity(0.6)))
-                            .scaleEffect(0.7)
-                            .frame(width: 14, height: 14)
-                    } else if isSecure {
+                    if isSecure {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.5))
                     }
                     
                     Text(displayText)
-                        .font(.system(size: 15, weight: .regular))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     
-                    if webPage.isLoading {
-                        Spacer(minLength: 14)
-                    }
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.5))
+                        .opacity(webPage.isLoading ? 1 : 0)
+                        .rotationEffect(.degrees(webPage.isLoading ? 360 : 0))
+                        .animation(webPage.isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: webPage.isLoading)
                 }
+                .padding(.horizontal, 14)
+                .frame(height: 32)
                 .frame(maxWidth: .infinity)
-                .frame(height: 36)
                 .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.white.opacity(0.1))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.05), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white.opacity(0.15))
                 )
             }
             .scaleEffect(urlFieldScale)
             .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
                 withAnimation(.spring(response: 0.15, dampingFraction: 0.9)) {
-                    urlFieldScale = pressing ? 0.98 : 1.0
+                    urlFieldScale = pressing ? 0.96 : 1.0
                 }
             }, perform: {})
             
-            Spacer(minLength: 12)
-            
-            // Share Button
-            SafariButton(
-                icon: "square.and.arrow.up",
-                isEnabled: webPage.url != nil,
-                action: onShare
-            )
-            .frame(width: 44)
-            
-            // Menu Button
-            Menu {
-                Button(action: onAddApp) {
-                    Label("Add to Apps", systemImage: "plus.square.on.square")
-                }
+            // Action buttons group
+            HStack(spacing: 20) {
+                // Share Button
+                SafariButton(
+                    icon: "square.and.arrow.up",
+                    isEnabled: webPage.url != nil,
+                    action: onShare
+                )
                 
-                if let onAddToProfile = onAddToProfile {
-                    Button(action: onAddToProfile) {
-                        Label("Add to Profile...", systemImage: "person.crop.circle.badge.plus")
-                    }
-                }
+                // Quick Add Button
+                SafariButton(
+                    icon: "plus.app",
+                    isEnabled: webPage.url != nil,
+                    action: onAddApp
+                )
                 
-                Button(action: {
-                    if let url = webPage.url {
-                        UIPasteboard.general.string = url.absoluteString
-                        HapticManager.notification(.success)
-                    }
-                }) {
-                    Label("Copy Link", systemImage: "doc.on.doc")
+                // Tab Grid Button
+                Button(action: onDismiss) {
+                    Image(systemName: "square.on.square")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundColor(.white)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
-                
-                Button(action: {
-                    if let url = webPage.url {
-                        UIApplication.shared.open(url)
-                    }
-                }) {
-                    Label("Open in Safari", systemImage: "safari")
-                }
-                
-                Divider()
-                
-                Button(action: {
-                    webPage.reload()
-                }) {
-                    Label("Reload", systemImage: "arrow.clockwise")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 20, weight: .regular))
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                .buttonStyle(SafariButtonStyle())
             }
-            .buttonStyle(SafariButtonStyle())
-            
-            // Tab Switcher Button
-            Button(action: onDismiss) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .stroke(Color.white.opacity(0.4), lineWidth: 1.5)
-                        .frame(width: 16, height: 16)
-                    
-                    Text("1")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.9))
-                }
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(SafariButtonStyle())
         }
         .padding(.horizontal, 16)
         .frame(height: 44)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
         .background(
             SafariNavigationBackground()
         )
@@ -191,9 +137,9 @@ struct SafariButton: View {
             }
         }) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .regular))
+                .font(.system(size: 18, weight: .regular))
                 .foregroundColor(isEnabled ? .white : Color.white.opacity(0.3))
-                .frame(width: 44, height: 44)
+                .frame(width: 24, height: 24)
                 .contentShape(Rectangle())
         }
         .disabled(!isEnabled)
@@ -215,29 +161,21 @@ struct SafariButtonStyle: ButtonStyle {
 struct SafariNavigationBackground: View {
     var body: some View {
         ZStack {
-            // Base blur layer
-            SafariVisualEffectView(material: .systemChromeMaterial, blurStyle: .systemChromeMaterialDark)
+            // Minimal blur effect
+            SafariVisualEffectView(material: .systemUltraThinMaterial, blurStyle: .systemUltraThinMaterialDark)
             
-            // Additional tint overlay
-            Color.black.opacity(0.2)
-            
-            // Subtle inner glow
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.1),
-                            Color.white.opacity(0.05)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 0.5
-                )
+            // Very subtle tint
+            Color.black.opacity(0.1)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
-        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+        .overlay(
+            // Top border only
+            VStack(spacing: 0) {
+                Color.white.opacity(0.1)
+                    .frame(height: 0.5)
+                Spacer()
+            }
+        )
+        .ignoresSafeArea(edges: .bottom)
     }
 }
 
@@ -264,154 +202,215 @@ struct SafariSearchOverlay: View {
     let onSelectURL: (String) -> Void
     
     @State private var recentSearches: [String] = [
-        "apple.com",
-        "github.com",
-        "interspace.fi"
+        "uniswap.org",
+        "ethereum.org",
+        "opensea.io"
     ]
+    
+    @State private var overlayOpacity: Double = 0
+    @State private var contentOffset: CGFloat = 50
     
     @FocusState private var isSearchFocused: Bool
     
     var body: some View {
         ZStack {
-            // Backdrop
-            Color.black.opacity(0.5)
+            // Full screen blur backdrop
+            SafariVisualEffectView(material: .systemUltraThinMaterial, blurStyle: .systemUltraThinMaterialDark)
                 .ignoresSafeArea()
+                .opacity(overlayOpacity)
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        isVisible = false
-                    }
+                    dismissSearch()
                 }
             
             VStack(spacing: 0) {
-                // Search Field Container
-                VStack(spacing: 16) {
-                    // Search Field
+                // Compact Search Container
+                VStack(spacing: 0) {
+                    // Search Bar
                     HStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 17))
-                            .foregroundColor(Color.white.opacity(0.5))
-                        
-                        TextField("Search or enter website name", text: $searchText)
-                            .font(.system(size: 17))
-                            .foregroundColor(.white)
-                            .focused($isSearchFocused)
-                            .onSubmit {
-                                if !searchText.isEmpty {
-                                    onSelectURL(searchText)
+                        // Search Field
+                        HStack(spacing: 10) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color.white.opacity(0.5))
+                            
+                            TextField("Search or enter website name", text: $searchText)
+                                .font(.system(size: 16))
+                                .foregroundColor(.white)
+                                .focused($isSearchFocused)
+                                .submitLabel(.go)
+                                .onSubmit {
+                                    if !searchText.isEmpty {
+                                        onSelectURL(searchText)
+                                    }
+                                }
+                            
+                            if !searchText.isEmpty {
+                                Button(action: {
+                                    searchText = ""
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(Color.white.opacity(0.4))
                                 }
                             }
-                        
-                        if !searchText.isEmpty {
-                            Button(action: {
-                                searchText = ""
-                            }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 17))
-                                    .foregroundColor(Color.white.opacity(0.3))
-                            }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color.white.opacity(0.15))
+                        )
                         
+                        // Cancel Button
                         Button("Cancel") {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                isVisible = false
-                            }
+                            dismissSearch()
                         }
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundColor(.white)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.1))
-                    )
+                    .padding(.top, 60)
+                    .padding(.bottom, 20)
                     
-                    // Suggestions
-                    VStack(alignment: .leading, spacing: 0) {
-                        if searchText.isEmpty {
-                            Text("Recent")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(Color.white.opacity(0.5))
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 8)
-                            
-                            ForEach(recentSearches, id: \.self) { search in
-                                Button(action: {
-                                    onSelectURL(search)
-                                }) {
-                                    HStack {
-                                        Image(systemName: "clock.arrow.circlepath")
-                                            .font(.system(size: 16))
-                                            .foregroundColor(Color.white.opacity(0.3))
-                                        
-                                        Text(search)
-                                            .font(.system(size: 16))
-                                            .foregroundColor(.white)
-                                        
-                                        Spacer()
+                    // Suggestions List
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            if searchText.isEmpty {
+                                // Recent searches
+                                HStack {
+                                    Text("Recent Searches")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(Color.white.opacity(0.5))
+                                        .textCase(.uppercase)
+                                    
+                                    Spacer()
+                                    
+                                    Button("Clear") {
+                                        recentSearches.removeAll()
                                     }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .background(Color.white.opacity(0.05))
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color.white.opacity(0.5))
                                 }
-                            }
-                        } else {
-                            // Search suggestions based on input
-                            ForEach(searchSuggestions, id: \.self) { suggestion in
-                                Button(action: {
-                                    onSelectURL(suggestion)
-                                }) {
-                                    HStack {
-                                        Image(systemName: "magnifyingglass")
-                                            .font(.system(size: 16))
-                                            .foregroundColor(Color.white.opacity(0.3))
-                                        
-                                        Text(suggestion)
-                                            .font(.system(size: 16))
-                                            .foregroundColor(.white)
-                                        
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .background(Color.white.opacity(0.05))
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 12)
+                                
+                                ForEach(recentSearches, id: \.self) { search in
+                                    SearchResultRow(
+                                        icon: "clock.arrow.circlepath",
+                                        text: search,
+                                        action: {
+                                            onSelectURL(search)
+                                        }
+                                    )
+                                }
+                            } else {
+                                // Search suggestions
+                                ForEach(searchSuggestions, id: \.self) { suggestion in
+                                    SearchResultRow(
+                                        icon: suggestion.contains("Search") ? "globe" : "magnifyingglass",
+                                        text: suggestion,
+                                        action: {
+                                            onSelectURL(suggestion)
+                                        }
+                                    )
                                 }
                             }
                         }
+                        .padding(.top, 8)
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.1))
-                            .background(
-                                SafariVisualEffectView(material: .systemChromeMaterial, blurStyle: .systemChromeMaterialDark)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            )
-                    )
+                    .frame(maxHeight: 400)
                 }
-                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color.black.opacity(0.3))
+                        .background(
+                            SafariVisualEffectView(material: .systemChromeMaterial, blurStyle: .systemChromeMaterialDark)
+                                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        )
+                )
+                .offset(y: contentOffset)
                 
                 Spacer()
             }
-            .padding(.top, 100)
         }
         .onAppear {
-            isSearchFocused = true
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                overlayOpacity = 1
+                contentOffset = 0
+            }
+            
+            // Focus search field after animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                isSearchFocused = true
+            }
+        }
+    }
+    
+    private func dismissSearch() {
+        isSearchFocused = false
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            overlayOpacity = 0
+            contentOffset = 50
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            isVisible = false
         }
     }
     
     private var searchSuggestions: [String] {
         guard !searchText.isEmpty else { return [] }
         
-        // Basic suggestions
+        // Smart suggestions
+        var suggestions: [String] = []
+        
+        // Check if it's already a URL
         if searchText.contains(".") {
-            return [searchText]
+            suggestions.append(searchText)
         } else {
-            return [
-                "\(searchText).com",
-                "\(searchText).org",
-                "\(searchText).io",
-                "Search Google for '\(searchText)'"
-            ]
+            // Common Web3 domains
+            suggestions.append("\(searchText).com")
+            suggestions.append("\(searchText).app")
+            suggestions.append("\(searchText).xyz")
         }
+        
+        // Always add search option
+        suggestions.append("Search for '\(searchText)'")
+        
+        return suggestions
+    }
+}
+
+// MARK: - Search Result Row
+struct SearchResultRow: View {
+    let icon: String
+    let text: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(Color.white.opacity(0.5))
+                    .frame(width: 24)
+                
+                Text(text)
+                    .font(.system(size: 16))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Image(systemName: "arrow.up.left")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color.white.opacity(0.3))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .background(Color.white.opacity(0.001))
     }
 }
