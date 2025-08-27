@@ -176,4 +176,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">Made with ❤️ by the Interspace Team</p>
-[![Tip in Crypto](https://tip.md/badge.svg)](https://tip.md/ardaerturk)
+<p align="center">
+  <a href="https://tip.md/ardaerturk">
+    <img src="https://tip.md/badge.svg" alt="Tip in Crypto" />
+  </a>
+</p>
